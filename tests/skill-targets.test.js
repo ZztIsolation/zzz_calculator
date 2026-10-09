@@ -187,14 +187,14 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 152)
-assert.equal(rowCount, 312)
+assert.equal(moveCount, 170)
+assert.equal(rowCount, 370)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
-    dashAttack: 9,
-    assistAttack: 19,
-    exSpecial: 17,
+    dashAttack: 14,
+    assistAttack: 22,
+    exSpecial: 20,
     fireSuppression: 3,
-    dodgeCounter: 4,
+    dodgeCounter: 6,
 })
 // Removing Velina C1's incorrect velina-c1-vortex-stun rule removed one skill target.
 const expectedTargetCount = 89

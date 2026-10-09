@@ -34,6 +34,7 @@ const mappedEquipmentEntry = Object.entries(mapping.driveDiscEquipment)
 const [knownEquipmentId, knownEquipment] = mappedEquipmentEntry
 const catalog = {
   displayAgents: [
+    { id: "jane_doe", name: { zhCN: "简·杜" } },
     { id: "hoshimi_miyabi", name: { zhCN: "星见雅" } },
     { id: "aria", name: { zhCN: "爱芮" } },
     { id: "sigrid", name: { zhCN: "希格莉德·德拉叙尔" } },
@@ -127,6 +128,15 @@ assert.deepEqual(
 )
 assert.ok(mapped.warnings.some(warning => /6号位.*未导入/.test(warning)))
 assert.notEqual(enkaDriveDiscId("1302309616", "7038"), enkaDriveDiscId("1300027938", "7038"))
+
+assert.deepEqual(mapping.agents["1261"], { id: "jane_doe", name: "简" })
+const janeShowcase = mapShowcaseToCatalog(parseEnkaShowcase({ PlayerInfo: {
+  ShowcaseDetail: { AvatarList: [makeAvatar(1261, { TalentLevel: 3 })] },
+} }), catalog, mapping, { uid: "test-jane-uid" })
+assert.equal(janeShowcase.mappedAgents.length, 1)
+assert.equal(janeShowcase.mappedAgents[0].agentId, "jane_doe")
+assert.equal(janeShowcase.skippedAgents.length, 0)
+assert.notEqual(janeShowcase.mappedAgents[0].teammateOnly, true)
 
 assert.deepEqual(mapping.agents["1591"], { id: "sigrid", name: "希格莉德·德拉叙尔" })
 assert.deepEqual(mapping.agents["1331"], { id: "vivian", name: "薇薇安·班希" })

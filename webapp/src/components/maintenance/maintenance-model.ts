@@ -4,7 +4,7 @@ import {
 } from "@core/maintenanceValidation.js"
 import { legacySkillTypeForMove, normalizeSkillTargetsInValue } from "@core/skillTargets.js"
 import { normalizeLegacyEffectAppliesToInValue } from "@core/effectRuleTargets.js"
-import { migrateLegacyBloodMarrowWEngine } from "@core/effectFormula.js"
+import { isAllowedInCombatFormulaOutput, migrateLegacyBloodMarrowWEngine } from "@core/effectFormula.js"
 import { isReleaseSettlement, isVelinaReleaseAgent, normalizeAnomalyReleaseEventForAgent } from "@core/anomalyRelease.js"
 
 export type ResourceValue =
@@ -325,9 +325,11 @@ function normalizeEffectRule(rule: any) {
     rule.formula ??= { expression: "", valueUnit: "storedValue" }
     if (rule.source.kind === "inCombatStat") {
       rule.scope = "inCombat"
-      rule.stat = "dmgBonus"
-      rule.mode = "flat"
-      rule.target = { kind: "default" }
+      if (!isAllowedInCombatFormulaOutput(rule)) {
+        rule.stat = "dmgBonus"
+        rule.mode = "flat"
+        rule.target = { kind: "default" }
+      }
       rule.source.variable = "x"
       rule.source.unit ??= ["critRate", "critDmg", "energyRegen", "penRatio"].includes(rule.source.stat)
         ? "storedPercent"

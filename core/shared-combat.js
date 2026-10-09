@@ -1424,12 +1424,17 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
         }
         if (isInCombatFormulaRule(rule)) {
             const sourceLabel = localizedText(source.label) || source.stat || "局内面板属性"
+            const compactSummary = source.stat === "anomalyProficiency"
+                && ["atkFlat", "anomalyCritRate"].includes(rule.stat)
+            const summaryLabel = `${storedRuleStatLabel(rule, meta)}按${sourceLabel}提升：`
             const parameters = formulaParameterValues(rule)
             const threshold = Number(parameters.threshold)
             const rate = Number(parameters.rate)
             const cap = Number(parameters.cap)
             let text
-            if (rule.stat === "dmgBonus" && source.stat === "critRate"
+            if (compactSummary) {
+                text = `${summaryLabel}待计算`
+            } else if (rule.stat === "dmgBonus" && source.stat === "critRate"
                 && Number.isFinite(threshold) && Number.isFinite(rate)) {
                 text = `局内暴击率超过${threshold}%时，每超出1%暴击率使造成的伤害提升${rate}%，${Number.isFinite(cap) ? `上限${cap}%` : "不设上限"}`
             } else {
@@ -1444,14 +1449,20 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
                     const evaluated = evaluateInCombatFormulaRule(rule, panel)
                     if (evaluated) {
                         const displaySourceValue = Number(Number(evaluated.sourceValue ?? 0).toFixed(3))
-                        const displayValue = Number(evaluated.value ?? 0) * coverage * 100
-                        text += `；当前${sourceLabel}${displaySourceValue}${source.unit === "storedPercent" ? "%" : ""}，通用伤害提升${Number(displayValue.toFixed(3))}%`
+                        const displayValue = Number(evaluated.value ?? 0) * coverage
+                            * (rule.formula?.valueUnit === "storedPercent" ? 100 : 1)
+                        const resultLabel = rule.stat === "dmgBonus" ? "通用伤害提升" : `${storedRuleStatLabel(rule, meta)} +`
+                        if (compactSummary) {
+                            text = `${summaryLabel} ${displayValue >= 0 ? "+" : ""}${Number(displayValue.toFixed(3))}${rule.formula?.valueUnit === "storedPercent" ? "%" : ""}`
+                        } else {
+                            text += `；当前${sourceLabel}${displaySourceValue}${source.unit === "storedPercent" ? "%" : ""}，${resultLabel}${Number(displayValue.toFixed(3))}${rule.formula?.valueUnit === "storedPercent" ? "%" : ""}`
+                        }
                     }
                 } catch {
                     // Keep the authored formula text if a live preview cannot evaluate it.
                 }
             }
-            return `${text}${requirementText}${coverageText}`
+            return `${text}${ruleTargetText(rule, meta)}${requirementText}${coverageText}`
         }
         const rawSourceValue = Number(ruleRuntime.sourceValue ?? source.defaultValue ?? 0)
         const sourceValue = Math.max(

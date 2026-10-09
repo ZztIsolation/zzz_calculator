@@ -84,6 +84,7 @@ import {
     evaluateInCombatFormulaRule,
     formulaParameterValues,
     formulaSourceValue,
+    isAllowedInCombatFormulaOutput,
     isAllowedInCombatFormulaSourceStat,
     isAllowedInCombatFormulaSourceType,
     isInCombatFormulaRule,
@@ -2667,8 +2668,7 @@ function resolveDynamicCombatFormula(entry, panel, outOfCombatPanel) {
     if (!isInCombatFormulaRule(rule)
         || !isAllowedInCombatFormulaSourceType(entry?.sourceType)
         || !isAllowedInCombatFormulaSourceStat(rule?.source?.stat)
-        || rule?.stat !== "dmgBonus"
-        || (rule?.target?.kind ?? "default") !== "default") {
+        || !isAllowedInCombatFormulaOutput(rule, entry?.sourceType)) {
         return null
     }
     if (!effectRuleRequirementMatches(rule, {
@@ -2692,8 +2692,8 @@ function resolveDynamicCombatFormula(entry, panel, outOfCombatPanel) {
         id: rule.id ?? rule.stat ?? "formula",
         label: rule.label ?? null,
         type: "formula",
-        stat: "dmgBonus",
-        mode: "flat",
+        stat: canonicalBuffStat(rule.stat ?? "dmgBonus"),
+        mode: rule.mode ?? "flat",
         basis: null,
         target: normalizedRuleTarget(rule),
         coverage,
@@ -2712,54 +2712,78 @@ function resolveDynamicCombatFormula(entry, panel, outOfCombatPanel) {
     })
 }
 
+function dynamicFormulaTargetAppliesTo(rule = {}) {
+    const target = normalizedRuleTarget(rule)
+    if (target.kind === "skill") {
+        return {
+            ...(rule.appliesTo ?? {}),
+            skillTargets: target.skillTargets,
+            ...(target.damageKinds.length ? { damageKinds: target.damageKinds } : {}),
+        }
+    }
+    if (target.kind === "anomaly") {
+        return {
+            ...(rule.appliesTo ?? {}),
+            damageKinds: [target.settlementType === "disorder"
+                ? "disorder"
+                : target.settlementType === "turbulence" ? "turbulence" : "anomaly"],
+            settlementTypes: [target.settlementType],
+            ...(target.anomalyEffects.length ? { anomalyEffects: target.anomalyEffects } : {}),
+            ...(target.anomalyVariants.length ? { anomalyVariants: target.anomalyVariants } : {}),
+        }
+    }
+    return rule.appliesTo ?? null
+}
+
+// The only panel-producing dynamic rule is AP -> ATK. Damage formulas then
+// read that updated panel, while target-specific crit stays in event modifiers.
+function resolveDynamicCombatFormulas(entries, panel, outOfCombatPanel) {
+    if (!entries.length) return []
+    const attack = entries.filter(entry => entry.rule.stat === "atkFlat")
+        .map(entry => ({ entry, resolved: resolveDynamicCombatFormula(entry, panel, outOfCombatPanel) }))
+        .filter(item => item.resolved)
+    const attackBonus = attack.reduce((total, item) => total + item.resolved.value, 0)
+    const withAttack = attackBonus ? new Proxy(panel, {
+        get(target, key) {
+            return key === "atk" ? Number(target.atk ?? 0) + attackBonus : target[key]
+        },
+    }) : panel
+    const rest = entries.filter(entry => entry.rule.stat !== "atkFlat")
+        .map(entry => ({ entry, resolved: resolveDynamicCombatFormula(entry, withAttack, outOfCombatPanel) }))
+        .filter(item => item.resolved)
+    return [...attack, ...rest]
+}
+
 function applyDynamicCombatFormulas(agent, outOfCombat, bonusTotals) {
     const base = calculateCombatPanelFromTotals(agent, outOfCombat, bonusTotals)
-    const entries = Array.isArray(bonusTotals?.dynamicFormulas)
-        ? bonusTotals.dynamicFormulas
-        : []
-    const resolvedEntries = entries
-        .map(entry => ({ entry, resolved: resolveDynamicCombatFormula(entry, base.panel, outOfCombat.panel) }))
-        .filter(item => item.resolved)
-    const dynamicFormulaResults = resolvedEntries.map(item => item.resolved)
-    const dynamicDmgBonus = dynamicFormulaResults.reduce(
-        (total, result) => total + Number(result.value ?? 0),
-        0,
-    )
-    for (const { entry, resolved: result } of resolvedEntries) {
-        const activeEffect = entry?.activeEffect
-        if (!activeEffect) continue
-        activeEffect.resolvedDynamicFormulas ??= []
-        activeEffect.resolvedDynamicFormulas.push(result)
-        activeEffect.resolvedStats ??= []
-        activeEffect.resolvedStats.push({ ...result, value: Number(result.value ?? 0) })
-        activeEffect.stats ??= []
-        activeEffect.stats.push({
-            ...result,
-            value: Number(result.value ?? 0),
-            stat: "dmgBonus",
-            mode: "flat",
-        })
-    }
-    const panel = dynamicDmgBonus === 0
-        ? base.panel
-        : {
-            ...base.panel,
-            dmgBonus: Number(base.panel.dmgBonus ?? 0) + dynamicDmgBonus,
-        }
+    const entries = bonusTotals.dynamicFormulas ?? []
+    const resolvedEntries = resolveDynamicCombatFormulas(entries, base.panel, outOfCombat.panel)
     const effectiveBonusTotals = entries.length
-        ? {
-            ...bonusTotals,
-            dmgBonus: Number(bonusTotals.dmgBonus ?? 0) + dynamicDmgBonus,
-            dynamicDmgBonus,
-        }
+        ? { ...bonusTotals, damageModifiers: [...bonusTotals.damageModifiers] }
         : bonusTotals
-    return {
-        panel,
-        selectedDmgBonus: Number(base.selectedDmgBonus ?? 0) + dynamicDmgBonus,
-        dynamicDmgBonus,
-        dynamicFormulaResults,
-        bonusTotals: effectiveBonusTotals,
+    let dynamicDmgBonus = 0
+    for (const { entry, resolved } of resolvedEntries) {
+        const isEvent = resolved.target.kind !== "default"
+        if (isEvent) {
+            const modifier = { ...resolved, type: "eventModifier", kind: resolved.stat,
+                appliesTo: dynamicFormulaTargetAppliesTo(resolved) }
+            effectiveBonusTotals.damageModifiers.push(modifier)
+            entry.activeEffect?.resolvedDamageModifiers.push(modifier)
+        } else {
+            effectiveBonusTotals[resolved.stat] += resolved.value
+            if (resolved.stat === "dmgBonus") dynamicDmgBonus += resolved.value
+            entry.activeEffect?.resolvedStats.push(resolved)
+            entry.activeEffect?.stats.push(resolved)
+        }
+        entry.activeEffect?.resolvedDynamicFormulas.push(resolved)
     }
+    const calculated = resolvedEntries.length
+        ? calculateCombatPanelFromTotals(agent, outOfCombat, effectiveBonusTotals)
+        : base
+    if (entries.length) effectiveBonusTotals.dynamicDmgBonus = dynamicDmgBonus
+    return { ...calculated, dynamicDmgBonus,
+        dynamicFormulaResults: resolvedEntries.map(item => item.resolved),
+        bonusTotals: effectiveBonusTotals }
 }
 
 function damageTargetPreset(id) {
@@ -6793,7 +6817,7 @@ function denseOutOfCombatStatRequirementMatches(requirement = {}, panelValues = 
 function fillDenseModifierSums(sums, eventModifierEntries = [], activeEntryFlags = [], outOfCombatPanelValues = null) {
     sums.fill(0)
     for (const modifier of eventModifierEntries ?? []) {
-        if (activeEntryFlags[modifier.entryIndex]
+        if ((modifier.entryIndex === null || modifier.entryIndex === undefined || activeEntryFlags[modifier.entryIndex])
             && denseOutOfCombatStatRequirementMatches(modifier.requirement, outOfCombatPanelValues)) {
             sums[modifier.kindIndex] = combineDamageModifierValue(
                 DAMAGE_MODIFIER_SUM_KEYS[modifier.kindIndex], sums[modifier.kindIndex], modifier.value,
@@ -8956,16 +8980,17 @@ export function createInCombatPanelCalculator(catalog, input) {
                 }
                 panelValues[PANEL_KEY_LOOKUP.dmgBonus] = densePanelValue(outPanelValues, "dmgBonus")
                     + denseCombatValue(combatValues, "dmgBonus")
-                const dynamicDmgBonus = dynamicFormulaEntries
-                    .filter(entry => activeEntryFlags[entry.entryIndex])
-                    .map(entry => resolveDynamicCombatFormula(
-                        entry,
-                        densePanelProxy(panelValues),
-                        densePanelProxy(outPanelValues),
-                    ))
-                    .filter(Boolean)
-                    .reduce((total, result) => total + Number(result.value ?? 0), 0)
+                const dynamicFormulaResults = resolveDynamicCombatFormulas(
+                    dynamicFormulaEntries.filter(entry => activeEntryFlags[entry.entryIndex]),
+                    densePanelProxy(panelValues), densePanelProxy(outPanelValues),
+                ).map(item => item.resolved)
+                const dynamicDmgBonus = dynamicFormulaResults
+                    .filter(result => result.stat === "dmgBonus")
+                    .reduce((total, result) => total + result.value, 0)
                 panelValues[PANEL_KEY_LOOKUP.dmgBonus] += dynamicDmgBonus
+                for (const result of dynamicFormulaResults) {
+                    if (result.stat === "atkFlat") panelValues[PANEL_KEY_LOOKUP.atk] += result.value
+                }
                 result.dynamicDmgBonus = dynamicDmgBonus
                 scalarResult.dynamicDmgBonus = dynamicDmgBonus
                 for (const element of DAMAGE_ELEMENTS) {
@@ -8977,7 +9002,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     ? densePanelValue(outPanelValues, "sheerForceFlat") + denseCombatValue(combatValues, "sheerForceFlat")
                     : 0
                 panelValues[PANEL_KEY_LOOKUP.sheerForce] = isRupture
-                    ? Math.max(0, (hp * SHEER_FORCE_HP_RATIO) + (atk * SHEER_FORCE_ATK_RATIO) + panelValues[PANEL_KEY_LOOKUP.sheerForceFlat])
+                    ? Math.max(0, (hp * SHEER_FORCE_HP_RATIO) + (panelValues[PANEL_KEY_LOOKUP.atk] * SHEER_FORCE_ATK_RATIO) + panelValues[PANEL_KEY_LOOKUP.sheerForceFlat])
                     : 0
 
                 if (includePanel) for (const key of OUTPUT_PANEL_KEYS) {
@@ -8985,13 +9010,34 @@ export function createInCombatPanelCalculator(catalog, input) {
                 }
                 result.selectedDmgBonus = densePanelValue(panelValues, "dmgBonus")
                     + densePanelValue(panelValues, selectedAttributeBonusKey)
+                const dynamicEventModifierEntries = dynamicFormulaResults.length ? compiledDamageTarget.events.map(compiledEvent => {
+                    const event = compiledEvent.event ?? compiledEvent
+                    return dynamicFormulaResults
+                        .filter(result => (result.target?.kind ?? "default") !== "default")
+                        .filter(result => damageModifierAppliesToCompiledEvent({
+                            ...result,
+                            kind: canonicalBuffStat(result.stat),
+                            value: Number(result.value ?? 0),
+                            appliesTo: dynamicFormulaTargetAppliesTo(result),
+                        }, event))
+                        .map(result => ({
+                            entryIndex: null,
+                            kindIndex: DAMAGE_MODIFIER_SUM_KEY_LOOKUP[canonicalBuffStat(result.stat)],
+                            value: Number(result.value ?? 0),
+                            requirement: result.requirement ?? null,
+                        }))
+                        .filter(modifier => modifier.kindIndex !== undefined)
+                }) : null
                 result.finalDamage = calculateCompiledDamageScoreValueDense({
                     agent,
                     panelValues,
                     outOfCombatPanelValues: outPanelValues,
                     combatValues,
                     compiledDamageTarget,
-                    eventModifierEntries,
+                    eventModifierEntries: dynamicEventModifierEntries ? eventModifierEntries.map((entries, index) => [
+                        ...entries,
+                        ...(dynamicEventModifierEntries[index] ?? []),
+                    ]) : eventModifierEntries,
                     activeEntryFlags,
                     modifierSums,
                 })

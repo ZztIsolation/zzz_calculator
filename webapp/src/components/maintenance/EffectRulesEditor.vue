@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { NAlert, NButton, NInput, NInputNumber, NRadioButton, NRadioGroup, NSelect, NSwitch } from "naive-ui"
 import { Plus, Trash2 } from "lucide-vue-next"
+import { isAllowedInCombatFormulaOutput } from "@core/effectFormula.js"
 import { createSystemManagedCoverage } from "@core/maintenanceValidation.js"
 import { statLabel } from "@/utils/format"
 import SkillTargetEditor from "./SkillTargetEditor.vue"
@@ -189,7 +190,7 @@ function corePassiveScalingFieldOptions() {
   return [
     option("", "固定值"),
     ...fields.map(field => {
-      return option(field, `核心被动倍率 · ${statLabel(field, props.catalog?.meta)}`)
+      return option(field, `核心被动倍率 · ${({ assaultCritRatePct: "强击基础暴击率%", assaultCritRatePerAnomalyProficiencyPct: "每点精通增加强击暴击率%" } as Record<string, string>)[field] ?? statLabel(field, props.catalog?.meta)}`)
     }),
   ]
 }
@@ -278,9 +279,11 @@ function setFormulaSourceKind(rule: any, value: string) {
       ? String(rule.source.stat)
       : "critRate"
     rule.scope = "inCombat"
-    rule.stat = "dmgBonus"
-    rule.mode = "flat"
-    rule.target = { kind: "default" }
+    if (!isAllowedInCombatFormulaOutput({ ...rule, source: { ...rule.source, kind: "inCombatStat", stat } })) {
+      rule.stat = "dmgBonus"
+      rule.mode = "flat"
+      rule.target = { kind: "default" }
+    }
     rule.source = {
       kind: "inCombatStat",
       stat,
@@ -346,6 +349,18 @@ function setFormulaParameterModificationText(rule: any, name: string, value: str
   emit("change")
 }
 
+function setFormulaParameterSource(rule: any, name: string, field: string | null) {
+  rule.formula.parameterSources ??= {}
+  if (field) {
+    rule.formula.parameterSources[name] = { kind: "corePassiveScaling", field }
+    rule.formula.parameters[name] = Number(props.corePassiveScaling.levels[0][field])
+  } else {
+    delete rule.formula.parameterSources[name]
+    if (!Object.keys(rule.formula.parameterSources).length) delete rule.formula.parameterSources
+  }
+  emit("change")
+}
+
 function setFormulaParameterValue(rule: any, name: string, value: number | null) {
   rule.formula.parameters[name] = Number(value ?? 0)
   emit("change")
@@ -374,6 +389,10 @@ function setFormulaParameterName(rule: any, currentName: string, value: string) 
       ]),
     )
   }
+  if (rule.formula?.parameterSources?.[currentName]) {
+    rule.formula.parameterSources[name] = rule.formula.parameterSources[currentName]
+    delete rule.formula.parameterSources[currentName]
+  }
   const expression = String(rule.formula?.expression ?? "")
   const escapedCurrentName = currentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   rule.formula.expression = expression.replace(new RegExp(`\\b${escapedCurrentName}\\b`, "g"), name)
@@ -394,6 +413,7 @@ function addFormulaParameter(rule: any) {
 }
 
 function removeFormulaParameter(rule: any, name: string) {
+  if (rule.formula?.parameterSources) delete rule.formula.parameterSources[name]
   if (rule.formula?.parameters) delete rule.formula.parameters[name]
   if (rule.formula?.modificationValues) delete rule.formula.modificationValues[name]
   emit("change")
@@ -669,7 +689,8 @@ function setRuleLabel(rule: any, value: string) {
         <label class="maintenance-field maintenance-field-wide"><span>公式</span><NInput v-model:value="rule.formula.expression" :disabled="disabled" placeholder="clamp(floor((x - 15000) / 400) + 10, 10, 40)" @update:value="emit('change')" /></label>
         <template v-for="name in formulaParameterNames(rule)" :key="name">
           <label class="maintenance-field"><span>参数名</span><NInput :value="name" :disabled="disabled" placeholder="threshold" @update:value="setFormulaParameterName(rule, name, String($event))" /></label>
-          <label class="maintenance-field"><span>参数 {{ name }} 默认值</span><NInputNumber :value="rule.formula.parameters[name]" :disabled="disabled" :step="0.01" @update:value="setFormulaParameterValue(rule, name, $event)" /></label>
+          <label v-if="corePassiveScaling?.levels?.length" class="maintenance-field"><span>参数 {{ name }} 数值来源</span><NSelect :value="rule.formula.parameterSources?.[name]?.field ?? null" :options="corePassiveScalingFieldOptions()" :disabled="disabled" @update:value="setFormulaParameterSource(rule, name, $event ? String($event) : null)" /></label>
+          <label class="maintenance-field"><span>参数 {{ name }} 默认值</span><NInputNumber :value="rule.formula.parameters[name]" :disabled="disabled || Boolean(rule.formula.parameterSources?.[name])" :step="0.01" @update:value="setFormulaParameterValue(rule, name, $event)" /></label>
           <label v-if="allowModificationValues" class="maintenance-field"><span>{{ name }} 的 R1/R2/R3/R4/R5</span><NInput :value="formulaParameterModificationText(rule, name)" :disabled="disabled" placeholder="0.48/0.56/0.64/0.72/0.8" @update:value="setFormulaParameterModificationText(rule, name, String($event))" /></label>
           <NButton quaternary type="error" :disabled="disabled" :title="`删除参数 ${name}`" @click="removeFormulaParameter(rule, name)"><template #icon><Trash2 :size="15" /></template>删除参数 {{ name }}</NButton>
         </template>

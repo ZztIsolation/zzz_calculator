@@ -1005,7 +1005,9 @@ function cleanAgentSkillBuff(buff) {
     next.sourceSkillRef = {
         agentSkillId: String(sourceSkillRef.agentSkillId ?? "").trim(),
         categoryId: String(sourceSkillRef.categoryId ?? "").trim(),
-        moveId: String(sourceSkillRef.moveId ?? "").trim(),
+        ...(sourceSkillRef.moveId !== undefined
+            ? { moveId: String(sourceSkillRef.moveId ?? "").trim() }
+            : {}),
         ...(String(sourceSkillRef.rowId ?? "").trim()
             ? { rowId: String(sourceSkillRef.rowId).trim() }
             : {}),

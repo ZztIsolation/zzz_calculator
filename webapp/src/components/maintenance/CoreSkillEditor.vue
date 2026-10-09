@@ -21,6 +21,7 @@ const PARAM_LABELS: Record<string, string> = {
   selectedSkillDmgBonusPct: "指定技能伤害加成%", physicalAnomalyBuildupEfficiencyPct: "物理异常积蓄效率%",
   physicalAnomalyExtraDamageRatioPct: "物理异常额外伤害比例%", disorderMultiplierBonusPerRemainingSecondPct: "每剩余秒紊乱倍率加算%",
   disorderMultiplierBonusCapPct: "紊乱倍率加算上限%", polarizedAssaultBaseAssaultDamagePct: "极性强击基础伤害%",
+  assaultCritRatePct: "强击基础暴击率%", assaultCritRatePerAnomalyProficiencyPct: "每点异常精通增加强击暴击率%",
   swordMeterMax: "剑意上限", ruptureDamage: "命破伤害说明",
 }
 

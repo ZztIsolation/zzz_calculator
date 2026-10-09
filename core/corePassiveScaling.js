@@ -27,22 +27,39 @@ export function corePassiveScalingRow(agent = {}, requestedLevel) {
 }
 
 export function materializeCorePassiveScalingRule(rule = {}, agent = {}, requestedLevel) {
-    const source = rule?.valueSource
-    if (source?.kind !== "corePassiveScaling") {
-        return rule
+    if (rule?.valueSource?.kind !== "corePassiveScaling" && !rule?.formula?.parameterSources) return rule
+    const scaling = corePassiveScalingRow(agent, requestedLevel)
+    let next = rule
+    const valueSource = rule?.valueSource
+    if (valueSource?.kind === "corePassiveScaling") {
+        const field = String(valueSource.field ?? "").trim()
+        const value = Number(scaling?.[field])
+        if (!field || !Number.isFinite(value)) {
+            throw new Error(`Invalid core passive scaling source for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)
+        }
+        next = { ...next, value, displayValue: value }
     }
 
-    const field = String(source.field ?? "").trim()
-    const scaling = corePassiveScalingRow(agent, requestedLevel)
-    const value = Number(scaling?.[field])
-    if (!field || !Number.isFinite(value)) {
-        throw new Error(`Invalid core passive scaling source for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)
+    const parameterSources = rule?.formula?.parameterSources
+    if (!parameterSources || typeof parameterSources !== "object" || Array.isArray(parameterSources)) {
+        return next
     }
-    return {
-        ...rule,
-        value,
-        displayValue: value,
+
+    const parameters = { ...(next.formula?.parameters ?? {}) }
+    let changed = false
+    for (const [name, parameterSource] of Object.entries(parameterSources)) {
+        if (parameterSource?.kind !== "corePassiveScaling") continue
+        const field = String(parameterSource.field ?? "").trim()
+        const value = Number(scaling?.[field])
+        if (!field || !Number.isFinite(value)) {
+            throw new Error(`Invalid core passive parameter scaling source for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)
+        }
+        parameters[name] = value
+        changed = true
     }
+    return changed
+        ? { ...next, formula: { ...(next.formula ?? {}), parameters } }
+        : next
 }
 
 export function materializeCorePassiveScalingEffect(effect, agent = {}, requestedLevel) {

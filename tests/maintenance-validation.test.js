@@ -642,6 +642,14 @@ const validSkillBuffAgent = {
 }
 const skillBuffContext = { agentSkills: [validAgentSkill] }
 assertValid("agents", validSkillBuffAgent, skillBuffContext)
+const categorySkillBuff = clone(validSkillBuffAgent)
+delete categorySkillBuff.combatBuffs.skillBuffs[0].sourceSkillRef.moveId
+assertValid("agents", categorySkillBuff, skillBuffContext)
+for (const moveId of [null, "", "missing_move"]) {
+    const invalid = clone(categorySkillBuff)
+    invalid.combatBuffs.skillBuffs[0].sourceSkillRef.moveId = moveId
+    assertInvalid("agents", invalid, "技能招式不存在", skillBuffContext)
+}
 
 const nonArraySkillBuffs = clone(validSkillBuffAgent)
 nonArraySkillBuffs.combatBuffs.skillBuffs = {}

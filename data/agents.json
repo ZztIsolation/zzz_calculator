@@ -8239,6 +8239,1006 @@
         "atk",
         "anomalyProficiency"
       ]
+    },
+    {
+      "id": "jane_doe",
+      "name": {
+        "zhCN": "简·杜"
+      },
+      "rarity": "S",
+      "attribute": "physical",
+      "damageElement": "physical",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "刑侦特勤组",
+      "images": {
+        "icon": "/assets/agents/jane_doe.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/16/15559334/671b9f8d9227c19355e2eceb9f23ef28_7055750575833971395.png",
+        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "hpBase": 7788,
+        "atkBase": 805,
+        "defBase": 606,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 114,
+        "anomalyMastery": 112,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：洞察"
+          },
+          "description": {
+            "zhCN": "简攻击命中敌人时，使其陷入[啮咬]状态，持续10秒；队伍任意角色对啮咬目标触发强击并施加畏缩时，畏缩持续时间延长5秒。强击基础暴击率随核心初始/A-F为20%/25%/28%/31%/34%/37%/40%，每点简的异常精通额外提升0.10%/0.11%/0.12%/0.13%/0.14%/0.15%/0.16%暴击率；强击暴击伤害为50%。当前计算采用啮咬条件成立的状态快照。"
+          },
+          "effects": [
+            {
+              "id": "jane-flinch-duration",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 5,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "disorder",
+                "anomalyEffects": [
+                  "flinch"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "jane-assault-crit-rate-base",
+              "type": "fixed",
+              "stat": "anomalyCritRate",
+              "value": 20,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "assaultCritRatePct"
+              },
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "jane-assault-crit-rate-from-proficiency",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "anomalyCritRate",
+              "mode": "flat",
+              "allowExtendedPanelFormula": true,
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "source": {
+                "kind": "inCombatStat",
+                "stat": "anomalyProficiency",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "局内异常精通"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "x * rate",
+                "parameters": {
+                  "rate": 0.1
+                },
+                "parameterSources": {
+                  "rate": {
+                    "kind": "corePassiveScaling",
+                    "field": "assaultCritRatePerAnomalyProficiencyPct"
+                  }
+                },
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "jane-assault-crit-dmg",
+              "type": "fixed",
+              "stat": "anomalyCritDmg",
+              "value": 50,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "mechanics": {
+            "bitesDurationSeconds": 10,
+            "flinchDurationBonusSeconds": 5
+          }
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：痛点"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他[异常]角色或同阵营角色时触发：物理异常积蓄效率提升20%；目标已经处于属性异常状态时，额外提升15%。潜能P2-P6使触发强击时的暴击伤害额外提升10%/15%/20%/25%/30%。积蓄效率仍为说明型机制。"
+          },
+          "defaultChecked": true,
+          "effects": [
+            {
+              "id": "jane-potential-assault-crit-dmg",
+              "type": "fixed",
+              "stat": "anomalyCritDmg",
+              "value": 0,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "potentialVisionScaling",
+                "field": "assaultCritDmgPct"
+              },
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "mechanics": {
+            "activation": "otherAnomalyOrSameFaction",
+            "physicalAnomalyBuildupEfficiencyPct": 20,
+            "additionalPhysicalAnomalyBuildupAgainstAnomalyPct": 15
+          }
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "犯罪顾问"
+            },
+            "description": {
+              "zhCN": "萨霍夫跳可使用次数增加一次；狂热状态下物理异常积蓄效率额外提升15%，每点异常精通使自身伤害提升0.1%，最多30%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "jane-c1-damage-from-proficiency",
+                "type": "formula",
+                "scope": "inCombat",
+                "stat": "dmgBonus",
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "source": {
+                  "kind": "inCombatStat",
+                  "stat": "anomalyProficiency",
+                  "unit": "storedValue",
+                  "label": {
+                    "zhCN": "狂热状态下异常精通"
+                  },
+                  "variable": "x"
+                },
+                "formula": {
+                  "expression": "clamp(x * 0.1, 0, 30)",
+                  "valueUnit": "storedPercent"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "近朱者赤"
+            },
+            "description": {
+              "zhCN": "强击目标无视15%防御；强击暴击伤害额外提升50%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "jane-c2-assault-def-ignore",
+                "type": "fixed",
+                "stat": "enemyDefIgnore",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "assault"
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              },
+              {
+                "id": "jane-c2-assault-crit-dmg",
+                "type": "fixed",
+                "stat": "anomalyCritDmg",
+                "value": 50,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "assault"
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "因势利导"
+            },
+            "description": {
+              "zhCN": "触发强击或紊乱后，全队属性异常伤害提升18%，持续15秒；选中本Buff表示条件已满足。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "jane-c4-anomaly-damage",
+                "type": "fixed",
+                "stat": "anomalyDamageBonus",
+                "value": 18,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "「肮脏」技巧"
+            },
+            "description": {
+              "zhCN": "狂热状态下暴击率提升20%、暴击伤害提升40%；强击暴击后追加等同于简1600%异常精通的物理伤害。本追加攻击暂不建模。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": [],
+            "mechanics": {
+              "modeled": false,
+              "extraAssaultDamageAnomalyProficiencyPct": 1600
+            }
+          }
+        ],
+        "skillBuffs": [
+          {
+            "id": "frenzy",
+            "sourceSkillRef": {
+              "agentSkillId": "jane_doe",
+              "categoryId": "basic"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "name": {
+              "zhCN": "狂热"
+            },
+            "description": {
+              "zhCN": "触发极限闪避、招架支援或发动招式造成伤害时累积狂热心流，达到上限时进入狂热状态。狂热状态下，物理异常积蓄效率提升25%；异常精通超过120点后，每超过1点使攻击力提升2点，最多提升600点。狂热期间发动招式造成伤害消耗狂热心流，极限闪避或招架支援回复狂热心流，耗尽时退出狂热。当前按狂热状态快照计算攻击力转换；积蓄效率、心流获得与消耗及动作时间仅作说明。"
+            },
+            "effects": [
+              {
+                "id": "jane-frenzy-atk-from-proficiency",
+                "type": "formula",
+                "scope": "inCombat",
+                "stat": "atkFlat",
+                "mode": "flat",
+                "allowExtendedPanelFormula": true,
+                "target": {
+                  "kind": "default"
+                },
+                "source": {
+                  "kind": "inCombatStat",
+                  "stat": "anomalyProficiency",
+                  "unit": "storedValue",
+                  "label": {
+                    "zhCN": "狂热状态下局内异常精通"
+                  },
+                  "variable": "x"
+                },
+                "formula": {
+                  "expression": "clamp(max(x - 120, 0) * 2, 0, 600)",
+                  "valueUnit": "storedValue"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": [],
+            "mechanics": {
+              "frenzyPhysicalAnomalyBuildupEfficiencyPct": 25,
+              "frenzyAtkPerAnomalyProficiencyAboveThreshold": 2,
+              "frenzyAtkBonusCap": 600,
+              "frenzyAnomalyProficiencyThreshold": 120
+            }
+          }
+        ]
+      },
+      "cinemaDescriptions": [
+        {
+          "cinemaLevel": 1,
+          "name": {
+            "zhCN": "犯罪顾问"
+          },
+          "description": {
+            "zhCN": "萨霍夫跳可使用次数增加一次；狂热状态下物理异常积蓄效率额外提升15%，每点异常精通使自身伤害提升0.1%，最多30%。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 2,
+          "name": {
+            "zhCN": "近朱者赤"
+          },
+          "description": {
+            "zhCN": "强击目标无视15%防御；强击暴击伤害额外提升50%。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 3,
+          "name": {
+            "zhCN": "无名氏"
+          },
+          "description": {
+            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级+2。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 4,
+          "name": {
+            "zhCN": "因势利导"
+          },
+          "description": {
+            "zhCN": "触发强击或紊乱后全队属性异常伤害提升18%。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 5,
+          "name": {
+            "zhCN": "囤积癖好"
+          },
+          "description": {
+            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级再+2。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 6,
+          "name": {
+            "zhCN": "「肮脏」技巧"
+          },
+          "description": {
+            "zhCN": "狂热暴击率+20%、暴击伤害+40%；强击暴击后追加1600%异常精通物理伤害，暂不建模。"
+          },
+          "modeled": false
+        }
+      ],
+      "coreSkill": {
+        "name": {
+          "zhCN": "洞察"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：洞察"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "assaultCritRatePct": 20,
+              "assaultCritRatePerAnomalyProficiencyPct": 0.1
+            },
+            {
+              "level": 2,
+              "assaultCritRatePct": 25,
+              "assaultCritRatePerAnomalyProficiencyPct": 0.11
+            },
+            {
+              "level": 3,
+              "assaultCritRatePct": 28,
+              "assaultCritRatePerAnomalyProficiencyPct": 0.12
+            },
+            {
+              "level": 4,
+              "assaultCritRatePct": 31,
+              "assaultCritRatePerAnomalyProficiencyPct": 0.13
+            },
+            {
+              "level": 5,
+              "assaultCritRatePct": 34,
+              "assaultCritRatePerAnomalyProficiencyPct": 0.14
+            },
+            {
+              "level": 6,
+              "assaultCritRatePct": 37,
+              "assaultCritRatePerAnomalyProficiencyPct": 0.15
+            },
+            {
+              "level": 7,
+              "assaultCritRatePct": 40,
+              "assaultCritRatePerAnomalyProficiencyPct": 0.16
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+        ]
+      },
+      "potentialVision": {
+        "name": {
+          "zhCN": "潜能觉醒：致命舞步"
+        },
+        "defaultLevel": 6,
+        "maxLevel": 6,
+        "mechanicUnlockLevel": 1,
+        "scaling": {
+          "name": {
+            "zhCN": "潜能觉醒：致命舞步"
+          },
+          "levels": [
+            {
+              "level": 0,
+              "assaultCritDmgPct": 0
+            },
+            {
+              "level": 1,
+              "assaultCritDmgPct": 0
+            },
+            {
+              "level": 2,
+              "assaultCritDmgPct": 10
+            },
+            {
+              "level": 3,
+              "assaultCritDmgPct": 15
+            },
+            {
+              "level": 4,
+              "assaultCritDmgPct": 20
+            },
+            {
+              "level": 5,
+              "assaultCritDmgPct": 25
+            },
+            {
+              "level": 6,
+              "assaultCritDmgPct": 30
+            }
+          ]
+        },
+        "mechanics": {
+          "levelOneUnlocksPotentialEnhancedMoves": true,
+          "c6ExtraAttackAnomalyProficiencyPct": 1600,
+          "c6ExtraAttackModeled": false
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+        ]
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "fanged_metal"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "physicalDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "anomalyMastery",
+            "atkPct"
+          ]
+        }
+      },
+      "importantSubStats": [
+        "atkPct",
+        "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "anomalyProficiency",
+        "anomalyMastery"
+      ],
+      "skillGroups": [
+        {
+          "id": "jane-basic-six-hits",
+          "name": {
+            "zhCN": "普通攻击六段"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_step_blade_dance",
+                "rowId": "1_damage"
+              },
+              "id": "jane-basic-six-hits-1"
+            },
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_step_blade_dance",
+                "rowId": "2_damage"
+              },
+              "id": "jane-basic-six-hits-2"
+            },
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_step_blade_dance",
+                "rowId": "3_damage"
+              },
+              "id": "jane-basic-six-hits-3"
+            },
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_step_blade_dance",
+                "rowId": "4_damage"
+              },
+              "id": "jane-basic-six-hits-4"
+            },
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_step_blade_dance",
+                "rowId": "5_damage"
+              },
+              "id": "jane-basic-six-hits-5"
+            },
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_step_blade_dance",
+                "rowId": "6_damage"
+              },
+              "id": "jane-basic-six-hits-6"
+            }
+          ]
+        },
+        {
+          "id": "jane-sahoff-jump",
+          "name": {
+            "zhCN": "狂热萨霍夫跳"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_sahoff_jump",
+                "rowId": "continuous_damage"
+              },
+              "id": "jane-sahoff-jump-1"
+            },
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_sahoff_jump",
+                "rowId": "finisher_damage"
+              },
+              "id": "jane-sahoff-jump-2"
+            }
+          ]
+        },
+        {
+          "id": "jane-sahoff-jump-potential",
+          "name": {
+            "zhCN": "潜能强化萨霍夫跳"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_sahoff_jump_potential",
+                "rowId": "continuous_damage"
+              },
+              "id": "jane-sahoff-jump-potential-1"
+            },
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "basic",
+                "moveId": "basic_sahoff_jump_potential",
+                "rowId": "finisher_damage"
+              },
+              "id": "jane-sahoff-jump-potential-2"
+            }
+          ]
+        },
+        {
+          "id": "jane-ex-special",
+          "name": {
+            "zhCN": "强化特殊技：掠空-横扫"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "special",
+                "moveId": "ex_special_air_sweep",
+                "rowId": "damage"
+              },
+              "id": "jane-ex-special-1"
+            }
+          ]
+        },
+        {
+          "id": "jane-ex-special-potential",
+          "name": {
+            "zhCN": "潜能强化特殊技：掠空-强袭"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "special",
+                "moveId": "ex_special_air_assault",
+                "rowId": "damage"
+              },
+              "id": "jane-ex-special-potential-1"
+            }
+          ]
+        },
+        {
+          "id": "jane-chain_sin_flower",
+          "name": {
+            "zhCN": "连携技：罪孽生花"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "chain",
+                "moveId": "chain_sin_flower",
+                "rowId": "damage"
+              },
+              "id": "jane-chain_sin_flower-1"
+            }
+          ]
+        },
+        {
+          "id": "jane-ultimate_finale",
+          "name": {
+            "zhCN": "终结技：终幕演出"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "jane_doe",
+                "categoryId": "chain",
+                "moveId": "ultimate_finale",
+                "rowId": "damage"
+              },
+              "id": "jane-ultimate_finale-1"
+            }
+          ]
+        }
+      ],
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "单次物理异常"
+        },
+        "events": [
+          {
+            "id": "jane-default-assault",
+            "kind": "anomaly",
+            "count": 1,
+            "stunned": true,
+            "settlementType": "attribute",
+            "anomalyEffect": "assault",
+            "anomalyVariant": "normal",
+            "procCount": 1
+          }
+        ],
+        "selectedEventId": "jane-default-assault"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 759,
+        "officialEntryVersion": "1788063783",
+        "level60Stats": "source-checked official structured page; HP 7788, ATK 805, DEF 606, Impact 86, CR 5%, CRIT DMG 50%, AP 114, AM 112",
+        "corePassiveScaling": "official initial/A-F assault crit 20/25/28/31/34/37/40% and AP coefficients 0.10/0.11/0.12/0.13/0.14/0.15/0.16%",
+        "potential": "P1 enhanced moves; P2-P6 assault crit damage 10/15/20/25/30%; first selection defaults P6",
+        "unsupportedMechanics": "Frenzy Flow, Bites trigger timing, anomaly buildup timing, energy, action time and C6 1600% AP extra attack remain descriptive-only",
+        "c1Formula": "Official C1 uses every point of AP: clamp(x * 0.1, 0, 30); 120 is only the frenzy ATK threshold. User confirmed correction on 2026-10-08.",
+        "potentialCoreBoundary": "Potential P2-P6 coefficients are the official stated max-Core values, used as the selected snapshot at other Core levels; no undocumented scaling inferred."
+      },
+      "hidden": false
     }
   ]
 }

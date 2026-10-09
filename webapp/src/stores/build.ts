@@ -293,6 +293,43 @@ function normalizePyroisBuffSelection(agent: any, selectedIds: string[], runtime
   return { selectedIds: normalizedIds, runtimeInputs: normalizedRuntimeInputs, migrated: true }
 }
 
+function normalizeJaneFrenzySplit(agent: any, config: any, selectedIds: string[], runtimeInputs: Record<string, any>, uncheckedIds: string[]) {
+  const version = Number(config.combat?.janeFrenzySplitVersion ?? 0)
+  if (agent?.id !== "jane_doe" || !(agent.combatBuffs?.skillBuffs ?? []).some((buff: any) => buff.id === "frenzy")) {
+    return { runtimeInputs, uncheckedIds, version: 0 }
+  }
+  if (version >= 1) return { runtimeInputs, uncheckedIds, version }
+
+  const coreId = "agent:jane_doe.corePassive"
+  const frenzyId = "agent:jane_doe.skill.frenzy"
+  const effectId = "jane-frenzy-atk-from-proficiency"
+  const normalized = clone(runtimeInputs ?? {})
+  const hasNewRuntime = Object.prototype.hasOwnProperty.call(normalized, frenzyId)
+  const hasNewSelection = selectedIds.includes(frenzyId) || uncheckedIds.includes(frenzyId) || hasNewRuntime
+  const unchecked = [...uncheckedIds]
+  // Old defaults were implicit: selected IDs alone do not describe the state.
+  const coreActive = selectedIds.includes(coreId) || (agent.combatBuffs.corePassive?.scope === "inCombat"
+    && agent.combatBuffs.corePassive.defaultChecked !== false && !uncheckedIds.includes(coreId))
+  if (Object.keys(config).length && !hasNewSelection && !coreActive) unchecked.push(frenzyId)
+
+  const legacy = normalized[coreId]
+  if (legacy && typeof legacy === "object" && !Array.isArray(legacy)) {
+    const oldEffect = legacy.effects?.[effectId] ?? legacy[effectId]
+    if (!hasNewRuntime) {
+      const moved = oldEffect && typeof oldEffect === "object" && !Array.isArray(oldEffect) ? { ...oldEffect } : {}
+      if (moved.coverage === undefined && legacy.coverage !== undefined) moved.coverage = legacy.coverage
+      if (Object.keys(moved).length) normalized[frenzyId] = { effects: { [effectId]: moved } }
+    }
+    if (legacy.effects && typeof legacy.effects === "object" && !Array.isArray(legacy.effects)) {
+      delete legacy.effects[effectId]
+      if (!Object.keys(legacy.effects).length) delete legacy.effects
+    }
+    delete legacy[effectId]
+    if (!Object.keys(legacy).length) delete normalized[coreId]
+  }
+  return { runtimeInputs: normalized, uncheckedIds: unchecked, version: 1 }
+}
+
 function normalizeAgentSkillBuffRuntimeInputs(agent: any, runtimeInputs: Record<string, any>) {
   const normalized = clone(runtimeInputs ?? {}) as Record<string, any>
   const hasTemperingBuff = agent?.id === "sigrid"
@@ -756,6 +793,7 @@ function buildPersistSnapshotFor(state: any) {
     addedBuffs: clone(state.addedBuffs),
     runtimeInputs: clone(state.runtimeInputs) as Record<string, any>,
     manuallyUncheckedDefaultBuffIds: clone(state.manuallyUncheckedDefaultBuffIds),
+    janeFrenzySplitVersion: state.janeFrenzySplitVersion,
     buffPickerState: normalizeBuffPickerState(state.buffPickerState),
   }
 }
@@ -806,6 +844,8 @@ function writeBuildPersistSnapshot(snapshot: any, options: BuildPersistOptions =
       addedBuffs: snapshot.addedBuffs,
       runtimeInputs: snapshot.runtimeInputs,
       manuallyUncheckedDefaultBuffIds: snapshot.manuallyUncheckedDefaultBuffIds,
+      ...(agentId === "jane_doe" && snapshot.janeFrenzySplitVersion >= 1
+        ? { janeFrenzySplitVersion: snapshot.janeFrenzySplitVersion } : {}),
     },
   }
   buildByAgent[agentId] = persistedConfig
@@ -1126,6 +1166,7 @@ export const useBuildStore = defineStore("build", {
     addedBuffs: [] as any[],
     runtimeInputs: {} as Record<string, any>,
     manuallyUncheckedDefaultBuffIds: [] as string[],
+    janeFrenzySplitVersion: 0,
     buffPickerState: null as BuffPickerState | null,
     targetConfig: defaultTargetConfig() as any,
     damageConfig: defaultDamageConfig() as any,
@@ -1228,6 +1269,10 @@ export const useBuildStore = defineStore("build", {
       this.manuallyUncheckedDefaultBuffIds = normalizedPyroisSelection.migrated
         ? manuallyUncheckedDefaultBuffIds.filter(id => id !== PYROIS_CORE_PASSIVE_BUFF_ID)
         : manuallyUncheckedDefaultBuffIds
+      const frenzy = normalizeJaneFrenzySplit(agent, config, this.selectedBuffIds, this.runtimeInputs, this.manuallyUncheckedDefaultBuffIds)
+      this.runtimeInputs = frenzy.runtimeInputs
+      this.manuallyUncheckedDefaultBuffIds = frenzy.uncheckedIds
+      this.janeFrenzySplitVersion = frenzy.version
       this.buffPickerState = normalizeBuffPickerState(config.buffPickerState)
       this.damageConfig = normalizeDamageConfig({
         ...(rawDamageConfig ?? {}),

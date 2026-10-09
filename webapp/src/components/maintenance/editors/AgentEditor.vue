@@ -213,7 +213,7 @@ function skillBuffCategoryOptions() {
 }
 
 function skillBuffMoveOptions(buff: any) {
-  return moveOptions(props.catalog, currentAgentSkill()?.id ?? "", buff.sourceSkillRef?.categoryId ?? "")
+  return [{ label: "整个技能目录", value: "" }, ...moveOptions(props.catalog, currentAgentSkill()?.id ?? "", buff.sourceSkillRef?.categoryId ?? "")]
 }
 
 function changeSkillBuffCategory(buff: any, value: string) {
@@ -228,7 +228,8 @@ function changeSkillBuffCategory(buff: any, value: string) {
 function changeSkillBuffMove(buff: any, value: string) {
   buff.sourceSkillRef ??= {}
   buff.sourceSkillRef.agentSkillId = currentAgentSkill()?.id ?? ""
-  buff.sourceSkillRef.moveId = value
+  if (value) buff.sourceSkillRef.moveId = value
+  else delete buff.sourceSkillRef.moveId
   changed()
 }
 
@@ -347,7 +348,7 @@ function enableCoreSkill(enabled: boolean) {
       </template>
     </MaintenanceSection>
 
-    <MaintenanceSection title="技能来源 Buff" description="维护由当前角色具体招式提供的独立 Buff；来源只绑定到整招式，不选择倍率行。">
+    <MaintenanceSection title="技能来源 Buff" description="维护由当前角色技能目录或具体招式提供的独立 Buff；来源不选择倍率行。">
       <template #actions><NButton size="small" :disabled="disabled || !currentAgentSkill()" @click="addSkillBuff"><template #icon><Plus :size="15" /></template>添加技能 Buff</NButton></template>
       <article v-for="(buff, index) in model.combatBuffs.skillBuffs" :key="index" class="maintenance-subcard skill-buff-card">
         <header class="maintenance-section-head"><div><h4>{{ textOf(buff.name) || `技能来源 Buff ${index + 1}` }}</h4></div><NButton quaternary type="error" :disabled="disabled" title="删除技能 Buff" @click="model.combatBuffs.skillBuffs.splice(index, 1); changed()"><template #icon><Trash2 :size="16" /></template></NButton></header>
@@ -355,7 +356,7 @@ function enableCoreSkill(enabled: boolean) {
           <label class="maintenance-field"><span>稳定 ID</span><NInput :value="buff.id" :disabled="disabled" @update:value="buff.id = String($event); changed()" /></label>
           <label class="maintenance-field"><span>Buff 名称</span><NInput :value="textOf(buff.name)" :disabled="disabled" @update:value="buff.name = { zhCN: String($event) }; changed()" /></label>
           <label class="maintenance-field"><span>来源技能目录</span><NSelect :value="buff.sourceSkillRef?.categoryId" :options="skillBuffCategoryOptions()" :disabled="disabled || !currentAgentSkill()" @update:value="changeSkillBuffCategory(buff, String($event))" /></label>
-          <label class="maintenance-field"><span>来源招式</span><NSelect :value="buff.sourceSkillRef?.moveId" :options="skillBuffMoveOptions(buff)" :disabled="disabled || !currentAgentSkill()" @update:value="changeSkillBuffMove(buff, String($event))" /></label>
+          <label class="maintenance-field"><span>来源招式</span><NSelect :value="buff.sourceSkillRef?.moveId ?? ''" :options="skillBuffMoveOptions(buff)" :disabled="disabled || !currentAgentSkill()" @update:value="changeSkillBuffMove(buff, String($event))" /></label>
           <label class="maintenance-field"><span>生效范围</span><NSelect :value="buff.scope" :options="SCOPE_OPTIONS" :disabled="disabled" @update:value="setBuffScope(buff, String($event))" /></label>
           <label class="maintenance-switch-field"><span>默认启用</span><NSwitch :value="buff.defaultChecked === true" :disabled="disabled" @update:value="buff.defaultChecked = Boolean($event); changed()" /></label>
           <label class="maintenance-field maintenance-field-wide"><span>Buff 描述</span><NInput type="textarea" :value="textOf(buff.description)" :disabled="disabled" @update:value="buff.description = { zhCN: String($event) }; changed()" /></label>
@@ -377,7 +378,7 @@ function enableCoreSkill(enabled: boolean) {
         </div>
         <div class="skill-table-wrap potential-scaling-table-wrap">
           <table class="skill-multiplier-table">
-            <thead><tr><th>潜能</th><th v-for="field in potentialScalingFields()" :key="field">{{ field }}</th></tr></thead>
+            <thead><tr><th>潜能</th><th v-for="field in potentialScalingFields()" :key="field">{{ field === "assaultCritDmgPct" ? "强击暴击伤害提升%" : field }}</th></tr></thead>
             <tbody><tr v-for="row in model.potentialVision.scaling.levels" :key="row.level"><td>P{{ row.level }}</td><td v-for="field in potentialScalingFields()" :key="field"><NInputNumber v-model:value="row[field]" :disabled="disabled" :step="0.1" @update:value="changed" /></td></tr></tbody>
           </table>
         </div>

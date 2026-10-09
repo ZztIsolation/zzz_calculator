@@ -92,6 +92,22 @@ export function isAllowedInCombatFormulaSourceType(sourceType) {
     return IN_COMBAT_FORMULA_SOURCE_TYPE_SET.has(String(sourceType ?? "").trim())
 }
 
+// Panel feedback is intentionally limited: proficiency is complete before this
+// phase and cannot be produced by these rules. Resolve ATK before damage rules.
+export function isAllowedInCombatFormulaOutput(rule = {}, sourceType = "self") {
+    if ((rule.mode ?? "flat") !== "flat") return false
+    const target = rule.target?.kind ?? "default"
+    if (rule.stat === "dmgBonus") return target === "default"
+    if (sourceType !== "self" || rule.source?.stat !== "anomalyProficiency"
+        || rule.source?.unit !== "storedValue") return false
+    if (rule.stat === "atkFlat") {
+        return target === "default" && rule.formula?.valueUnit === "storedValue"
+    }
+    return rule.stat === "anomalyCritRate" && target === "anomaly"
+        && rule.target.settlementType === "attribute"
+        && rule.formula?.valueUnit === "storedPercent"
+}
+
 export function formulaParameterDefaults(rule = {}) {
     const parameters = rule?.formula?.parameters
     if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) {

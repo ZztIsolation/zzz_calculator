@@ -80,8 +80,9 @@ regression clauses before reusing a conversion.
 
 Effects retain their ownership: Core Passive, Additional Ability, Cinema,
 move-sourced Buff, W-Engine, set, teammate, field or Boss. Move-sourced Buffs use
-`combatBuffs.skillBuffs[]` with a valid current-agent move reference, name,
-description and explicit default state. They are not a generic container for any
+`combatBuffs.skillBuffs[]` with a valid current-agent skill-category reference,
+optionally narrowed to a move, plus a name, description and explicit default state.
+They are not a generic container for any
 effect mentioning a move.
 
 | Concern | Current rule |
@@ -106,6 +107,21 @@ Runtime compatibility remains. Lossless migrations normalize old values;
 unsupported filters must produce actionable maintenance errors rather than silently
 broaden the effect. Maintenance's supported fields are broader than the player
 custom-Buff whitelist.
+
+### Core-sourced formula parameters
+
+Formula rules can bind declared numeric parameters to Core scaling with
+`formula.parameterSources`. The initial row remains the persisted compatibility
+value; maintenance synchronizes it, while runtime materializes the selected Core
+level. Only Core Passive and skill-sourced self Buffs can declare these sources,
+with a complete initial/A-F table and no conflicting refinement binding.
+
+In-combat self formulas can convert finalized Anomaly Proficiency into
+default-target flat ATK or Attribute-Anomaly CRIT Rate. The ATK phase runs before
+damage formulas; target-specific CRIT remains an event modifier and never changes
+ordinary panel CRIT. Unsupported dependencies and outputs fail validation. Fixed
+scoring uses the existing dense fallback when a specialized scalar/bound is not
+available. See [Jane's model](jane-modeling.md) for the character-specific rules.
 
 ## Events, groups and defaults
 

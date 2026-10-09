@@ -132,6 +132,7 @@ for (const [key, values] of Object.entries(expectedModificationValues)) {
     }
 }
 
+assert.equal(wEngine("zzz_wiki_760").relatedAgentId, "jane_doe")
 const meta = buildMeta(catalog)
 assert.deepEqual(
     ["zzz_wiki_1243", "zzz_wiki_760"].map(id => {
