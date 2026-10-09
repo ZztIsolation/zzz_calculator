@@ -1,3 +1,8 @@
+> **Historical archive — not current operating instructions.**
+> Original: `docs/scanner-integration-1.0.43.md`. Period: 2026-07, Scanner 1.0.43 / Helper 1.3.1. Archived: 2026-10-08.
+> Source commit: `6355fbd310cc5836aff0e78bc3fb46e68a5356f8`. Current reference: [current document](../../README.zh-CN.md#扫描器集成).
+> Statements, values and validation results below describe their original revision, not the current implementation or live deployment.
+
 # Scanner 1.0.43 / Helper 1.3.1 Integration Evidence
 
 This document records candidate evidence only. It does not authorize a public

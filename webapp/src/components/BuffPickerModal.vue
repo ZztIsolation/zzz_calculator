@@ -1599,10 +1599,15 @@ async function apply() {
   flex-shrink: 0;
 }
 
+.buff-picker-layout.is-teammate-layout {
+  overflow-y: auto;
+}
+
 .buff-sections.is-teammate {
   display: grid;
   flex: 1;
-  min-height: 0;
+  /* Keep the selectors reachable when the toolbar fills a very short dialog. */
+  min-height: 112px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: minmax(0, 1fr);
   gap: 12px;
