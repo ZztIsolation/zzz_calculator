@@ -1,0 +1,586 @@
+> **Historical archive — not current operating instructions.**
+> Original: `README.md`. Period: through 2026-10-04. Archived: 2026-10-08.
+> Source commit: `6355fbd310cc5836aff0e78bc3fb46e68a5356f8`. Current reference: [current document](../../README.md).
+> Statements, values and validation results below describe their original revision, not the current implementation or live deployment.
+
+## Upload Update Summaries
+
+The entries below summarize each development day. Implementation details,
+modeling decisions, and verification evidence remain in the
+[detailed changelog](../changelog.md).
+
+### 2026-10-04 Scanner Elevation Retry And Inventory Recovery
+
+- Fixed web Scanner elevation retries dropping settings such as “Remove Missing Drive Discs”. Connection, preparation, and restart requests now use connection epochs and an ordered queue so late responses cannot settle a later retry.
+- Startup failures, UAC cancellation, and Helper disconnects now expose expandable raw diagnostics; duplicate actions are disabled while busy, and failed scans retain recoverable inventory state.
+- Added preference-persistence, bridge, error-state, inventory-recovery, and desktop-browser regression coverage.
+
+### 2026-10-03 Bounded Production Deployment And Recovery
+
+- Added explicit runner, SSH, server, and systemd deadlines, phase checkpoints, TERM cleanup grace, bounded rollback, and a fail-closed `supervisor=bounded-v1` contract for audit, dry-run, deployment, and rollback.
+- Replaced process-heavy per-file tree hashing with one streaming Node implementation that preserves the legacy digest bytes; added the recovery runbook for lock ownership, control-plane installation, no-switch audit/dry-run, exact-SHA artifacts, and the intentional service-restart boundary.
+- Added timeout and digest-compatibility regression coverage.
+
+### 2026-10-02 Enka Teammate Buff Sync And Maintained-State Protection
+
+- Showcase/Enka imports now feed the native teammate-Buff configuration with explicit refresh, selection, Cinema, and resync behavior while preserving manual Buff/runtime choices, source details, loadouts, and retryable save conflicts.
+- Added official Roxy (洛克茜) teammate Buffs and the Imbuement multiplier. It applies to direct, sheer, and sharp damage, chooses the strongest covered source instead of stacking alternatives, and stays consistent across white-box, compiled/dense, Worker, and optimizer paths.
+- Field Buff selection is now globally exclusive across versions, phases, and modes; Boss Buffs remain independent, legacy persisted selections are normalized, and maintained `importantPanelStats` stay first-class data.
+
+### 2026-10-02 Defense Battle 3.2 Phase 2 Field Buffs
+
+- Added the Defense Battle v5, version 3.2 phase-two field Buffs 御风惊雷, 冰锋碎厄, and 焚烬启明, covering Sharp damage, Ice/Ether damage, Fire/Electric damage, triggered DEF reduction, and stun vulnerability.
+- Only supported stats and triggers enter calculation. Energy recovery, buildup efficiency, Daze increase, and stun-recovery reduction remain explicit descriptive boundaries.
+
+### 2026-10-01 Velina Wind Anomaly And Maintenance Modeling
+
+- Added Velina as a first-class Wind Anomaly agent with separate Wind Anomaly, Turbulence, and Release settlement semantics, confirmed multiplier catalogs, a configurable Cinema 6 recast bonus, maintenance editors, specialty-aware W-Engine selection, Enka mapping, and editable default two-piece recommendations.
+- Initial-panel and Release formulas remain candidate-dependent through ordinary, compiled, dense, fixed-set, Worker, and strict optimizer paths; source/element ownership and unsupported timeline mechanics remain explicit.
+- Added cross-kernel, browser, maintenance, and optimizer regression coverage.
+
+### 2026-09-30 Four Anomaly W-Engines
+
+- Added 朔月裁霜, 灼心摇壶, 咚哒回声, and 雨林饕客 with official icons, level-60 data, exact modification ranks 1–5, adjustable stacks, and precise anomaly targets.
+- Flat Energy restoration remains an explicit descriptive boundary rather than being converted into Energy Regen; shared controls, thresholds, persistence, maintenance, score kernels, and exact optimizer results are covered by regression tests.
+
+### 2026-09-27 Drive Disc Scoring And Analysis UI
+
+- Added effective-substat counts, current-versus-optimized score comparison, automatic recalculation, and a more visible analysis entry point in the Workbench.
+- Absolute damage differences now display as integers while underlying calculation precision is preserved; redundant context, refresh, and summary rows were removed.
+
+### 2026-09-26 Pyrois Enka Showcase Mapping And Production Release
+
+- Added the Enka avatar ID `1551` mapping to Pyrois, so showcase imports can recognize and offer Pyrois alongside other mapped agents.
+- Added regression coverage for mapped and skipped showcase agents. The correction was merged through PR #66 and promoted to production with the exact `main`, `deploy`, and server commit `080ad126fff5ac004f5e604027159f07487bb3dd`. Public UID `45591123` verification now maps `1551` to `pyrois` while preserving other unmapped entries.
+
+### 2026-09-19 Pyrois Four-Branch Ultimate Modeling
+
+- Added Pyrois, four distinct Ultimates, and separate Assault Directive skill groups. The four branch effects are unified under the Core Passive using the direct-damage snapshot assumptions documented in [the modeling notes](../pyrois-modeling.md). Sol Exuvia now enforces its wearer restriction. Official data takes precedence, and unrevealed M6 effects are explicitly excluded.
+
+### 2026-09-18 Defense Battle 3.2 Phase 1 Field Buffs
+
+- Added 矢刃摧坚, 异潮弥涌, and 蚀光染梦 for Defense Battle v5, version 3.2 phase 1. The existing field-Buff schema and calculation paths are reused; the picker now recognizes `防卫战 v5 · 3.2版本 · 第一期`.
+
+### 2026-09-18 Agent Important Substats Highlight
+
+- Added the optional agent-level `importantSubStats` field and maintenance editor. Matching substats are highlighted in the vertical Drive Disc scheme panel; compact cards and all calculation/optimization/scoring paths are unchanged. Empty values are omitted on save, and Claret ships with `defPct`, `critRate`, `critDmg`, and `penFlat`.
+
+### 2026-09-17 Workbench Action And Catalog Cleanup
+
+- Refined Workbench action controls, event summaries, optimizer controls, responsive layout, and browser regression coverage. The same update removes obsolete Cinema entries and adds explicit default coverage metadata to affected W-Engine effects.
+
+### 2026-09-15 Armorer W-Engine Refinement Descriptions
+
+- Corrected Claret's four Armorer W-Engine descriptions to enumerate all five refinement values instead of displaying min-max ranges. The official-data importer now generates those descriptions from the structured refinement arrays, so display text and calculation data cannot drift apart.
+
+### 2026-09-14 Workbench And Teammate Buff Refinements
+
+- Refined Workbench scheme controls, damage-summary presentation, action buttons, and responsive interaction states.
+- Added teammate Buff rules with validated specialty exclusions and expanded maintenance, picker, formula, and skill-target coverage.
+
+### 2026-09-14 Claret Cinema-Resolved Default Rotation
+
+- Claret's administrator default rotation now resolves by Cinema level. Cinema 0-5 keeps `双连携六毁伤`; Cinema 6 uses `6影双连携九毁伤`, which repeats the `长按特殊技三次毁伤` skill group three times instead of twice, so the expanded Maim total grows from six hits to nine. The basic slam group, the two chain hits, and the single ultimate are unchanged.
+- The Cinema 6 variant rebuilds its event ids and remaps `selectedEventId`, following the single-variant pattern already used by Miyabi. No core or frontend change was needed: the workbench re-resolves the administrator loop whenever the Cinema level changes.
+- Cinema 6's own `热夜之梦` Buff stays descriptive-only, so the extra Maim is expressed by the authored rotation rather than assumed from teammates, energy, remnant charges, or action time.
+
+### 2026-09-13 Claret Armorer Sharp-Damage Modeling
+
+- Added Claret (克拉蕾·弗林特) as a first-class Armorer/sharp-damage domain. Sharp events use DEF as their basis, support the two-stage sharp-critical check and sharp-specific damage multiplier, and keep ordinary damage bonuses auditable in the white box.
+- Added Claret's source-checked skill groups, Core Passive and Cinema rules, four DEF-base Armorer W-Engines, official source metadata, local artwork, and Enka identity mapping. The 3.2 phase-one Boss and field catalog entries are included in the data layer.
+- Fixed sharp fixed-objective panel parity so in-combat DEF is preserved across normal, compiled, dense, indexed, fixed-set, Worker, and optimizer paths. Heuristic potential filtering no longer selects DEF/sharp-only candidates for ordinary agents.
+- Migrated dynamic in-combat formula handling into the shared core and kept Blood Marrow's overflow rule generic, so all supported damage domains consume the same validated bonus path. Tests cover formula evaluation, white-box rows, optimizer fuzz, browser-local computation, and catalog integrity.
+- This update is merged through pull requests into `main` only. The `deploy` branch is unchanged, and no production deployment or promotion workflow is triggered by this development update.
+
+### 2026-09-08 Vivian Optimizer Parity
+
+- Completed Vivian's strict optimizer and cross-kernel parity. Ordinary, compiled, dense, fixed-score, browser Worker, and optimizer paths now share the same self-sourced Ether Release semantics and regression coverage.
+
+### 2026-09-06 Explicit Production Promotion
+
+- Replaced the bot-authored approval-PR promotion path with an owner-attributed explicit dispatch. The frozen main SHA, exact CI artifact, protected `deploy` ref, non-forced update, resume, rollback, and production evidence are revalidated as one transaction.
+
+### 2026-09-05 Production Verification And Buff Fixes
+
+- Corrected Juhufu's CRIT DMG scaling to use the initial attack value and added regression coverage for the teammate Buff rule.
+- Hardened the new production-promotion workflow's eligibility, token permissions, reusable-workflow context, and secret propagation.
+
+### 2026-09-05 Vivian Single-Release Modeling (Development Branch)
+
+- Added Vivian (薇薇安·班希) from official Wiki entry 1276, including her level-60 panel, seven Core Passive Release coefficient tiers, the expressible Additional Ability/Cinema effects, official artwork, Enka `1331` mapping, and the signature Dreaming Bird relationship.
+- The workbench intentionally defines no administrator default rotation. A fresh build receives one non-administrator `mode: anomaly` event: a single Ether Corruption unit with Vivian as both the original source and Release trigger. The Release ratio reads current in-combat Anomaly Proficiency, so a self-sourced panel contributes to both the base unit and the ratio.
+- Retained Core Passive: Fate's Lament as a description-only self Buff: it records the official mechanics without independent calculation effects, follows the existing default-Buff selection, and remains manually switchable.
+- The Core Passive description includes the official F-level per-10-Proficiency coefficients for all six anomaly attributes; the structured core-scaling table remains the calculation source for other core levels.
+- The official page has no stable skill IDs, so this branch does not fabricate a skill catalog or multi-event rotation. Cinema 2's 130% proficiency yield is modeled as a Release-only `1.3` factor on the Anomaly Proficiency conversion; it does not alter the original anomaly unit, ordinary Anomaly, Disorder, or other damage zones. Cinema 6's special five-fold Release remains an explicit boundary for a future event variant.
+
+### 2026-09-04 Defense Buffs And Workbench Layout
+
+- Added the Defense Battle field Buff catalog updates and refined Workbench layout behavior across the protected responsive surfaces.
+- Preserved Soldier 11's manual catalog corrections and compatibility data while completing the surrounding Potential Vision maintenance coverage.
+- Separated production CD onto the protected `deploy` branch: `main` now produces the exact immutable artifact, while promotion, rollback, and browser-storage validation consume only the reviewed SHA.
+
+### 2026-08-31 Workbench Event Summary Expansion
+
+- Compact event summaries now preserve the chosen first two items and expose the remaining items through an inline, keyboard-accessible expansion. Desktop, scaled-desktop, and mobile layout coverage protects the interaction from clipping or unintended horizontal overflow.
+
+### 2026-08-30 Reliable Loadout Saves
+
+- Removed the nested Web Lock deadlock from Drive Disc loadout saves, added bounded storage waits, and restored retryable failed-save drafts without changing browser storage schemas or losing user data.
+
+### 2026-08-29 Sigrid Generated-Hit Segmentation
+
+- Sigrid's generated normal-attack total remains one public event but is evaluated per child hit, so skill-targeted PEN and other nonlinear defense, resistance, and stun modifiers apply only to the matching hit across ordinary, white-box, compiled, dense, Worker, and optimizer paths.
+
+### 2026-08-28 Critical Assault 3.1 Phase 3
+
+- Added the Critical Assault 3.1 phase-three field and Boss catalogs, official Boss assets, default picker coverage, and regression tests.
+
+### 2026-08-25 Soldier 11 And Potential Vision Modeling
+
+- Added Soldier 11 with complete level 1-16 skill multipliers, Core Skill, Cinemas, The Brimstone relationship, official artwork, and Enka `1041` mapping. Malformed Potential cells in the official Wiki are explicitly corrected against current game data and documented as source defects.
+- Added a Potential Vision P0-P6 axis independent from Cinema: P1 unlocks the fifth Basic hit, its empowered package, and Fire Assault; P2-P6 grant 16/24/32/40/48% CRIT DMG only while Fields of Fire is active. The extra 22.5% Fire DMG now follows each event's Stun state.
+- The default P6 Stun package uses Chain-AA plus Ultimate-AA. Each empowered fifth hit resolves six extra packets after B4 and the B5 body consume one guaranteed Fire Suppression each; skill gates, count limits, white-box, compiled/dense, browser Worker, and strict optimizer paths share that contract.
+
+### 2026-08-24 Sigrid And Workbench Follow-Ups
+
+- Split Sigrid's Tempering into an independent Chain-Attack Buff and made her default event composition auditable, while retaining stable saved references.
+- Fixed Workbench UI regressions and Enka percentage recovery, with browser compatibility and layout coverage for the affected panels.
+- Extended production validation to accept semantic optimizer completion and additive health fields without weakening the existing release evidence contract.
+
+### 2026-08-24 Sigrid Formal Calculation Support
+
+- Added Sigrid de L'Azur with complete level 1-16 skill multipliers, Core Skill, Cinemas, a one-Stun default rotation, Knight's Extolment, official artwork, and Enka showcase mappings. The catalog follows Version 3.1 release data and excludes superseded beta mechanics and values.
+- Modeled Aerial Patrol Spear CRIT Rate and Stun multiplier, Tempered, Contamination, Cinemas 1/2/4/6, and configurable Formation Breaker counts in their exact damage areas. Energy, Decibels, stance timers, blocks, and action time remain explicit non-simulated boundaries.
+- Added skill-targeted PEN Ratio so Cinema 2's 24% PEN applies only to Unbridled Spear and Converging Spear events across white-box, compiled/dense, fixed-score, browser Worker, and strict optimizer paths. Knight's Extolment now uses an exact two-stack threshold for Ice RES Ignore.
+
+### 2026-08-22 Showcase Import And UID Safety
+
+- Added transactional showcase/Enka import with safe UID rebinding, unified Drive Disc import handling, account-aware loadout synchronization, and fail-closed production enablement and validation.
+
+### 2026-08-21 Defense Battle 3.1 Phase 2
+
+- Added the Defense Battle 3.1 phase-two field Buff catalog, picker metadata, and targeted regression coverage.
+
+### 2026-08-17 Drive Disc Editor Save Fix
+
+- Fixed Drive Disc editor saves and compatibility handling so edits remain retryable without dropping local inventory data.
+
+### 2026-08-14 Critical Assault 3.1 Phase 2
+
+- Added the Critical Assault 3.1 phase-two field Buff catalog, Boss metadata, and default picker coverage.
+
+### 2026-08-12 Remielle Teammate Buff Modeling
+
+- Added Remielle's teammate Buff group, independent Anomaly-count and skill-level controls, and the Alienation multiplier zone across normal, Release, Disorder, compiled, dense, fixed-score, and optimizer paths.
+
+### 2026-08-01 Scanner 1.0.49 Integration
+
+- Integrated the immutable Scanner 1.0.49 schema-v3 manifest with Helper 1.3.1 and protocol v4. Native fourth-row navigation, permission repair, and configured non-level-15 stops now complete safely without changing browser storage schemas.
+
+### 2026-07-29 Drive Disc Update
+
+- Added official catalog data and local artwork for Thorned Rose and Vow of the Prophetic Feather.
+- Thorned Rose now applies its 16% DEF two-piece bonus, permanent 15% damage bonus, and automatic 8%/16% CRIT Rate thresholds at 1,000/1,800 final out-of-combat DEF across calculation and optimizer paths.
+- Vow of the Prophetic Feather applies 30 Anomaly Proficiency at two pieces and 50 more at four pieces. Its official 15% Luminous Attribute Anomaly damage text is preserved but intentionally excluded from calculation because it belongs to an independent multiplier area that is not modeled yet.
+- Added the Critical Assault 3.1 phase-one Boss archive and damage-affecting encounter rules, with local Boss assets and catalog validation.
+
+### 2026-07-28 Current Skill-Level Calculation Fix
+
+- Made the current Workbench skill-level selectors authoritative across ordinary, white-box, compiled, dense, fixed-score, browser-local, and exact optimizer calculation paths while preserving legacy saved-event compatibility.
+
+### 2026-07-25 Hotfix
+
+- Added Aria Cinema 1's initial-Anomaly-Mastery conversion as an explicit Buff rule. It floors the final out-of-combat panel value, converts each whole point above 100 into 0.5% Anomaly CRIT Rate, adds the existing 25% base rate, and caps the result at 100%. It applies only to Corruption Release; in-combat Anomaly Mastery does not affect it.
+- Exposed the new conversion type only to administrator maintenance under Anomaly target plus Release. It is absent from every player custom-Buff mode. Legacy Release-profile CRIT formulas remain a read-time fallback and never stack with the explicit rule.
+
+### 2026-07-24 Hotfix
+
+- Added Norma Hollowell to teammate Buff maintenance with separate Technical
+  Gap and Bangboo Barrage controls, Cinema 1 all-attribute RES reduction,
+  Cinema 2 Technical Gap amplification, and her official local avatar.
+- Added the three Defense Battle 3.0 Phase 3 field Buffs, Final Movement,
+  Chained Circuit, and Zero-Degree Operation, with explicit targeting for
+  Chain/Ultimate, attribute Anomaly, and Basic/Chain effects.
+- Moved Nangongyu's Additional Ability above Cinema 1 while preserving all
+  existing calculation ids, values, and surrounding authored order.
+- Removed the duplicate Neon Fantasies W-Engine listing, retained the
+  source-verified canonical entry, and migrated legacy `neon_fantasies`
+  loadouts and Buff selections.
+- Propagated skill-targeted CRIT DMG through white-box, compiled/dense,
+  browser Worker, and optimizer calculation paths without exposing it in the
+  player custom-Buff editor.
+
+### 2026-07-23 Daily Update
+
+- Promoted Release from an Anomaly variant to a third settlement type. The event manager now presents Attribute Anomaly, Disorder, and Release together; agents without a Release profile keep a disabled entry labeled as unsupported.
+- Added dual-source Release events. The equipped agent is always the Release trigger, while the generalized model supports either the current agent or another saved agent as the original Anomaly source. External sources use frozen panel/Buff snapshots with agent, configuration hash, and capture-time metadata. Aria's player-facing editor is temporarily locked to Corruption and Aria as the live source; existing external-source Aria events are normalized on load while the generalized model remains available for later reopening.
+- Added a restricted structured formula tree with explicit `raw`, `percent`, and `decimal` units. The shared evaluation trace drives multiplier explanations, white-box output, and optimizer dependencies. Fixed-multiplier profiles replace the Release base multiplier before converting it relative to one original Anomaly unit; they do not multiply final damage directly.
+- Migrated Aria's existing coefficient, Core Skill scaling, stunned factor, and Cinema 1 CRIT rules to profiles and Release-scoped modifiers. Full, compiled, dense, fixed-score, browser Worker, server, and strict optimizer paths remain equivalent. The first version optimizes only the trigger's build and does not jointly search the external source build.
+- Compacted Aria's Release editor into two field rows and reduced the visible multiplier explanation to out-of-combat Anomaly Mastery, the Release stunned adjustment, and the final Release multiplier. The description displays the five maximum-Core coefficients while calculations continue to use the selected Core tier.
+
+### 2026-07-22 Daily Update
+
+- Added complete Aria character, skill, Core Skill, Cinema, and signature
+  W-Engine data. Her default target is one stunned Corruption Release, calculated
+  from unrounded out-of-combat Anomaly Mastery and one Corruption proc.
+- Made Aria's in-combat Anomaly Proficiency Core Passive resolve from the selected
+  Core Skill tier: none and A-F grant `45/52/60/67/75/82/90`. The picker,
+  calculation, white-box output, and optimizer now share that resolved value.
+- Added multi-select four-piece optimization. Each candidate set uses the existing
+  strict exact kernel, then all branches merge into one stable global Top 10 with
+  per-set metrics and the actual set attached to every result.
+- Added Release white-box rows, scoped Cinema effects, Corruption duration support,
+  corrected Phaethon's Melody triggers, and rule-level attribute requirements across
+  browser workers, the server, and optimizer scoring paths.
+- Added account-scoped, per-disc agent reservations while preserving the existing
+  browser storage schema and Drive Disc identities. The optimizer always excludes
+  another agent's reserved discs; records without reservations retain identical
+  Top 10 behavior.
+- Added a runtime-gated six-slot loadout preview and shared visual picker. The UI
+  remains disabled by default and can be enabled independently after compatibility
+  validation; reservation data and optimizer constraints do not depend on the UI.
+- Added a production deployment runbook and stricter server-package evidence for
+  reproducible website, Helper/Scanner, manifest, CDN, monitoring, and rollback work.
+
+### 2026-07-20 Daily Update
+
+- Scanner connection recovery now distinguishes denied browser loopback access,
+  an unavailable Helper, a rejected page origin, and a failed WebSocket
+  handshake. Chrome permission failures receive targeted recovery guidance
+  instead of another Helper download and feed privacy-limited diagnostics.
+- Scanner warehouse readiness now requires the semantic warehouse title plus
+  grayscale grid or panel structure instead of dismantle-button or rarity
+  colors. The UI distinguishes a missing page, an unreadable title, count OCR
+  failure, and warehouse context loss during a scan.
+
+### 2026-07-19 Server And CDN Origin Migration
+
+- Made `121.199.21.10` the documented production host and retained the existing
+  atomic `/opt/zzz_calculator/releases/<release>` plus `current` deployment
+  layout.
+- Moved Helper and Scanner release payloads outside application releases into
+  `/srv/zzz-download-origin`, where Nginx serves immutable versioned binaries
+  with HTTP Range support and short-lived manifests separately.
+- Changed Helper and Scanner download priority to
+  `download.zzzcaculator.top`, followed by the main server and finally GitHub
+  Release as a disaster-recovery fallback.
+- Added a reproducible server release package command and checked-in Nginx and
+  systemd production templates. GitHub Pages deployment is now manual fallback
+  infrastructure and no longer claims the production custom domain.
+
+### 2026-07-19 Daily Update
+
+- Added drag-and-drop plus precise up/down ordering for each teammate's
+  maintenance Buff list. The complete order is saved atomically and reused by
+  the player Buff picker; Qianxia now shows Core Passive, Additional Ability,
+  EX Special, then Cinema 1/2/4.
+- Added explicit Dash Attack, EX Special, and Assist Attack move tags, including
+  targeted two-piece Drive Disc effects across calculation and optimization.
+- Modeled Dawn Blossom's two-piece bonus and nine requested four-piece sets,
+  with independent uptime/stacks, specialty requirements, and team-effect
+  exclusivity.
+- Removed the optimizer's automatic ATK, Anomaly Proficiency, CRIT Rate, and
+  CRIT DMG minimums. Existing untouched defaults migrate to unrestricted
+  searches, while deliberate user-entered limits remain available.
+- Added `/settings` with separate controls for browser-owned calculator data
+  and storage used by the hosted scan integration.
+- Clarified the Drive Disc toolbar as single-item add, batch import/export,
+  refresh, and Scan, with Scan as the only primary action.
+
+### 2026-07-18 Daily Update
+
+- Added teammate attribute/specialty filtering and completed team-applicable
+  Jane Doe Buffs plus Ye Shunguang Cinema 4/6 rules and the Cinema-6 loop.
+- Made Anomaly and Disorder timing effect-specific, moved stun state to each
+  event, and exposed live skill, Anomaly, and Disorder event multipliers.
+- Unified Alice's Disorder stack model and fixed the systemic loss of Anomaly
+  Mastery percentages across panels, damage calculation, and optimization.
+- Added account-scoped Drive Disc JSON export and reimport without exposing
+  account ownership or derived fingerprints.
+- Simplified player custom-Buff choices while retaining full maintenance
+  controls, and added container-aware layout regression protection.
+
+### 2026-07-17 Daily Update
+
+- Completed Alice Thymefield's damage, Buff, Cinema, default-loop, panel, and
+  optimizer modeling, including Anomaly Mastery slot-6 support.
+- Added first-class all-attribute RES ignore as a stat distinct from resistance
+  reduction and compatible with existing element-specific RES ignore.
+
+### 2026-07-16 Daily Update
+
+- Added versioned Boss archives and moved Boss encounter Buff selection into
+  the unified picker without coupling it to target defense or resistance.
+- Added the 3.0 Critical Assault phase-3 field Buffs and independent refinement
+  selection for teammate-carried W-Engines.
+- Replaced shared Buff coverage with independent per-effect `0-1` overrides
+  while preserving administrator-authored defaults.
+- Fixed maintenance saves for four-piece Drive Disc skill targets and retained
+  backward-compatible cleanup of legacy coverage and Boss payloads.
+
+### 2026-07-15 Daily Update
+
+- Removed generic effect `appliesTo` filters in favor of explicit global,
+  Anomaly, move, and skill-type targets.
+- Hardened canonical skill types and clarified the separate damage-bonus and
+  skill-multiplier zones across maintenance, calculation, and optimization.
+
+### 2026-07-14 Daily Update
+
+- Rebuilt administrator default loops as a cinema-tabbed master-detail modal
+  and replaced skill-ID prefix targeting with structured skill targets.
+- Expanded the strict optimizer contract from Top 5 to fixed Top 10 and replaced
+  the result dropdown with an immediate rank selector.
+- Restored maintenance visibility controls in the Vue workbench while keeping
+  hidden records compatible with existing saved builds.
+
+### 2026-07-13 Daily Update
+
+- Accelerated strict-exact Drive Disc optimization with result-preserving
+  pruning, specialized scoring paths, benchmarks, and parity checks.
+- Rebuilt Vue maintenance as a structured administrator workspace with
+  resource-specific forms, generated IDs, readable references, and save previews.
+
+### 2026-07-12 Daily Update
+
+- Archived the Vue rewrite before cleanup, then retired the legacy frontend and
+  consolidated browser and Node execution around the shared core and Vue app.
+- Removed obsolete duplicate runtime code and generated artifacts while
+  preserving public catalogs, source assets, storage compatibility, and tests.
+
+### 2026-07-02 Drive Disc Modal Workflow Update
+
+This update improves the calculator's optimizer and Drive Disc workflows:
+
+- The Drive Disc analysis modal now starts from the role-aware difference view,
+  while keeping the current substat and gain-curve views available.
+- Combat Buff, two-piece/four-piece optimizer filters, calculation config,
+  Drive Disc edit, and loadout edit modals now use explicit cancel/apply or
+  cancel/save footers, so tentative edits do not immediately mutate the active
+  build.
+- Stacked W-Engine effects can share one runtime stack control through
+  `stackGroup`; Qingming Cage now keeps its two "Qingming Companion" effects in
+  sync.
+
+### 2026-07-01 Role-Aware Drive Disc Stat Difference Analysis
+
+This update reuses the existing "stat analysis" modal and adds a "difference
+analysis" view:
+
+- Substat differences use the current six equipped Drive Discs, Buff runtime
+  state, and damage target as the baseline, then sort by real marginal damage.
+- Slot 4/5/6 main-stat candidates read the agent's
+  `preferredDriveDiscs.mainStatLimits`, falling back to the generic slot pool
+  only when no role preference exists.
+- The currently equipped main stat is filtered out, so a physical-damage disc no
+  longer produces a meaningless `-30 physicalDmg` reverse row.
+- Browser-local analysis, backend analysis, and regression tests are kept in
+  parity.
+
+### 2026-06-30 GitHub Pages Deployment
+
+This update moves the public calculator to GitHub Pages deployment:
+
+- Added `npm run build:pages` to generate a `dist/pages` static site with
+  `static/catalog.json`, `static/app-config.json`, and `CNAME`.
+- Frontend catalog/config loading now prefers static JSON while keeping the
+  local Node server APIs as development fallbacks.
+- Added a GitHub Actions Pages workflow that publishes the Pages artifact
+  without committing `dist/pages` or large `downloads/` files.
+
+### 2026-06-24 01:31 +08:00
+
+This upload adds or expands these major areas:
+
+- Added the official Drive Disc sets Howling Salon and Dawn Bloom Journey,
+  including local icon assets, 2-piece stats, and modeled 4-piece self buffs.
+- Completed Wind stat support across maintenance, homepage panels, the
+  calculator page, Drive Disc inventory, scanner import, optimizer scoring, and
+  stat rules for `windDmg`, `windResIgnore`, `enemyWindResReduction`, and
+  `windSheerDmg`.
+- Added Wind DMG Bonus to slot-5 Drive Disc main-stat pools, using the same
+  30% S-rank main-stat cap as the existing elemental DMG bonus stats.
+- Extended regression validation through percent sanity, maintenance
+  validation, shared combat helpers, Drive Disc import/analysis, optimizer,
+  compiled panel, and damage white-box tests.
+
+### 2026-06-23 12:55 +08:00
+
+This upload adds or expands these major areas:
+
+- Merged the optimizer workspace into the homepage so `/` now shows manual
+  Drive Disc selection, saved loadout selection, optimized candidate tabs,
+  out-of-combat panel, in-combat panel, and damage white-box output together.
+- Replaced the old `/calculate.html` page with a compatibility redirect to `/`
+  and tightened missing static file handling so unknown files return `404`.
+- Added unified Drive Disc scheme controls for manual picks, saved loadouts,
+  and optimizer results, including current-scheme 4-piece buff runtime controls
+  and save/apply loadout actions from the same workspace.
+- Expanded combat buff and Drive Disc set data for newer teammates and 4-piece
+  behavior, including additional teammate portrait assets.
+- Added regression coverage for the unified optimizer UI, compatibility
+  redirect, damage modifier handling, maintenance validation, optimizer set
+  behavior, shared combat helpers, and W-Engine modification values.
+
+### 2026-06-09 20:28 +08:00
+
+This upload adds or expands these major areas:
+
+- Added boss stun target controls and stun multiplier modeling for direct,
+  sheer, anomaly, and disorder damage, including white-box formula rows,
+  modeling docs, and regression coverage.
+- Added Core Skill-scaled skill multiplier support so damage rows can use
+  Core Skill levels such as `0` and `A-F`; Hoshimi Miyabi now includes
+  Frostburn Break core-skill damage data and cinema-targeted buffs.
+- Upgraded the Drive Disc optimizer with an `exact-super-bound-parallel`
+  worker-thread path, compiled/dense score kernels, worker metrics, and
+  benchmark coverage for parallel exact searches.
+- Added optimizer controls for recommended 4-piece set selection, agent
+  default 4-piece sets, and automatic/manual 4-piece buff runtime inputs.
+- Improved page-level feedback and error reporting with a shared frontend
+  notice helper across the homepage, optimizer, Drive Disc, account, and
+  maintenance pages.
+- Expanded teammate buff maintenance into grouped teammate records with
+  portrait/icon metadata, and added teammate portraits for combat buff
+  browsing.
+- Preserved defense ignore as a distinct maintenance stat instead of folding it
+  into defense reduction during form cleanup.
+- Added compiled-score, compiled-panel-score, maintenance-stat, stun-multiplier,
+  preferred-Drive-Disc, and teammate-image validation coverage.
+
+### 2026-06-07 21:15 +08:00
+
+This upload adds or expands these major areas:
+
+- Improved frontend usability across the calculator, optimizer, Drive Disc,
+  account, and maintenance pages, including clearer empty states, compact
+  mobile navigation, sticky action bars, visible optimizer progress, and a
+  searchable skill multiplier picker.
+- Added a shared browser dialog helper and replaced native prompt/confirm flows
+  for account actions, Drive Disc deletion/import sync, loadout deletion, and
+  optimizer loadout naming.
+- Added homepage final-damage feedback after calculation and scroll-to-result
+  behavior so the damage white-box output is easier to find.
+- Preserved selected combat buff state per agent and refined custom resistance
+  input handling with explicit positive/negative controls.
+- Restricted sheer force and sheer damage to Rupture agents, with regression
+  coverage for non-Rupture agents attempting sheer events.
+- Expanded exact optimizer pruning instrumentation and warmup behavior,
+  including timing metrics, seed cutoffs, skipped bound checks, and a fuzz test
+  comparing exact-super-bound results with exact-legacy results.
+
+### 2026-06-04 00:46 +08:00
+
+This upload adds or expands these major areas:
+
+- Added Yixuan as a Rupture/Xuanmo agent, including portrait art, base stats,
+  Core Skill buffs, default sheer-damage calculation config, and a full skill
+  multiplier catalog modeled on sheer force.
+- Added the sheer damage system: `sheer` damage events, derived `sheerForce`,
+  flat sheer force, general and element-specific sheer damage bonuses, crit
+  support, resistance handling, and dedicated white-box formula rows.
+- Expanded stat rules, Drive Disc set effects, W-Engine effects, W-Engine image
+  assets, maintenance validation, custom buff options, and optimizer scoring for
+  sheer-damage builds.
+- Added new Rupture-focused W-Engines and modification value tests, including
+  physical, fire, ice, ether, and sheer-force buff variants.
+- Added Drive Disc analysis APIs and frontend tooling for substat effective
+  rolls and per-stat damage gain curves.
+- Improved the calculator and optimizer UI with sheer objective/event controls,
+  entity selection helpers, analysis panels, and styling updates.
+- Added `npm run test:drive-disc-analysis` plus regression coverage for sheer
+  damage white-box output, optimizer progress, shared combat helpers,
+  maintenance validation, and W-Engine modification values.
+- Added a frontend usability audit document for the current calculator and
+  optimizer experience.
+
+### 2026-06-03 00:50 +08:00
+
+This upload adds or expands these major areas:
+
+- Expanded the W-Engine catalog and image assets with a larger set of Support,
+  Stun, Anomaly, Attack, and Defense engines.
+- Migrated W-Engine modification modeling from legacy scaling rules to explicit
+  modification-rank value tables, with validation and regression tests for the
+  new `modificationValues` shape.
+- Expanded teammate combat buff data for Nangongyu, Youye cinema effects, Yao
+  Jiayin, Rina, Lucy, Nicole, and Soukaku.
+- Split attribute anomaly damage bonus and disorder damage bonus into separate
+  event modifier zones; disorder no longer inherits attribute anomaly damage
+  bonus or anomaly crit.
+- Added normal and polarized disorder handling, and made disorder duration use
+  catalog defaults instead of a user-entered duration field.
+- Upgraded combat buff selection with a teammate picker, source-grouped active
+  buffs, per-source remove actions, and limits for teammate, W-Engine team, and
+  Drive Disc team buff sources.
+- Grouped related runtime inputs for multi-effect formula and derived buffs so
+  one source input can drive all linked effect rules.
+- Updated homepage and optimizer damage controls, white-box rows, custom buff
+  options, maintenance validation, modeling docs, and regression tests for the
+  new disorder and W-Engine behavior.
+
+### 2026-06-02 02:55 +08:00
+
+This upload adds or expands these major areas:
+
+- Added a calculator configuration workflow for the optimizer, with single
+  direct-damage, anomaly-focused, and custom multi-event damage objectives.
+- Added per-agent admin default calculation configs that can be edited from the
+  maintenance page and applied from the optimizer page; Hoshimi Miyabi now ships
+  with a default mixed rotation target.
+- Reworked anomaly data into a unified `effects` catalog with `settlementType`,
+  while still exposing attribute anomaly and disorder lists separately to the
+  calculator and maintenance UI.
+- Added Hoshimi Miyabi's Frost Frozen Disorder model, including its 600% fixed
+  multiplier, 75% per-tick multiplier, and 20 second default duration.
+- Expanded damage event normalization so disorder is modeled as an anomaly
+  settlement type, event lists can sum into `totalFinalDamage`, direct damage
+  exposes crit/non-crit/expected variants, and damage rows include panel
+  snapshots for debugging.
+- Upgraded the Drive Disc optimizer with the recommended `exact-super-bound`
+  algorithm, a legacy exact comparison mode, a fast non-strict heuristic mode,
+  super-bound pruning metrics, scored/pruned/processed counts, and better
+  progress percentages.
+- Added support for choosing multiple allowed extra 2-piece sets instead of a
+  single fixed extra set.
+- Improved optimizer background jobs, polling, cancelation, progress display,
+  evaluation-rate reporting, complexity hints, and result metrics.
+- Added `npm run benchmark:optimizer` for comparing the legacy exact optimizer
+  against the new super-bound exact optimizer.
+- Extended maintenance validation for default calculation configs, anomaly
+  settlement types, skill references, event counts, and disorder timing.
+- Expanded regression coverage for optimizer algorithms, progress accounting,
+  custom/default damage configs, anomaly settlement, damage white-box output,
+  and maintenance validation.
+
+### 2026-06-01 22:54 +08:00
+
+This upload added or expanded these major areas:
+
+- Multi-account support with isolated Drive Disc inventories, loadouts, imports,
+  and homepage selections.
+- Direct, anomaly, and disorder damage calculation with white-box multiplier
+  rows for defense, resistance, PEN, RES ignore, anomaly proficiency, anomaly
+  level, attribute anomaly damage bonus, disorder damage bonus, anomaly crit,
+  and final damage.
+- Data-backed anomaly and disorder catalogs in `data/anomaly_effects.json`.
+- Agent skill multiplier catalogs for Ye Shunguang, Hoshimi Miyabi, and Alice
+  Thymefield, including generated total-hit rows for compatible multi-hit
+  moves.
+- W-Engine modification levels from 1 to 5, with exact calculation values and
+  official rounded display values for self and team buffs.
+- New agent and W-Engine data and assets for Hoshimi Miyabi, Alice Thymefield,
+  Hailfall Star Palace, and Tenfold Starforge.
+- Expanded teammate, field, boss, manual, skill-targeted, and W-Engine team
+  buff modeling, including modifier-only buffs and buff amplification rules.
+- Homepage and optimizer damage controls for target presets, defense,
+  elemental resistance, direct skill selection, anomaly events, and disorder
+  timing.
+- Drive Disc import deduplication, upgrade merging, remove-missing sync, and
+  loadout cleanup when imported or deleted discs disappear.
+- Drive Disc loadout management and optimizer save-to-loadout flow.
+- Maintenance UI support for agent skills, W-Engine modification scaling,
+  anomaly/disorder effects, split self/team effects, and stricter validation.
+- Additional regression tests for accounts, scanner import, W-Engine
+  modification scaling, shared combat helpers, anomaly damage, damage
+  white-box output, maintenance validation, and optimizer behavior.
