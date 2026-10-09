@@ -88,6 +88,25 @@ describe("build store", () => {
     localStorage.clear()
   })
 
+  it("persists dormant anomaly CRIT choices for attribute, turbulence and release across reloads", async () => {
+    const catalog = await loadCalculatorContext(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.."))
+    const meta = buildMeta(catalog)
+    const agent = catalog.agentsMap.get("aria")
+    const store = useBuildStore()
+    store.applyAgentConfig("aria", meta, { wEngineId: "zzz_wiki_212" })
+    store.setDamageConfig({ mode: "custom", selectedEventId: "attribute", events: [
+      { id: "attribute", kind: "anomaly", settlementType: "attribute", anomalyEffect: "assault", critMode: "crit" },
+      { id: "turbulence", kind: "anomaly", settlementType: "turbulence", anomalyEffect: "assault", elapsedSeconds: 0, critMode: "nonCrit" },
+      { ...agent.defaultCalculationConfig.events[0], id: "release", critMode: "crit" },
+    ] }, agent)
+    await store.persist()
+    setActivePinia(createPinia())
+    const restored = useBuildStore()
+    restored.initialize({}, meta)
+    expect(restored.damageConfig.events.map((event: any) => event.critMode)).toEqual(["crit", "nonCrit", "crit"])
+    expect(restored.damageConfig.events.map((event: any) => event.settlementType)).toEqual(["attribute", "turbulence", "release"])
+  })
+
   it("persists picker slots per account and character without collapsing empty positions", async () => {
     const meta = buffPickerMeta()
     localStorage.setItem("zzz-calculator.currentAccount.v1", "alice")

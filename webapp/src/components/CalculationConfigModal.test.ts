@@ -239,6 +239,48 @@ afterEach(() => {
 })
 
 describe("CalculationConfigModal", () => {
+  it.each(["attribute", "turbulence", "release"])("keeps %s CRIT preference through temporary Buff loss, copying and reopening", async settlementType => {
+    const effectId = settlementType === "release" ? "corruption" : "assault"
+    const event = settlementType === "release"
+      ? { ...clone(aria.defaultCalculationConfig.events[0]), id: "crit-event", critMode: "expected" }
+      : { id: "crit-event", kind: "anomaly", settlementType, anomalyEffect: effectId, count: 1, stunned: true, critMode: "expected", elapsedSeconds: 0 }
+    const combatEffects = [{ resolvedDamageModifiers: [
+      { kind: "anomalyCritRate", value: 0.72, appliesTo: { settlementTypes: [settlementType], anomalyEffects: [effectId] } },
+      { kind: "anomalyCritDmg", value: 0.5, appliesTo: { settlementTypes: [settlementType], anomalyEffects: [effectId] } },
+    ] }]
+    const wrapper = mountModal({ agent: settlementType === "release" ? aria : alice, combatEffects,
+      damageConfig: { mode: "custom", selectedEventId: event.id, events: [event] } })
+    await openModal(wrapper)
+    selectComponentWithOption(wrapper, "crit")!.vm.$emit("update:value", "crit")
+    await nextTick()
+    await wrapper.setProps({ combatEffects: [] })
+    expect(selectComponentWithOption(wrapper, "crit")).toBeUndefined()
+    const dormant = await saveModal(wrapper)
+    expect(dormant.events[0].critMode).toBe("crit")
+    await wrapper.setProps({ show: false, damageConfig: dormant })
+    await openModal(wrapper)
+    await wrapper.setProps({ combatEffects })
+    expect(selectComponentWithOption(wrapper, "crit")!.props("value")).toBe("crit")
+    const copy = modalDom().get('[aria-label="复制目标事件"]')
+    await copy.trigger('click')
+    const copied = await saveModal(wrapper)
+    expect(copied.events).toHaveLength(2)
+    expect(copied.events.every((item: any) => item.critMode === "crit")).toBe(true)
+  })
+
+  it("does not enable anomaly CRIT from damage alone, a mismatched target or panel CRIT", async () => {
+    const wrapper = mountModal({ agent: alice,
+      damageConfig: { mode: "custom", events: [{ id: "a", kind: "anomaly", settlementType: "attribute", anomalyEffect: "assault", critMode: "crit" }] },
+      releaseContext: { inCombatPanel: { critRate: 1, critDmg: 3 } },
+      combatEffects: [{ resolvedDamageModifiers: [
+        { kind: "anomalyCritDmg", value: 0.5 },
+        { kind: "anomalyCritRate", value: 1, appliesTo: { anomalyEffects: ["shock"] } },
+      ] }],
+    })
+    await openModal(wrapper)
+    expect(selectComponentWithOption(wrapper, "crit")).toBeUndefined()
+  })
+
   const modalDom = () => new DOMWrapper(document.body)
   const turbulenceSelect = (wrapper: ReturnType<typeof mount>) => selectComponentWithOption(wrapper, "frost_frozen")!
   const turbulenceTime = (wrapper: ReturnType<typeof mount>) => wrapper.findAllComponents(NInputNumber)

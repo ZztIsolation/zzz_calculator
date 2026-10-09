@@ -36,7 +36,7 @@
     "test:w-engine-modification": "node tests/w-engine-modification.test.js",
     "test:attack-w-engines": "node tests/attack-w-engines.test.js",
     "test:anomaly-w-engines": "node tests/anomaly-w-engines.test.js",
-    "test:anomaly-damage": "node tests/anomaly-damage.test.js",
+    "test:anomaly-damage": "node tests/anomaly-damage.test.js && node tests/anomaly-crit-modes.test.js",
     "test:turbulence-damage": "node tests/turbulence-damage.test.js",
     "test:sharp-damage": "node tests/sharp-damage.test.js",
     "test:roxy-teammate-buffs": "node tests/roxy-teammate-buffs.test.js",

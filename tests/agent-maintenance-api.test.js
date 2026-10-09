@@ -107,6 +107,27 @@ try {
     const preflight = await fetch(`${base}/api/maintenance/agents`, { method: "OPTIONS", headers: { Origin: base, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "If-Match" } })
     assert.match(preflight.headers.get("access-control-allow-headers"), /If-Match/)
 
+    // Exercise actual catalog writes and reloads in this isolated temporary catalog.
+    let critAgent = (await read()).agents.agents.find(item => item.id === "aria")
+    const release = structuredClone(critAgent.defaultCalculationConfig.events[0])
+    for (const critMode of ["expected", "crit", "nonCrit"]) {
+        const events = [
+            { id: "attribute", kind: "anomaly", settlementType: "attribute", anomalyEffect: "corruption", procCount: 1, count: 1, critMode },
+            { id: "turbulence", kind: "anomaly", settlementType: "turbulence", anomalyEffect: "corruption", elapsedSeconds: 0, count: 1, critMode },
+            { ...release, id: "release", critMode },
+        ]
+        const candidate = { ...critAgent,
+            defaultCalculationConfig: { mode: "custom", selectedEventId: "attribute", events },
+            skillGroups: [{ id: "crit-outcomes", name: { zhCN: "暴击模式回读" }, defaultCount: 1, minCount: 0, step: 1, events }],
+        }
+        const outcome = await write(candidate, match(critAgent))
+        assert.equal(outcome.status, 200, JSON.stringify(outcome.body))
+        critAgent = (await read()).agents.agents.find(item => item.id === "aria")
+        for (const rows of [critAgent.defaultCalculationConfig.events, critAgent.skillGroups[0].events]) {
+            assert.deepEqual(rows.map(row => row.critMode), [critMode, critMode, critMode])
+        }
+    }
+
     // A broken history directory blocks mutation, rather than saving without evidence.
     const historyDirectory = path.join(dataDir, ".agent-history")
     await fs.rename(historyDirectory, `${historyDirectory}-held`)

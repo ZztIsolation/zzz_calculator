@@ -5,6 +5,7 @@ declare module "@runtime/catalog-loader.js" {
 }
 
 declare module "@core/calculator-core.js" {
+  export function resolveAnomalyCritForEvent(event: any, bonusTotals?: any, panel?: any, outOfCombatPanel?: any): any
   export function buildMeta(catalog: any): any
   export function normalizeCatalog(catalog: any): any
   export function calculateOutOfCombatPanel(catalog: any, input: any): any

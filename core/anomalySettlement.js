@@ -1,3 +1,5 @@
+import { normalizeAnomalyCritMode, supportsAnomalyCrit } from "./anomalyCrit.js"
+
 // Shared by storage, editors, maintenance and the calculation boundary.
 export const WIND_TURBULENCE_NOTICE = "乱流伤害受益于非风属性代理人的面板，而与维琳娜自身面板无关。异常代理人的组队伤害计算将在后续开发。"
 
@@ -33,11 +35,14 @@ export function cleanStoredReactiveEvent(event = {}, agent = {}) {
     if (isLegacyTurbulenceEvent(event)
         || (isWindAgent(agent) && (turbulence || disorder))
         || (disorder && (event.anomalyEffect ?? event.previousAnomalyEffect) === "wind_corrosion")) return null
-    if (!turbulence) return event
+    if (!turbulence) return supportsAnomalyCrit(event) && event.critMode !== undefined
+        ? { ...event, critMode: normalizeAnomalyCritMode(event.critMode) }
+        : event
     return {
         ...(event.id !== undefined ? { id: event.id } : {}),
         kind: "anomaly",
         settlementType: "turbulence",
+        ...(event.critMode !== undefined ? { critMode: normalizeAnomalyCritMode(event.critMode) } : {}),
         anomalyEffect: event.anomalyEffect,
         elapsedSeconds: event.elapsedSeconds ?? 0,
         count: event.count ?? 1,

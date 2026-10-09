@@ -33,6 +33,7 @@ const eventOptions = computed(() => events.value.map(event => ({
   value: String(event?.id ?? ""),
 })))
 const selectedVariantItems = computed(() => eventVariantItems(selectedEvent.value))
+const selectedModeLabel = computed(() => ({ expected: "期望", crit: "暴击", nonCrit: "非暴击" } as Record<string, string>)[selectedVariantKey(selectedEvent.value)] ?? "期望")
 
 watch(() => props.damage, () => {
   const nextId = props.damage?.selectedEventId ?? events.value[0]?.id ?? null
@@ -99,7 +100,7 @@ function eventLabel(event: any): string {
 }
 
 function eventVariantItems(event: any) {
-  if (!event?.damageVariants || !["direct", "sheer", "sharp"].includes(event.kind)) {
+  if (!event?.damageVariants || (event.kind === "anomaly" && !event.critInfo?.available)) {
     return []
   }
   if (event.kind === "sharp") {
@@ -117,12 +118,16 @@ function eventVariantItems(event: any) {
   return [
     ["expected", "期望"],
     ["crit", "暴击"],
-    ["nonCrit", "非暴击"],
+    ["nonCrit", event?.kind === "anomaly" && Number(event?.critInfo?.critRate ?? 0) >= 1 ? "非暴击（对照）" : "非暴击"],
   ].map(([key, label]) => ({
     key,
     label,
     value: event.damageVariants?.[key]?.finalDamage,
   })).filter(item => Number.isFinite(Number(item.value)))
+}
+
+function selectedVariantKey(event: any): string {
+  return String(event?.input?.critMode ?? event?.critInfo?.effectiveMode ?? "expected")
 }
 
 function selectEventId(value: string | number | null) {
@@ -136,8 +141,9 @@ function selectEventId(value: string | number | null) {
       <div>
         <span>当前白盒</span>
         <strong>{{ selectedEvent ? eventLabel(selectedEvent) : "单次伤害" }}</strong>
+        <small v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.critInfo?.available" class="damage-current-mode">当前模式：{{ selectedModeLabel }}</small>
         <small v-if="selectedVariantItems.length" class="damage-selected-variants">
-          <span v-for="item in selectedVariantItems" :key="item.key">{{ item.label }} {{ summaryNumber(item.value) }}</span>
+          <span v-for="item in selectedVariantItems" :key="item.key" :class="{ 'damage-selected-variant': item.key === selectedVariantKey(selectedEvent) }">{{ item.label }} {{ summaryNumber(item.value) }}</span>
         </small>
       </div>
       <div class="damage-whitebox-current-values">
@@ -235,6 +241,16 @@ function selectEventId(value: string | number | null) {
   color: var(--app-muted);
   font-size: 11px;
   font-weight: 650;
+}
+
+.damage-selected-variants .damage-selected-variant {
+  color: var(--app-text);
+  font-weight: 750;
+}
+
+.damage-current-mode {
+  color: var(--app-muted);
+  font-size: 11px;
 }
 
 .damage-event-select {

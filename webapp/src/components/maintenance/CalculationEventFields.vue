@@ -249,6 +249,11 @@ function critModeOptions() {
       <label v-if="!event.skillRef && visibleKind() === 'direct'" class="maintenance-field"><span>伤害基础值</span><NSelect v-model:value="event.damageBasis" :options="CALCULATION_DAMAGE_BASIS_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
     </template>
 
+    <label v-if="['anomaly', 'turbulence', 'release'].includes(visibleKind())" class="maintenance-field">
+      <span>暴击模式</span>
+      <NSelect :value="event.critMode ?? 'expected'" :options="CRIT_MODE_OPTIONS" :disabled="disabled" aria-label="异常暴击模式" @update:value="event.critMode = $event; emit('change')" />
+    </label>
+
     <template v-if="visibleKind() === 'anomaly'">
       <label class="maintenance-field"><span>异常类型</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>异常形态</span><NSelect v-model:value="event.anomalyVariant" :options="ANOMALY_VARIANT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>

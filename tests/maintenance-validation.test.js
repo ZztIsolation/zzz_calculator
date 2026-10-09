@@ -1822,6 +1822,16 @@ const validReleaseAgent = {
 assertValid("agents", validReleaseAgent, validCalculationContext)
 const cleanedReleaseAgent = cleanMaintenanceItem("agents", validReleaseAgent)
 assert.deepEqual(cleanedReleaseAgent.defaultCalculationConfig.events[0], validReleaseEvent)
+for (const critMode of ["expected", "crit", "nonCrit"]) {
+    const withCrit = { ...validReleaseAgent, defaultCalculationConfig: {
+        ...validReleaseAgent.defaultCalculationConfig, events: [{ ...validReleaseEvent, critMode }],
+    } }
+    assertValid("agents", withCrit, validCalculationContext)
+    assert.equal(cleanMaintenanceItem("agents", withCrit).defaultCalculationConfig.events[0].critMode, critMode)
+}
+assertInvalid("agents", { ...validReleaseAgent, defaultCalculationConfig: {
+    ...validReleaseAgent.defaultCalculationConfig, events: [{ ...validReleaseEvent, critMode: "sharpCrit" }],
+} }, "critMode", validCalculationContext)
 assert.equal(cleanedReleaseAgent.anomalyReleaseProfiles[0].expression.args[0].whiteBoxRole, "conversionSource")
 assert.equal(cleanedReleaseAgent.defaultCalculationConfig.events[0].anomalyVariant, undefined)
 assert.equal(cleanedReleaseAgent.defaultCalculationConfig.events[0].procCount, undefined)

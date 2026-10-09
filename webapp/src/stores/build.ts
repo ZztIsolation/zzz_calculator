@@ -344,6 +344,7 @@ function defaultEvent(kind = "direct", id = `${kind}-1`) {
       kind: "anomaly",
       settlementType: "attribute",
       anomalyEffect: "assault",
+      critMode: "expected",
       procCount: 1,
       count: 1,
       stunned: true,

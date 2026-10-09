@@ -1,4 +1,5 @@
 import { createServer } from "node:http"
+import { normalizeAnomalyCritMode } from "../core/anomalyCrit.js"
 import { createHash, randomUUID } from "node:crypto"
 import { AgentMaintenanceError, AgentMaintenanceHistory, agentRevision, agentRevisions, assertAgentRevision } from "./agentMaintenance.js"
 import { readFile, rename, rm, writeFile } from "node:fs/promises"
@@ -1245,6 +1246,7 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
                 ),
             }
         }
+        if (event.critMode !== undefined) base.critMode = normalizeAnomalyCritMode(event.critMode)
         if (settlementType === "release") {
             if (String(options.agentId ?? "").trim() === "velina") {
                 const releaseSource = String(

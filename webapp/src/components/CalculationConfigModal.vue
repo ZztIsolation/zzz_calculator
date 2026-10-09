@@ -32,7 +32,7 @@ import {
   normalizeSkillLevel,
   skillRowValue,
 } from "@core/skillMultiplierCandidates.js"
-import { damageModifierAppliesTo, isTeamAnomalyDamageModifier } from "@core/calculator-core.js"
+import { damageModifierAppliesTo, isTeamAnomalyDamageModifier, resolveAnomalyCritForEvent } from "@core/calculator-core.js"
 import {
   calculationSkillGroups,
   defaultSkillGroupReferenceEvent,
@@ -123,7 +123,7 @@ const calculationModeOptions = computed(() => [
 const critModeOptions = [
   { label: "期望", value: "expected" },
   { label: "暴击", value: "crit" },
-  { label: "不暴击", value: "nonCrit" },
+  { label: "非暴击", value: "nonCrit" },
 ]
 const sharpCritModeOptions = [
   { label: "期望", value: "expected" },
@@ -476,6 +476,42 @@ function eventStunValue(event: any) {
 
 function critOptionsForEvent(event: any) {
   return event?.kind === "sharp" ? sharpCritModeOptions : critModeOptions
+}
+
+function anomalyCritPreviewEvent(event: any) {
+  if (event?.kind !== "anomaly") return null
+  const settlementType = event.settlementType ?? "attribute"
+  if (!["attribute", "release", "turbulence"].includes(settlementType)) return null
+  const effect = settlementType === "turbulence"
+    ? turbulenceEffectFor(event)
+    : releaseEffect(event)
+  return {
+    ...event,
+    kind: "anomaly",
+    settlementType,
+    damageElement: effect?.element ?? damageElementForAgent(props.agent),
+    stunned: eventStunValue(event),
+    releaseProfile: settlementType === "release"
+      ? anomalyReleaseProfile(props.agent, isVelinaRelease.value ? event.releaseSource : event.triggerActorRef?.profileId, effect?.element)
+      : undefined,
+    releaseCoreScalingRow: settlementType === "release" ? corePassiveScalingRow(props.agent, props.releaseContext?.coreSkillLevel) : undefined,
+  }
+}
+
+function anomalyCritState(event: any) {
+  const preview = anomalyCritPreviewEvent(event)
+  if (!preview) return null
+  const modifiers = (props.combatEffects ?? []).flatMap((combatEffect: any) => combatEffect?.resolvedDamageModifiers ?? [])
+  return resolveAnomalyCritForEvent(
+    preview,
+    { damageModifiers: modifiers },
+    props.releaseContext?.inCombatPanel ?? {},
+    props.releaseContext?.outOfCombatPanel ?? props.releaseContext?.inCombatPanel ?? {},
+  )
+}
+
+function anomalyCritModeAvailable(event: any) {
+  return Boolean(anomalyCritState(event)?.available)
 }
 
 function skillGroupChildTotalCount(childEvent: any, groupEvent: any = selectedEvent.value) {
@@ -1750,7 +1786,7 @@ function save() {
                   <NInputNumber v-else :value="selectedEvent?.skillMultiplier ?? 100" :min="0" :step="0.1" aria-label="技能倍率百分比" @update:value="updateSelectedEvent({ skillMultiplier: Number($event ?? 0) })" />
                 </div>
               </div>
-              <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind)" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field>
+              <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind) || anomalyCritModeAvailable(selectedEvent)" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field>
                 <span class="metric-title">暴击模式</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(critOptionsForEvent(selectedEvent), selectedEvent?.critMode ?? 'expected') }}</span>

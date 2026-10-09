@@ -296,16 +296,17 @@ export function defaultEffectRule() {
 
 export function defaultCalculationEvent(kind = "direct", agent: any = null) {
   const base: any = { id: internalId("event"), kind, count: 1, stunned: true }
-  if (kind === "anomaly") return { ...base, settlementType: "attribute", anomalyEffect: "assault", procCount: 1 }
+  if (kind === "anomaly") return { ...base, settlementType: "attribute", anomalyEffect: "assault", critMode: "expected", procCount: 1 }
   if (kind === "disorder") return { ...base, kind: "anomaly", settlementType: "disorder", disorderType: "normal", anomalyEffect: "burn", elapsedSeconds: 0 }
   if (kind === "turbulence") return {
     ...base,
     kind: "anomaly",
     settlementType: "turbulence",
     anomalyEffect: defaultTurbulenceEffectId(agent),
+    critMode: "expected",
     elapsedSeconds: 0,
   }
-  if (kind === "release") return { ...base, kind: "anomaly", settlementType: "release", anomalyEffect: "assault" }
+  if (kind === "release") return { ...base, kind: "anomaly", settlementType: "release", anomalyEffect: "assault", critMode: "expected" }
   if (kind === "luminescence") return {
     id: base.id,
     kind: "anomaly",

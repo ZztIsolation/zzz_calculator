@@ -157,6 +157,19 @@ afterEach(() => {
 })
 
 describe("DefaultCalculationConfigModal", () => {
+  it("saves and restores an anomaly CRIT mode in maintenance even without a live Buff context", async () => {
+    const wrapper = mountModal({ ...config(), variants: [], selectedEventId: "assault", events: [
+      { id: "assault", kind: "anomaly", settlementType: "attribute", anomalyEffect: "assault", count: 1 },
+    ] })
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="异常暴击模式"]').element.value).toBe("expected")
+    await wrapper.get('[aria-label="异常暴击模式"]').setValue("nonCrit")
+    await button(wrapper, "应用").trigger("click")
+    const saved = wrapper.emitted("apply")![0][0] as any
+    expect(saved.events[0].critMode).toBe("nonCrit")
+    await wrapper.setProps({ show: false, config: saved })
+    await wrapper.setProps({ show: true })
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="异常暴击模式"]').element.value).toBe("nonCrit")
+  })
   const turbulenceCatalog = { ...catalog, anomalyEffects: anomalyEffectsData }
   const sourceConfig = (anomalyEffect: string, elapsedSeconds = 0) => ({ ...config(), variants: [], selectedEventId: "source", events: [
     { id: "source", kind: "anomaly", settlementType: "turbulence", anomalyEffect, elapsedSeconds, count: 1 },

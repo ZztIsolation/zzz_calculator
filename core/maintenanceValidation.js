@@ -1685,6 +1685,9 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     if (event.settlementType !== undefined) {
         requireEnum(errors, event.settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.settlementType`)
     }
+    if (["attribute", "turbulence", "release"].includes(settlementType) && event.critMode !== undefined) {
+        requireEnum(errors, event.critMode, new Set(["expected", "crit", "nonCrit"]), `${path}.critMode`)
+    }
     if (settlementType === "attribute") {
         if (!calculationAnomalyIds(context, "anomaly").has(event.anomalyEffect)) {
             add(errors, `${path}.anomalyEffect`, "属性异常不存在。")

@@ -3,6 +3,25 @@ import { NSelect } from "naive-ui"
 import DamageWhiteBox from "@/components/DamageWhiteBox.vue"
 
 describe("DamageWhiteBox", () => {
+  it("shows three anomaly outcomes, current mode and guaranteed-CRIT counterfactual without changing configuration", async () => {
+    const event = {
+      id: "assault", kind: "anomaly", settlementType: "attribute", count: 2, finalDamage: 20000,
+      input: { kind: "anomaly", anomalyEffect: "assault", critMode: "nonCrit" },
+      critInfo: { available: true, effectiveMode: "nonCrit", critRate: 1, critDmg: 0.5 },
+      damageVariants: { expected: { finalDamage: 30000 }, crit: { finalDamage: 30000 }, nonCrit: { finalDamage: 20000 } },
+    }
+    const wrapper = mount(DamageWhiteBox, { props: { damage: { events: [event] } } })
+    expect(wrapper.text()).toContain("当前模式：非暴击")
+    expect(wrapper.text()).toContain("非暴击（对照） 20,000")
+    expect(wrapper.get('.damage-selected-variant').text()).toContain("非暴击")
+    await wrapper.get('.damage-selected-variant').trigger('click')
+    expect(event.input.critMode).toBe("nonCrit")
+    await wrapper.setProps({ damage: { events: [{ ...event, critInfo: { ...event.critInfo, available: false }, damageVariants: undefined }] } })
+    expect(wrapper.find('.damage-selected-variants').exists()).toBe(false)
+    expect(wrapper.find('.damage-current-mode').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it.each([
     [undefined, "乱流 · 烈霜（星见雅） ×1"],
     ["手动命名事件", "乱流 · 手动命名事件 ×1"],
