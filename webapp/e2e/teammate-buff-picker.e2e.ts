@@ -1,9 +1,64 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
+
+// Headless Chromium hides native scrollbars by default. These tests must render
+// the real gutter/thumb used in the desktop browser, not just inspect CSS values.
+test.use({ launchOptions: {
+  executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH?.trim() || undefined,
+  ignoreDefaultArgs: ["--hide-scrollbars"],
+} })
 
 async function openTeammates(page: Page) {
   await page.getByTestId("open-buff-picker").click()
   await page.locator(".n-tabs-tab").filter({ hasText: /^队友 Buff$/ }).click()
   await expect(page.getByTestId("teammate-slot-0")).toBeVisible()
+  await expect(page.locator(".calculation-modal")).toHaveCSS("transform", "none")
+}
+
+async function openSupportMenu(page: Page, mobile = false, slot = 0) {
+  const control = page.getByTestId(`teammate-slot-${slot}`)
+  await control.click()
+  const menu = page.locator(".teammate-select-menu")
+  await expect(menu).toHaveCSS("transform", "none")
+  if (mobile) await menu.getByText("支援", { exact: true }).tap()
+  else await menu.getByText("支援", { exact: true }).hover()
+  await expect(menu.locator(".teammate-select-option").filter({ hasText: "卢西娅" })).toBeAttached()
+  return menu
+}
+
+async function expectMenuLayout(page: Page, menu: Locator) {
+  await expect.poll(() => menu.evaluate(root => {
+    const issues: string[] = []
+    const rect = root.getBoundingClientRect()
+    if (rect.left < -1 || rect.right > innerWidth + 1 || rect.top < -1 || rect.bottom > innerHeight + 1) issues.push("menu leaves viewport")
+    if (document.documentElement.scrollWidth > innerWidth + 1) issues.push("page overflows horizontally")
+    const columns = root.querySelectorAll<HTMLElement>(".n-cascader-submenu")
+    columns.forEach((column, index) => {
+      const container = column.querySelector<HTMLElement>(".n-scrollbar-container")!
+      if (container.scrollWidth > container.clientWidth + 1) issues.push(`column ${index} overflows horizontally`)
+      if (container.offsetHeight > container.clientHeight) issues.push(`column ${index} has a horizontal scrollbar`)
+      if (index !== 0) return
+      if (Math.abs(column.getBoundingClientRect().width - 100) > 1) issues.push("category width differs from 100px")
+      if (container.offsetWidth !== container.clientWidth || container.scrollHeight > container.clientHeight) issues.push("categories scroll or are clipped")
+      const bounds = container.getBoundingClientRect()
+      for (const label of container.querySelectorAll<HTMLElement>(".n-cascader-option__label")) {
+        const r = label.getBoundingClientRect()
+        if (label.scrollWidth > label.clientWidth || r.bottom > bounds.bottom + 1 || r.top < bounds.top - 1) issues.push(`category clipped: ${label.textContent}`)
+        const hit = document.elementFromPoint(r.left + 5, r.top + r.height / 2)
+        if (!label.contains(hit)) issues.push(`category covered: ${label.textContent}`)
+      }
+    })
+    return issues
+  })).toEqual([])
+}
+
+async function expectReachable(option: Locator, container: Locator) {
+  const bounds = await container.boundingBox()
+  expect(bounds).not.toBeNull()
+  await expect.poll(() => option.evaluate((element, r) => {
+    const box = element.getBoundingClientRect()
+    const hit = document.elementFromPoint(box.left + 5, box.top + box.height / 2)
+    return box.top >= r!.y - 1 && box.bottom <= r!.y + r!.height + 1 && element.contains(hit)
+  }, bounds)).toBe(true)
 }
 
 async function chooseTeammate(page: Page, slot: number, name: string) {
@@ -24,6 +79,109 @@ async function savedSelection(page: Page) {
   })
 }
 
+test("keeps categories static and scrolls only overflowing characters", async ({ page }, testInfo) => {
+  await page.goto("/")
+  await openTeammates(page)
+  const control = page.getByTestId("teammate-slot-0")
+  const mobile = Boolean(testInfo.project.use.isMobile)
+  const menu = await openSupportMenu(page, mobile)
+  const last = menu.locator(".teammate-select-option").filter({ hasText: "卢西娅" })
+  const container = menu.locator(".n-cascader-submenu").last().locator(".n-scrollbar-container")
+  await expectMenuLayout(page, menu)
+  expect(await menu.evaluate(element => Boolean(element.closest(".calculation-modal")))).toBe(false)
+  await expectReachable(last, container)
+  // Measure the native gutter: absence of Naive UI's custom thumb proves nothing.
+  expect(await container.evaluate(element => element.offsetWidth - element.clientWidth)).toBe(0)
+
+  await page.setViewportSize({ width: page.viewportSize()!.width, height: 400 })
+  if (mobile) await menu.getByText("支援", { exact: true }).tap()
+  else await menu.getByText("支援", { exact: true }).hover()
+  await expectMenuLayout(page, menu)
+  await expect.poll(() => container.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0)
+  await page.mouse.move(1, 1)
+  expect(await container.evaluate(element => element.offsetWidth - element.clientWidth)).toBe(10)
+  await expect(menu.locator(".n-scrollbar-rail:visible")).toHaveCount(0)
+  const rect = (await container.boundingBox())!
+  await page.mouse.move(rect.x + 50, rect.y + rect.height / 2)
+  await page.mouse.wheel(0, 500)
+  await expect.poll(() => container.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+  await expectReachable(last, container)
+
+  await page.mouse.wheel(0, -500)
+  await expect.poll(() => container.evaluate(element => element.scrollTop)).toBe(0)
+  const thumbCenter = await container.evaluate(element => element.clientHeight * element.clientHeight / element.scrollHeight / 2)
+  await page.mouse.move(rect.x + rect.width - 5, rect.y + thumbCenter)
+  await page.mouse.down()
+  await page.mouse.move(rect.x + rect.width - 5, rect.y + rect.height - 2, { steps: 10 })
+  await page.mouse.up()
+  await expectReachable(last, container)
+  await page.mouse.move(1, 1)
+  await page.screenshot({ path: testInfo.outputPath("teammate-short.png") })
+  await last.click()
+  await expect(control).toContainText("卢西娅")
+  await expect(menu).toBeHidden()
+
+  await page.setViewportSize(testInfo.project.use.viewport!)
+  await control.click()
+  await page.keyboard.press("Escape")
+  await expect(menu).toBeHidden()
+  await control.click()
+  await page.locator(".calculation-modal .n-card-header").click()
+  await expect(menu).toBeHidden()
+  await expect(page.getByRole("button", { name: "应用选择", exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "取消", exact: true }).click()
+  await openTeammates(page)
+  await expect(control).not.toContainText("卢西娅")
+  await chooseTeammate(page, 0, "卢西娅")
+  await expect(control).toContainText("卢西娅")
+})
+
+test("category text and native scrollbars adapt across narrow, short and large viewports", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1920", "Additional sizes use one desktop context; standard projects cover scale and touch")
+  test.setTimeout(120_000)
+  page.setDefaultTimeout(10_000)
+  const sizes = [
+    [2560, 1440], [1920, 1080], [1440, 900], [1366, 768], [1280, 720],
+    [1024, 576], [768, 1024], [844, 360], [640, 320],
+    [390, 844], [360, 640], [320, 568], [320, 400],
+  ]
+  await page.goto("/")
+  await openTeammates(page)
+  for (const [width, height] of sizes) {
+    await test.step(`${width}x${height}`, async () => {
+      await page.setViewportSize({ width: width!, height: height! })
+      // Alternate slots so narrow layouts also exercise the lower selector.
+      const menu = await openSupportMenu(page, false, width! < 768 ? 1 : 0)
+      await expectMenuLayout(page, menu)
+      const column = menu.locator(".n-cascader-submenu").last()
+      const container = column.locator(".n-scrollbar-container")
+      const rect = (await container.boundingBox())!
+      const overflow = await container.evaluate(e => e.scrollHeight > e.clientHeight)
+      expect(await container.evaluate(e => e.offsetWidth - e.clientWidth)).toBe(overflow ? 10 : 0)
+      await page.mouse.move(rect.x + 50, rect.y + rect.height / 2)
+      await page.mouse.wheel(0, 1000)
+      await expectReachable(menu.locator(".teammate-select-option").filter({ hasText: "卢西娅" }), container)
+      await menu.getByText("强攻", { exact: true }).hover()
+      await expect(column.locator(".teammate-select-option")).toHaveCount(3)
+      await expectMenuLayout(page, menu)
+      const smallOverflow = await container.evaluate(e => e.scrollHeight > e.clientHeight)
+      expect(await container.evaluate(e => e.offsetWidth - e.clientWidth)).toBe(smallOverflow ? 10 : 0)
+      await page.mouse.move(1, 1)
+      await page.screenshot({ path: testInfo.outputPath(`teammate-${width}x${height}.png`) })
+      await menu.getByText("击破", { exact: true }).hover()
+      await expect(column.locator(".teammate-select-option")).toHaveCount(10)
+      await expectMenuLayout(page, menu)
+      expect(await container.evaluate(e => e.offsetWidth - e.clientWidth)).toBe(10)
+      const longRect = (await container.boundingBox())!
+      await page.mouse.move(longRect.x + 50, longRect.y + longRect.height / 2)
+      await page.mouse.wheel(0, 1000)
+      await expectReachable(column.locator(".teammate-select-option").last(), container)
+      await page.keyboard.press("Escape")
+      await expect(menu).toBeHidden()
+    })
+  }
+})
+
 test("teammates remain in their own responsive columns and preserve manual cinema choices after reload", async ({ page }, testInfo) => {
   await page.goto("/")
   await expect(page.getByTestId("open-buff-picker")).toBeVisible()
@@ -34,6 +192,7 @@ test("teammates remain in their own responsive columns and preserve manual cinem
   await expect(page.getByTestId("teammate-specialty-filter")).toHaveCount(0)
   await page.getByTestId("teammate-slot-0").click()
   const menu = page.locator(".teammate-select-menu")
+  await expect(menu).toHaveCSS("transform", "none")
   const supportCategory = menu.getByText("支援", { exact: true })
   const qianxiaOption = menu.locator(".teammate-select-option").filter({ hasText: "千夏" })
   if (testInfo.project.use.isMobile) {

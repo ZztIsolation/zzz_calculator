@@ -82,6 +82,25 @@ describe("TeammateSelect", () => {
     expect(selected.find(".teammate-select-avatar").exists()).toBe(false)
   })
 
+  it("mounts the menu outside modal clipping and keeps overflow scrolling visible", () => {
+    const selected = mountSelect()
+    const cascader = selected.findComponent({ name: "Cascader" })
+
+    expect(cascader.exists()).toBe(true)
+    expect(cascader.props("to")).toBe("body")
+    expect(cascader.props("scrollbarProps")).toMatchObject({
+      trigger: "none",
+      themeOverrides: {
+        width: "10px",
+        color: "rgba(51, 65, 85, 0.72)",
+      },
+    })
+    expect(cascader.props("themeOverrides")).toMatchObject({
+      optionHeight: "36px",
+      optionFontSize: "14px",
+    })
+  })
+
   it("searches names across categories and selects the matching teammate with the keyboard", async () => {
     const selected = mountSelect(null, options.map(option => ({ ...option, importStatus: 'imported' as const })))
     await openMenu()
