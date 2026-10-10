@@ -8239,6 +8239,1025 @@
         "atk",
         "anomalyProficiency"
       ]
+    },
+    {
+      "id": "ellen_joe",
+      "name": {
+        "zhCN": "艾莲"
+      },
+      "rarity": "S",
+      "attribute": "ice",
+      "damageElement": "ice",
+      "specialty": "attack",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "维多利亚家政",
+      "images": {
+        "portrait": "/assets/agents/ellen_joe.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/IconRole21.webp"
+      },
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 863,
+        "defBase": 606,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 93,
+        "anomalyProficiency": 93,
+        "anomalyMastery": 94,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "凌牙厉齿"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "凌牙厉齿"
+          },
+          "defaultLevelAtCoreSkill": "F",
+          "levels": [
+            {
+              "level": 1,
+              "selectedSkillCritDmgPct": 50
+            },
+            {
+              "level": 2,
+              "selectedSkillCritDmgPct": 58.3
+            },
+            {
+              "level": 3,
+              "selectedSkillCritDmgPct": 66.6
+            },
+            {
+              "level": 4,
+              "selectedSkillCritDmgPct": 75
+            },
+            {
+              "level": 5,
+              "selectedSkillCritDmgPct": 83.3
+            },
+            {
+              "level": 6,
+              "selectedSkillCritDmgPct": 91.6
+            },
+            {
+              "level": 7,
+              "selectedSkillCritDmgPct": 100
+            }
+          ]
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1191",
+          "https://static.nanoka.cc/zzz/3.3.4+19304006/zh/character/1191.json"
+        ]
+      },
+      "potentialVision": {
+        "name": {
+          "zhCN": "鲨气汹汹"
+        },
+        "defaultLevel": 6,
+        "maxLevel": 6,
+        "mechanicUnlockLevel": 1,
+        "scaling": {
+          "name": {
+            "zhCN": "潜能觉醒：极冰带"
+          },
+          "levels": [
+            {
+              "level": 0,
+              "stormCritDmgPerStackPct": 0,
+              "stormIceResIgnorePct": 0
+            },
+            {
+              "level": 1,
+              "stormCritDmgPerStackPct": 0,
+              "stormIceResIgnorePct": 0
+            },
+            {
+              "level": 2,
+              "stormCritDmgPerStackPct": 1.6,
+              "stormIceResIgnorePct": 3.3
+            },
+            {
+              "level": 3,
+              "stormCritDmgPerStackPct": 2.4,
+              "stormIceResIgnorePct": 5
+            },
+            {
+              "level": 4,
+              "stormCritDmgPerStackPct": 3.2,
+              "stormIceResIgnorePct": 6.7
+            },
+            {
+              "level": 5,
+              "stormCritDmgPerStackPct": 4,
+              "stormIceResIgnorePct": 8.3
+            },
+            {
+              "level": 6,
+              "stormCritDmgPerStackPct": 4.8,
+              "stormIceResIgnorePct": 10
+            }
+          ]
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1191",
+          "https://static.nanoka.cc/zzz/3.3.4+19304006/zh/character/1191.json"
+        ],
+        "mechanics": {
+          "levelOneUnlocksEnhancedMoves": true,
+          "additionalAbilityAddsStunTeammateCondition": true,
+          "frostEdgeAutomaticAfter": [
+            "flash_freeze_trimming:hit_3",
+            "ex_sharknami",
+            "dodge_reef",
+            "assist_followup"
+          ],
+          "defaultTargetSize": "large"
+        }
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：凌牙厉齿"
+          },
+          "defaultChecked": true,
+          "effects": [
+            {
+              "id": "core-frozen-attacks-crit-dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 50,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "flash_freeze_trimming"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "dodge",
+                    "skillType": "dodge",
+                    "moveId": "arctic_ambush",
+                    "rowId": "charged_cut"
+                  }
+                ]
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "selectedSkillCritDmgPct"
+              }
+            },
+            {
+              "id": "core-potential-attacks-crit-dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 50,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "chain",
+                    "skillType": "chain",
+                    "moveId": "chain_avalanche"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "chain",
+                    "skillType": "ultimate",
+                    "moveId": "ultimate_endless_winter"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "icy_waves"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "frost_edge_small"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "frost_edge_medium"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ellen_joe",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "frost_edge_large"
+                  }
+                ]
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "selectedSkillCritDmgPct"
+              },
+              "requirement": {
+                "minPotentialLevel": 1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "description": {
+            "zhCN": "蓄力剪击和急冻普攻获得50%/58.3%/66.6%/75%/83.3%/91.6%/100%暴伤。潜能1后连携、大招、霜锋、冰刃浪也获得该加成；强化E两段不获得此核心暴伤。"
+          }
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：风暴潮"
+          },
+          "defaultChecked": true,
+          "buffModifiers": [],
+          "description": {
+            "zhCN": "原版需同属性或同阵营队友；潜能1后击破队友也可触发，琉音满足条件。冰伤命中后每层增加3%冰伤，最多10层，持续10秒。潜能2至6每层额外暴伤为1.6%/2.4%/3.2%/4%/4.8%；仅10层时无视3.3%/5%/6.7%/8.3%/10%冰抗。默认按失衡前已叠满、轴内保持满层；层数和覆盖率可调。"
+          },
+          "effects": [
+            {
+              "id": "storm-ice-damage",
+              "type": "stacked",
+              "stat": "iceDmg",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "stackGroup": "ellen_storm_tide",
+              "stackLabel": {
+                "zhCN": "风暴潮层数"
+              },
+              "durationSeconds": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "storm-potential-crit-dmg",
+              "type": "stacked",
+              "stat": "critDmg",
+              "value": 0,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "stackGroup": "ellen_storm_tide",
+              "stackLabel": {
+                "zhCN": "风暴潮层数"
+              },
+              "durationSeconds": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "valueSource": {
+                "kind": "potentialVisionScaling",
+                "field": "stormCritDmgPerStackPct"
+              }
+            },
+            {
+              "id": "storm-potential-ice-res-ignore",
+              "type": "stacked",
+              "stat": "iceResIgnore",
+              "value": 0,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "stackGroup": "ellen_storm_tide",
+              "stackLabel": {
+                "zhCN": "风暴潮层数"
+              },
+              "durationSeconds": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "activationStacks": 10,
+              "valueSource": {
+                "kind": "potentialVisionScaling",
+                "field": "stormIceResIgnorePct"
+              }
+            }
+          ]
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "凛冬前兆"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "在[冲刺攻击：冰渊潜袭]中发动快速剪击命中敌人时，获得的[急冻充能]提升至3点；在[冲刺攻击：冰渊潜袭]中发动蓄力剪击命中敌人时，获得的[急冻充能]提升至6点；每消耗1点[急冻充能]，艾莲的暴击率提升2%，持续15秒，最多叠加6层，每层效果单独结算持续时间。"
+            },
+            "effects": [
+              {
+                "id": "c1-crit-rate",
+                "type": "stacked",
+                "stat": "critRate",
+                "value": 2,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "maxStacks": 6,
+                "defaultStacks": 6,
+                "stackGroup": "ellen_c1_freeze",
+                "stackLabel": {
+                  "zhCN": "一影暴击层数"
+                },
+                "durationSeconds": 15,
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "冰洋掠食者"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "发动第三段[普通攻击：急冻修剪法]后，可以直接衔接发动[强化特殊技：鲨卷风]；发动[强化特殊技]时，每拥有1点[急冻充能]，当前招式造成的暴击伤害提升20%，最多提升60%。"
+            },
+            "effects": [
+              {
+                "id": "c2-ex-crit-dmg",
+                "type": "fixed",
+                "stat": "critDmg",
+                "value": 60,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "ellen_joe",
+                      "categoryId": "special",
+                      "skillType": "special",
+                      "moveId": "ex_tail_swipe"
+                    },
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "ellen_joe",
+                      "categoryId": "special",
+                      "skillType": "special",
+                      "moveId": "ex_sharknami"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "强化特殊技发动时拥有至少3点急冻充能；不足时按覆盖率调低"
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 3,
+            "cinemaName": {
+              "zhCN": "永不加班"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "无休寒潮"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "队伍中任意角色对敌人施加[冻结]效果或使敌人失衡时，自身获得6点[急冻充能]和[快蓄]效果，并回复4点能量，能量回复效果10秒内最多触发一次。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 5,
+            "cinemaName": {
+              "zhCN": "睡眠充足"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "盛宴时分"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "发动[强化特殊技]、[连携技]或获得[快蓄]时，艾莲的穿透率提升20%，持续6秒，同时获得1层[盛宴]，[盛宴]最多叠加3层；拥有3层[盛宴]后，在[冲刺攻击：冰渊潜袭]中发动蓄力剪击命中敌人时，消耗所有[盛宴]，使当前招式造成的伤害提升250%。"
+            },
+            "effects": [
+              {
+                "id": "c6-pen-ratio",
+                "type": "fixed",
+                "stat": "penRatio",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "durationSeconds": 6
+              },
+              {
+                "id": "c6-charged-cut-damage",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 250,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "ellen_joe",
+                      "categoryId": "dodge",
+                      "skillType": "dodge",
+                      "moveId": "arctic_ambush",
+                      "rowId": "charged_cut"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "消耗3层盛宴的蓄力剪击"
+              }
+            ],
+            "buffModifiers": []
+          }
+        ],
+        "skillBuffs": []
+      },
+      "skillGroups": [
+        {
+          "id": "flash_freeze_full",
+          "name": {
+            "zhCN": "急冻修剪法：一、二、三段（不含霜锋）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "a1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ellen_joe",
+                "categoryId": "basic",
+                "moveId": "flash_freeze_trimming",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "a2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ellen_joe",
+                "categoryId": "basic",
+                "moveId": "flash_freeze_trimming",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "a3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ellen_joe",
+                "categoryId": "basic",
+                "moveId": "flash_freeze_trimming",
+                "rowId": "hit_3"
+              }
+            }
+          ]
+        },
+        {
+          "id": "icy_waves_full",
+          "name": {
+            "zhCN": "冰刃浪：两段完整命中"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "wave1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ellen_joe",
+                "categoryId": "basic",
+                "moveId": "icy_waves",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "wave2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ellen_joe",
+                "categoryId": "basic",
+                "moveId": "icy_waves",
+                "rowId": "hit_2"
+              }
+            }
+          ]
+        }
+      ],
+      "defaultTeammates": [
+        {
+          "teammateId": "liuyin",
+          "cinemaLevel": 0
+        },
+        {
+          "teammateId": "qianxia",
+          "cinemaLevel": 0
+        }
+      ],
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "0影原版参考轴：2大＋2套急冻A＋强化E两段＋连携"
+        },
+        "events": [
+          {
+            "id": "ultimate_1",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ellen_joe",
+              "categoryId": "chain",
+              "moveId": "ultimate_endless_winter",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "basic_string_1",
+            "kind": "skillGroup",
+            "skillGroupId": "flash_freeze_full",
+            "count": 1,
+            "stunned": true
+          },
+          {
+            "id": "ex_1",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ellen_joe",
+              "categoryId": "special",
+              "moveId": "ex_tail_swipe",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "ex_2",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ellen_joe",
+              "categoryId": "special",
+              "moveId": "ex_sharknami",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "chain_1",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ellen_joe",
+              "categoryId": "chain",
+              "moveId": "chain_avalanche",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "ultimate_2",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ellen_joe",
+              "categoryId": "chain",
+              "moveId": "ultimate_endless_winter",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "basic_string_2",
+            "kind": "skillGroup",
+            "skillGroupId": "flash_freeze_full",
+            "count": 1,
+            "stunned": true
+          }
+        ],
+        "selectedEventId": "ultimate_1",
+        "potentialVariants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 0,
+            "name": {
+              "zhCN": "0影艾莲＋琉音＋千夏：2大2套A2冰刃浪（大体型，含3霜锋）"
+            },
+            "events": [
+              {
+                "id": "ultimate_1",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_endless_winter",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "basic_string_1",
+                "kind": "skillGroup",
+                "skillGroupId": "flash_freeze_full",
+                "count": 1,
+                "stunned": true
+              },
+              {
+                "id": "frost_edge_1",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "basic",
+                  "moveId": "frost_edge_large",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "icy_waves_1",
+                "kind": "skillGroup",
+                "skillGroupId": "icy_waves_full",
+                "count": 1,
+                "stunned": true
+              },
+              {
+                "id": "ex_1",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "special",
+                  "moveId": "ex_tail_swipe",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "ex_2",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "special",
+                  "moveId": "ex_sharknami",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "frost_edge_2",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "basic",
+                  "moveId": "frost_edge_large",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "chain_1",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "chain",
+                  "moveId": "chain_avalanche",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "ultimate_2",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_endless_winter",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "basic_string_2",
+                "kind": "skillGroup",
+                "skillGroupId": "flash_freeze_full",
+                "count": 1,
+                "stunned": true
+              },
+              {
+                "id": "frost_edge_3",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "basic",
+                  "moveId": "frost_edge_large",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "icy_waves_2",
+                "kind": "skillGroup",
+                "skillGroupId": "icy_waves_full",
+                "count": 1,
+                "stunned": true
+              }
+            ],
+            "selectedEventId": "ultimate_1",
+            "minPotentialLevel": 1,
+            "maxPotentialLevel": 6
+          }
+        ]
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "shadow_harmony",
+          "polar_metal",
+          "zzz_wiki_2029"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "critRate",
+            "critDmg",
+            "atkPct"
+          ],
+          "5": [
+            "iceDmg",
+            "penRatio",
+            "atkPct"
+          ],
+          "6": [
+            "atkPct"
+          ]
+        }
+      },
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg",
+        "penRatio"
+      ],
+      "hidden": false,
+      "sources": [
+        "https://zzz.nanoka.cc/character/1191",
+        "https://static.nanoka.cc/zzz/3.3.4+19304006/zh/character/1191.json"
+      ],
+      "verification": {
+        "dataVersion": "3.3.4+19304006",
+        "acquiredAt": "2026-10-10",
+        "sourceSha256": "e2e1bdff3b10c751175bd588fc17181997053870469e65065744e43017e5e9b7",
+        "defaults": "User explicitly confirmed C0/P6, full 1/2/3 frozen basic strings and large target. User-authored rotation is not replaced by a generic combo.",
+        "basePanel": "L60 excludes core nodes; A/C/E +4.8 CR, B/D/F +25 base ATK. Core F = 938 ATK and 19.4 CR before W-Engine/discs.",
+        "frostEdge": "Three automatic Frost Edges: after each basic third hit and after EX Sharknami. One body-size variant per proc, large by user choice.",
+        "stackAssumption": "Storm Tide starts and stays at 10 stacks for the default burst; source skill is 10-second refresh. Stack count and effect coverage are editable, not auto simulated.",
+        "teammateAssumption": "Default teammates are Liuyin and Qianxia at Cinema 0 because teammate Cinemas were not supplied. Existing saved build selections take precedence; adjust teammate Cinema, snapshots and equipment in Buff picker.",
+        "driveDiscs": "Default set IDs are search candidates, not a proven optimal set or panel. Sixth slot defaults to attack for the damage objective.",
+        "unsupported": "Resource/Decibel regeneration, animation timing, duration feasibility and automatic buff application are not simulated. Two Ultimates are explicit user events; no automatic second Ultimate is granted. P0 reference omits enhanced waves/Frost Edge and requires manual Additional Ability disable in this all-physical teammate team.",
+        "cinemaBoundary": "C2 EX Crit DMG assumes >=3 Flash Freeze charges at cast; edit its coverage otherwise. No alternate C1-C6 rotations authored."
+      }
     }
   ]
 }

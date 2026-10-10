@@ -22,7 +22,7 @@ import {
   normalizeAnomalySourceSnapshot,
 } from "@core/anomalyRelease.js"
 import { buildCombatBuffGroups, teammateDriveDiscSetIdsFromBuffIds, wEngineIdFromTeamBuffId } from "@/utils/combatBuffs"
-import { normalizeBuffPickerState, selectedTeammateOwnerIds, type BuffPickerState } from "@/utils/teammateBuffPicker"
+import { isTeammatePotentialBuff, normalizeBuffPickerState, selectedTeammateOwnerIds, teammateCinemaLevel, type BuffPickerState } from "@/utils/teammateBuffPicker"
 import {
   clampWEngineModificationLevel,
   coreSkillDefaultLevel,
@@ -1166,6 +1166,17 @@ export const useBuildStore = defineStore("build", {
       const wEngine = availableWEngines.find((item: any) => item.id === wEngineId)
       const combat = config.combat ?? {}
       const rawDamageConfig = config.damage ?? config.damageConfig
+      const useDefaultTeammates = config.buffPickerState === undefined
+        && config.selectedBuffIds === undefined && combat.activeBuffIds === undefined
+      const defaultTeammateState = useDefaultTeammates && agent.defaultTeammates?.length
+        ? normalizeBuffPickerState({ teammateSlots: agent.defaultTeammates ?? [] })
+        : null
+      const defaultTeammateBuffIds = (defaultTeammateState?.teammateSlots ?? []).flatMap(slot => {
+        if (!slot) return []
+        const group = (meta.teammateCombatBuffGroups ?? []).find((item: any) => item.id === slot.teammateId)
+        return (group?.buffs ?? []).filter((buff: any) => !isTeammatePotentialBuff(buff)
+          && (teammateCinemaLevel(buff) ?? 0) <= slot.cinemaLevel).map((buff: any) => buff.id)
+      })
 
       this.agentId = agent.id
       this.agentLevel = numeric(config.agentLevel, 60)
@@ -1195,7 +1206,7 @@ export const useBuildStore = defineStore("build", {
       this.wEngineModificationLevel = clampWEngineModificationLevel(config.wEngineModificationLevel ?? 1, wEngine)
       const rawTargetConfig = config.targetConfig ?? rawDamageConfig?.target ?? rawDamageConfig?.targetConfig ?? {}
       const legacyBossEncounterId = String(rawTargetConfig?.bossEncounterId ?? "")
-      const rawSelectedBuffIds = stringArray(combat.activeBuffIds ?? config.selectedBuffIds)
+      const rawSelectedBuffIds = stringArray(combat.activeBuffIds ?? config.selectedBuffIds ?? defaultTeammateBuffIds)
         .map(id => normalizeTeammateBuffId(normalizeWEngineBuffId(meta, id)))
       const normalizedTeammateState = normalizeTeammateBuffState(
         rawSelectedBuffIds,
@@ -1227,7 +1238,7 @@ export const useBuildStore = defineStore("build", {
       this.manuallyUncheckedDefaultBuffIds = normalizedPyroisSelection.migrated
         ? manuallyUncheckedDefaultBuffIds.filter(id => id !== PYROIS_CORE_PASSIVE_BUFF_ID)
         : manuallyUncheckedDefaultBuffIds
-      this.buffPickerState = normalizeBuffPickerState(config.buffPickerState)
+      this.buffPickerState = normalizeBuffPickerState(config.buffPickerState) ?? defaultTeammateState
       this.damageConfig = normalizeDamageConfig({
         ...(rawDamageConfig ?? {}),
         target: rawDamageConfig?.target ?? rawTargetConfig,

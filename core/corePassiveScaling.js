@@ -42,6 +42,9 @@ export function materializeCorePassiveScalingRule(rule = {}, agent = {}, request
         ...rule,
         value,
         displayValue: value,
+        ...(rule.type === "stacked" && rule.activationStacks == null
+            ? { valuePerStack: value, displayValuePerStack: value }
+            : {}),
     }
 }
 

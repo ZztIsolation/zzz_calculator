@@ -208,6 +208,9 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
 ]
 
 export const FALLBACK_LABELS = {
+    selectedSkillCritDmgPct: "指定招式暴伤加成%",
+    stormCritDmgPerStackPct: "风暴潮每层额外暴伤%",
+    stormIceResIgnorePct: "风暴潮满层冰抗无视%",
     hp: "生命值",
     atk: "攻击力",
     def: "防御力",

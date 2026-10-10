@@ -96,6 +96,13 @@ effect mentioning a move.
 | Buff modifiers | Modify a referenced rule once; an absent source Buff cannot produce an independent modifier benefit |
 | Duration/cooldown | Descriptive or explicit formula parameters, not automatically derived uptime |
 
+Self effects may specify `requirement.minPotentialLevel` / `maxPotentialLevel`.
+Potential materialization filters inactive rules before panel/event compilation;
+it does not prevent selecting authored moves at P0. Dynamic `valueSource` supports
+fixed and stacked rules. For ordinary stacks the resolved value is the per-stack
+value; with `activationStacks` it is the fixed activated amount. A P0 compatibility
+value of zero is valid when its structured scaling source is present.
+
 `dmgBonus` enters the damage-bonus zone; `skillMultiplierBonus` adds to the selected
 skill multiplier. PEN Ratio, DEF Ignore and DEF reduction remain separate.
 Evaluate per-hit modifiers before aggregating nonlinear target factors. Descriptions
@@ -143,6 +150,10 @@ the body only, without an implicit Assault Directive:
   scaling; P0 does not receive P2-P6 Buff values.
 - Workbench loads administrator configurations as runtime `adminDefault`; user
   custom configurations retain separate persistence semantics.
+- Optional `defaultTeammates` applies only when a character has no saved teammate
+  picker or explicit Buff selection. It selects the two authored teammates and
+  their Buffs up to the authored Cinema levels. Saved empty selections are also
+  authoritative. Defaults do not grant teammate equipment or infer uptime.
 - Characters may intentionally omit administrator defaults and groups. Vivian's
   profile-aware single Release fallback is such a case, not missing content.
 

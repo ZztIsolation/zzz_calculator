@@ -8167,6 +8167,7 @@ export function buildMeta(catalog) {
         combatBuffs: agent.combatBuffs ?? {},
         cinemaDescriptions: agent.cinemaDescriptions ?? [],
         preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
+        defaultTeammates: agent.defaultTeammates ?? [],
         importantSubStats: agent.importantSubStats ?? [],
         importantPanelStats: agent.importantPanelStats ?? [],
         skillGroups: agent.skillGroups ?? [],

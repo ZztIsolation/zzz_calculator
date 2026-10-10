@@ -17,6 +17,7 @@ const coreStatOptions = [
 ]
 
 const PARAM_LABELS: Record<string, string> = {
+  selectedSkillCritDmgPct: "指定招式暴伤加成%",
   frostburnBreakAtkMultiplier: "霜灼·破伤害倍率%", teamAnomalyBuildupPct: "全队异常积蓄效率%",
   selectedSkillDmgBonusPct: "指定技能伤害加成%", physicalAnomalyBuildupEfficiencyPct: "物理异常积蓄效率%",
   physicalAnomalyExtraDamageRatioPct: "物理异常额外伤害比例%", disorderMultiplierBonusPerRemainingSecondPct: "每剩余秒紊乱倍率加算%",

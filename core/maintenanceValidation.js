@@ -615,6 +615,18 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     if (rule.requirement?.eventStunned !== undefined && typeof rule.requirement.eventStunned !== "boolean") {
         add(errors, `${path}.requirement.eventStunned`, "失衡状态要求必须是布尔值。")
     }
+    for (const key of ["minPotentialLevel", "maxPotentialLevel"]) {
+        if (rule.requirement?.[key] == null) continue
+        const level = Number(rule.requirement[key])
+        if (sourceType !== "self" || !context.agent?.potentialVision) {
+            add(errors, `${path}.requirement.${key}`, "潜能条件只能用于具有潜能影像的角色自身效果。")
+        } else if (!Number.isInteger(level) || level < 0 || level > Number(context.agent.potentialVision.maxLevel)) {
+            add(errors, `${path}.requirement.${key}`, "潜能条件必须位于 P0 到角色最高潜能等级之间。")
+        }
+    }
+    if (Number(rule.requirement?.minPotentialLevel) > Number(rule.requirement?.maxPotentialLevel)) {
+        add(errors, `${path}.requirement`, "最低潜能等级不能高于最高潜能等级。")
+    }
     if (rule.requirement?.agentIds !== undefined) {
         const ids = rule.requirement.agentIds
         if (!Array.isArray(ids)) {
@@ -710,8 +722,8 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
     if (rule.valueSource !== undefined) {
         const source = rule.valueSource ?? {}
-        if (type !== "fixed") {
-            add(errors, `${path}.valueSource`, "动态数值来源只支持固定值规则。")
+        if (type !== "fixed" && type !== "stacked") {
+            add(errors, `${path}.valueSource`, "动态数值来源只支持固定值或叠层规则。")
         }
         requireEnum(errors, source.kind, EFFECT_VALUE_SOURCE_KIND_VALUES, `${path}.valueSource.kind`)
         const field = String(source.field ?? "").trim()
@@ -1071,7 +1083,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
             && rule.value !== ""
         const valueKey = hasFixedActivationValue ? "value" : "valuePerStack"
         const value = requireFinite(errors, hasFixedActivationValue ? rule.value : rule.valuePerStack ?? rule.value, `${path}.${valueKey}`)
-        if (Number.isFinite(value) && value === 0) {
+        if (Number.isFinite(value) && value === 0 && !rule.valueSource) {
             add(errors, `${path}.${valueKey}`, hasFixedActivationValue ? "激活数值不能为 0。" : "每层数值不能为 0。")
         }
         const maxStacks = requireFinite(errors, rule.maxStacks, `${path}.maxStacks`)
@@ -2455,6 +2467,27 @@ function validateAgent(item, context) {
         add(errors, "damageElement", "特殊显示属性必须填写真实伤害结算属性。")
     }
     validateOptionalSources(errors, item, item?.images?.portrait ?? item?.images?.icon)
+    if (item?.defaultTeammates !== undefined) {
+        if (!Array.isArray(item.defaultTeammates) || item.defaultTeammates.length > 2) {
+            add(errors, "defaultTeammates", "默认队友必须是最多两项的数组。")
+        } else {
+            const seen = new Set([item.id])
+            const teammates = context.combatBuffs?.teammates ?? context.teammateCombatBuffGroups ?? []
+            item.defaultTeammates.forEach((slot, index) => {
+                const path = `defaultTeammates[${index}]`
+                const id = slot?.teammateId
+                requireId(errors, { id }, `${path}.teammateId`)
+                if (seen.has(id)) add(errors, `${path}.teammateId`, "默认队友不能重复或选择自身。")
+                seen.add(id)
+                if (teammates.length && !teammates.some(teammate => teammate.id === id)) {
+                    add(errors, `${path}.teammateId`, "队友 Buff 目录中不存在此角色。")
+                }
+                if (!isDefaultCalculationCinemaLevel(slot?.cinemaLevel)) {
+                    add(errors, `${path}.cinemaLevel`, "队友影画必须是 0 到 6 的整数。")
+                }
+            })
+        }
+    }
 
     for (const stat of AGENT_LEVEL_STATS) {
         const value = requireFinite(errors, item?.level60?.[stat], `level60.${stat}`)
@@ -2490,7 +2523,7 @@ function validateAgent(item, context) {
 
     validateEffectSet(errors, item?.combatBuffs?.corePassive, "combatBuffs.corePassive", {
         sourceType: "self",
-        context: { ...context, agent: item, allowCorePassiveScalingSource: true },
+        context: { ...context, agent: item, allowCorePassiveScalingSource: true, allowPotentialVisionScalingSource: true },
     })
     validatePotentialVision(errors, item?.potentialVision)
     validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", {

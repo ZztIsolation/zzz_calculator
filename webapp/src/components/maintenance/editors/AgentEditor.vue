@@ -245,6 +245,22 @@ function enableCoreSkill(enabled: boolean) {
   } : null
   changed()
 }
+
+function defaultTeammateOptions() {
+  const teammates = props.catalog?.combatBuffs?.teammates ?? props.catalog?.teammateCombatBuffGroups ?? []
+  return teammates.filter((teammate: any) => teammate.id !== props.model.id)
+    .map((teammate: any) => option(teammate.id, textOf(teammate.name)))
+}
+
+function addDefaultTeammate() {
+  props.model.defaultTeammates ??= []
+  const selected = new Set(props.model.defaultTeammates.map((slot: any) => slot.teammateId))
+  const candidate = defaultTeammateOptions().find((item: any) => !selected.has(item.value))
+  if (candidate && props.model.defaultTeammates.length < 2) {
+    props.model.defaultTeammates.push({ teammateId: candidate.value, cinemaLevel: 0 })
+    changed()
+  }
+}
 </script>
 
 <template>
@@ -263,6 +279,15 @@ function enableCoreSkill(enabled: boolean) {
         <label class="maintenance-switch-field"><span>首页/优化器显示</span><NSwitch :value="model.hidden !== true" :disabled="disabled" @update:value="model.hidden = !$event; changed()" /></label>
       </div>
       <SourceListEditor :sources="model.sources" :disabled="disabled" @change="changed" />
+    </MaintenanceSection>
+
+    <MaintenanceSection title="默认队友" description="首次选择角色时应用；已有保存配置及手动取消项优先。队友影画可在工作台调整。">
+      <template #actions><NButton size="small" :disabled="disabled || (model.defaultTeammates?.length ?? 0) >= 2" @click="addDefaultTeammate"><template #icon><Plus :size="15" /></template>添加队友</NButton></template>
+      <div v-for="(slot, index) in model.defaultTeammates ?? []" :key="index" class="maintenance-grid">
+        <label class="maintenance-field"><span>队友</span><NSelect v-model:value="slot.teammateId" :options="defaultTeammateOptions()" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>影画</span><NInputNumber v-model:value="slot.cinemaLevel" :min="0" :max="6" :precision="0" :disabled="disabled" @update:value="changed" /></label>
+        <NButton size="small" :disabled="disabled" @click="model.defaultTeammates.splice(index, 1); changed()"><template #icon><Trash2 :size="15" /></template>移除</NButton>
+      </div>
     </MaintenanceSection>
 
     <MaintenanceSection title="60 级面板">
@@ -342,7 +367,7 @@ function enableCoreSkill(enabled: boolean) {
           <label class="maintenance-field"><span>生效范围</span><NSelect :value="model.combatBuffs[entry.key].scope" :options="SCOPE_OPTIONS" :disabled="disabled" @update:value="setBuffScope(model.combatBuffs[entry.key], String($event))" /></label>
           <label class="maintenance-field maintenance-field-wide"><span>Buff 描述</span><NInput type="textarea" :value="textOf(model.combatBuffs[entry.key].description)" :disabled="disabled" @update:value="model.combatBuffs[entry.key].description = { zhCN: String($event) }; changed()" /></label>
         </div>
-        <EffectRulesEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" :allow-coverage="model.combatBuffs[entry.key].scope === 'inCombat'" :preferred-skill-id="catalog?.agentSkills?.agentSkills?.find((skill: any) => skill.agentId === model.id)?.id" :core-passive-scaling="entry.key === 'corePassive' ? model.coreSkill?.corePassiveScaling : null" :potential-vision-scaling="entry.key === 'additionalAbility' ? model.potentialVision?.scaling : null" @change="changed" />
+        <EffectRulesEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" :allow-coverage="model.combatBuffs[entry.key].scope === 'inCombat'" :preferred-skill-id="catalog?.agentSkills?.agentSkills?.find((skill: any) => skill.agentId === model.id)?.id" :core-passive-scaling="entry.key === 'corePassive' ? model.coreSkill?.corePassiveScaling : null" :potential-vision-scaling="model.potentialVision?.scaling" @change="changed" />
         <div class="buff-modifier-block"><div class="maintenance-row-head"><strong>Buff 修饰</strong></div><BuffModifiersEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" @change="changed" /></div>
       </template>
     </MaintenanceSection>
@@ -377,7 +402,7 @@ function enableCoreSkill(enabled: boolean) {
         </div>
         <div class="skill-table-wrap potential-scaling-table-wrap">
           <table class="skill-multiplier-table">
-            <thead><tr><th>潜能</th><th v-for="field in potentialScalingFields()" :key="field">{{ field }}</th></tr></thead>
+            <thead><tr><th>潜能</th><th v-for="field in potentialScalingFields()" :key="field">{{ statLabel(field, catalog?.meta) }}</th></tr></thead>
             <tbody><tr v-for="row in model.potentialVision.scaling.levels" :key="row.level"><td>P{{ row.level }}</td><td v-for="field in potentialScalingFields()" :key="field"><NInputNumber v-model:value="row[field]" :disabled="disabled" :step="0.1" @update:value="changed" /></td></tr></tbody>
           </table>
         </div>
