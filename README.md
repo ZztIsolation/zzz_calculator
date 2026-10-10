@@ -2,6 +2,8 @@
 
 ZZZ Calculator is a Vue 3 and shared-core tool for Zenless Zone Zero agent panels, damage snapshots, Drive Disc optimization, local inventory and Scanner imports. Calculation and optimization run in the browser; the Node service provides catalogs, static assets, local maintenance and bounded integrations.
 
+Language: [简体中文](README.zh-CN.md)
+
 ## Upload Update Summaries
 
 - **2026-10-09 — Adaptive teammate menu**: position and size the teammate menu within available space, with a fixed category column and independently scrolling characters on narrow and short viewports.
@@ -9,6 +11,16 @@ ZZZ Calculator is a Vue 3 and shared-core tool for Zenless Zone Zero agent panel
 - **2026-10-07 — Catalog assets**: added and verified current W-Engine records and content-versioned thumbnails.
 - **2026-10-04 — Web/runtime hardening**: preserved Scanner settings across web elevation retries and revalidated compact catalog responses with ETags.
 - **2026-10-03 — Production recovery controls**: bounded deployment phases, audit evidence and recovery diagnostics without changing the normal exact-SHA promotion boundary.
+- **2026-10-02 — Enka teammate Buff sync**: connected showcase imports to native teammate Buff configuration while preserving manual selections, source details, loadouts and retryable save conflicts.
+- **2026-10-02 — Defense Battle 3.2 phase-two Field Buffs**: added the three phase-two Field Buff records for Sharp, elemental, triggered DEF reduction and stun vulnerability effects, with unsupported mechanics kept descriptive.
+- **2026-10-01 — Velina Wind Anomaly modeling**: added separate Wind Anomaly, Turbulence and Release semantics, confirmed multiplier data, maintenance controls, Enka mapping and editable default recommendations.
+- **2026-09-30 — Anomaly W-Engines**: added four official Anomaly W-Engines with level-60 data, exact refinement values, adjustable stacks and precise anomaly targets.
+- **2026-09-27 — Drive Disc scoring and analysis**: added effective-substat counts, current-versus-optimized score comparison and a clearer analysis entry point while preserving calculation precision.
+- **2026-09-26 — Pyrois showcase mapping and release**: mapped Enka avatar ID `1551` to Pyrois and verified mapped/skipped showcase handling through the production release.
+- **2026-09-19 — Pyrois four-branch Ultimate modeling**: added Pyrois, four Ultimate branches and separate Assault Directive skill groups under the documented direct-damage snapshot assumptions.
+- **2026-09-18 — Defense Battle 3.2 phase-one Field Buffs**: added the phase-one Field Buff catalog and picker coverage for the existing Field Buff calculation paths.
+- **2026-09-18 — Important substat highlighting**: added the optional agent-level `importantSubStats` field and maintenance editor for highlighting relevant Drive Disc substats.
+- **2026-09-17 — Workbench and catalog cleanup**: refined Workbench actions, event summaries, optimizer controls and responsive behavior while removing obsolete Cinema entries and clarifying W-Engine coverage metadata.
 
 Older release and implementation history is in the [archived summaries](docs/archive/) and the [current changelog](docs/changelog.md).
 

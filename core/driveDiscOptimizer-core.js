@@ -265,7 +265,7 @@ function requestedFourPieceSetIds(input = {}, agent = null) {
 }
 
 function normalizeFourPieceBuffMode(value) {
-    return String(value ?? "auto").trim() === "manual" ? "manual" : "auto"
+    return String(value ?? "manual").trim() === "auto" ? "auto" : "manual"
 }
 
 function normalizeFourPieceBuffRuntimeInputs(value = {}) {

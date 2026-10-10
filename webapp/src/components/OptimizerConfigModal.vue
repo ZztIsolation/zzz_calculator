@@ -72,7 +72,7 @@ function optimizerMinimumStep(key: string) {
 function normalizeOptimizerDraft(value: any = {}) {
   return {
     algorithm: String(value?.algorithm || "exact-super-bound"),
-    fourPieceBuffMode: value?.fourPieceBuffMode === "manual" ? "manual" : "auto",
+    fourPieceBuffMode: value?.fourPieceBuffMode === "auto" ? "auto" : "manual",
     fourPieceBuffRuntimeInputs: clone(value?.fourPieceBuffRuntimeInputs ?? {}),
     mainStatLimits: {
       "4": stringArray(value?.mainStatLimits?.["4"]),
@@ -312,7 +312,6 @@ function save() {
             >
               手动配置触发参数
             </NCheckbox>
-            <span class="muted">{{ optimizerDraft.fourPieceBuffMode === "manual" ? "按下方参数参与优化" : "按默认触发参数参与优化" }}</span>
           </dd>
         </div>
 

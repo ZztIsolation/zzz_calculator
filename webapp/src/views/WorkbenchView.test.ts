@@ -324,12 +324,11 @@ describe("WorkbenchView optimizer progress", () => {
 
   it("uses one rich selector for each selected agent and w-engine", () => {
     expect(source).not.toContain("selection-summary")
-    expect(source).toContain("renderAgentSelectLabel")
+    expect(source).toContain("<AgentSelect")
     expect(source).toContain("<WEngineSelect")
-    expect(source).toContain(':render-label="renderAgentSelectLabel"')
+    expect(source).toContain(':items="catalogStore.displayAgents"')
     expect(source).toContain(':items="catalogStore.displayWEngines"')
     expect(source).toContain(':agent="selectedAgent"')
-    expect(source).toContain("workbench-entity-select-icon")
     expect(source).toContain('aria-label="选择角色"')
     expect(source).toContain('aria-label="选择音擎"')
   })
@@ -384,7 +383,7 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("uses display collections for every workbench catalog picker", () => {
-    expect(source).toContain("catalogStore.displayAgents.map")
+    expect(source).toContain(':items="catalogStore.displayAgents"')
     expect(source).toContain("catalogStore.displayWEngines.find")
     expect(source).toContain("[...catalogStore.displayDriveDiscSets]")
     expect(source).toContain(':drive-disc-sets="catalogStore.displayDriveDiscSets"')

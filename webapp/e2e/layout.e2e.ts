@@ -74,10 +74,11 @@ async function chooseNaiveOption(page: Page, label: string, option: string) {
 }
 
 async function chooseWorkbenchAgent(page: Page, option: string) {
-  const select = page.locator(".workbench-left .n-select").first()
-  await select.click()
+  const select = page.locator(".agent-select")
+  await select.locator(".n-base-selection").click()
   await select.locator("input").fill(option)
-  await page.locator(".n-base-select-option").filter({ hasText: option }).last().click()
+  await select.locator("input").press("ArrowDown")
+  await select.locator("input").press("Enter")
 }
 
 async function expectProminentConfigButton(

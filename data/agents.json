@@ -8277,7 +8277,7 @@
             "zhCN": "核心被动：洞察"
           },
           "description": {
-            "zhCN": "简攻击命中敌人时，使其陷入[啮咬]状态，持续10秒；队伍任意角色对啮咬目标触发强击并施加畏缩时，畏缩持续时间延长5秒。强击基础暴击率随核心初始/A-F为20%/25%/28%/31%/34%/37%/40%，每点简的异常精通额外提升0.10%/0.11%/0.12%/0.13%/0.14%/0.15%/0.16%暴击率；强击暴击伤害为50%。当前计算采用啮咬条件成立的状态快照。"
+            "zhCN": "简攻击命中敌人时，使其陷入[啮咬]状态，持续10秒；队伍任意角色对啮咬目标触发强击并施加畏缩时，畏缩持续时间延长5秒。强击基础暴击率随核心初始/A-F为20%/25%/28%/31%/34%/37%/40%，每点简的异常精通额外提升0.10%/0.11%/0.12%/0.13%/0.14%/0.15%/0.16%暴击率；强击暴击伤害为50%。"
           },
           "effects": [
             {
@@ -8400,7 +8400,7 @@
             "zhCN": "额外能力：痛点"
           },
           "description": {
-            "zhCN": "队伍中存在其他[异常]角色或同阵营角色时触发：物理异常积蓄效率提升20%；目标已经处于属性异常状态时，额外提升15%。潜能P2-P6使触发强击时的暴击伤害额外提升10%/15%/20%/25%/30%。积蓄效率仍为说明型机制。"
+            "zhCN": "队伍中存在其他[异常]角色或同阵营角色时触发：物理异常积蓄效率提升20%；目标已经处于属性异常状态时，额外提升15%。潜能P2-P6使触发强击时的暴击伤害额外提升10%/15%/20%/25%/30%。"
           },
           "defaultChecked": true,
           "effects": [
@@ -8467,7 +8467,7 @@
                   "variable": "x"
                 },
                 "formula": {
-                  "expression": "clamp(x * 0.1, 0, 30)",
+                  "expression": "clamp(max(x - 120, 0) * 0.1, 0, 30)",
                   "valueUnit": "storedPercent"
                 },
                 "coverage": {
@@ -8540,7 +8540,7 @@
               "zhCN": "因势利导"
             },
             "description": {
-              "zhCN": "触发强击或紊乱后，全队属性异常伤害提升18%，持续15秒；选中本Buff表示条件已满足。"
+              "zhCN": "触发强击或紊乱后，全队属性异常伤害提升18%，持续15秒。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -8570,11 +8570,44 @@
               "zhCN": "「肮脏」技巧"
             },
             "description": {
-              "zhCN": "狂热状态下暴击率提升20%、暴击伤害提升40%；强击暴击后追加等同于简1600%异常精通的物理伤害。本追加攻击暂不建模。"
+              "zhCN": "狂热状态下暴击率提升20%、暴击伤害提升40%；强击暴击后追加等同于简1600%异常精通的物理伤害（此伤害暂未建模）。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "effects": [],
+            "effects": [
+              {
+                "id": "effect_dc6dd7f820",
+                "type": "fixed",
+                "target": {
+                  "kind": "default"
+                },
+                "stat": "critRate",
+                "mode": "flat",
+                "value": 20,
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              },
+              {
+                "id": "effect_9799a77543",
+                "type": "fixed",
+                "target": {
+                  "kind": "default"
+                },
+                "stat": "critDmg",
+                "mode": "flat",
+                "value": 40,
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
             "buffModifiers": [],
             "mechanics": {
               "modeled": false,
@@ -8595,7 +8628,7 @@
               "zhCN": "狂热"
             },
             "description": {
-              "zhCN": "触发极限闪避、招架支援或发动招式造成伤害时累积狂热心流，达到上限时进入狂热状态。狂热状态下，物理异常积蓄效率提升25%；异常精通超过120点后，每超过1点使攻击力提升2点，最多提升600点。狂热期间发动招式造成伤害消耗狂热心流，极限闪避或招架支援回复狂热心流，耗尽时退出狂热。当前按狂热状态快照计算攻击力转换；积蓄效率、心流获得与消耗及动作时间仅作说明。"
+              "zhCN": "触发极限闪避、招架支援或发动招式造成伤害时累积狂热心流，达到上限时进入狂热状态。狂热状态下，物理异常积蓄效率提升25%；异常精通超过120点后，每超过1点使攻击力提升2点，最多提升600点。狂热期间发动招式造成伤害消耗狂热心流，极限闪避或招架支援回复狂热心流，耗尽时退出狂热。"
             },
             "effects": [
               {
@@ -8930,8 +8963,7 @@
             "penRatio"
           ],
           "6": [
-            "anomalyMastery",
-            "atkPct"
+            "anomalyMastery"
           ]
         }
       },
@@ -8943,267 +8975,6 @@
         "atk",
         "anomalyProficiency",
         "anomalyMastery"
-      ],
-      "skillGroups": [
-        {
-          "id": "jane-basic-six-hits",
-          "name": {
-            "zhCN": "普通攻击六段"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_step_blade_dance",
-                "rowId": "1_damage"
-              },
-              "id": "jane-basic-six-hits-1"
-            },
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_step_blade_dance",
-                "rowId": "2_damage"
-              },
-              "id": "jane-basic-six-hits-2"
-            },
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_step_blade_dance",
-                "rowId": "3_damage"
-              },
-              "id": "jane-basic-six-hits-3"
-            },
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_step_blade_dance",
-                "rowId": "4_damage"
-              },
-              "id": "jane-basic-six-hits-4"
-            },
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_step_blade_dance",
-                "rowId": "5_damage"
-              },
-              "id": "jane-basic-six-hits-5"
-            },
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_step_blade_dance",
-                "rowId": "6_damage"
-              },
-              "id": "jane-basic-six-hits-6"
-            }
-          ]
-        },
-        {
-          "id": "jane-sahoff-jump",
-          "name": {
-            "zhCN": "狂热萨霍夫跳"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_sahoff_jump",
-                "rowId": "continuous_damage"
-              },
-              "id": "jane-sahoff-jump-1"
-            },
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_sahoff_jump",
-                "rowId": "finisher_damage"
-              },
-              "id": "jane-sahoff-jump-2"
-            }
-          ]
-        },
-        {
-          "id": "jane-sahoff-jump-potential",
-          "name": {
-            "zhCN": "潜能强化萨霍夫跳"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_sahoff_jump_potential",
-                "rowId": "continuous_damage"
-              },
-              "id": "jane-sahoff-jump-potential-1"
-            },
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "basic",
-                "moveId": "basic_sahoff_jump_potential",
-                "rowId": "finisher_damage"
-              },
-              "id": "jane-sahoff-jump-potential-2"
-            }
-          ]
-        },
-        {
-          "id": "jane-ex-special",
-          "name": {
-            "zhCN": "强化特殊技：掠空-横扫"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "special",
-                "moveId": "ex_special_air_sweep",
-                "rowId": "damage"
-              },
-              "id": "jane-ex-special-1"
-            }
-          ]
-        },
-        {
-          "id": "jane-ex-special-potential",
-          "name": {
-            "zhCN": "潜能强化特殊技：掠空-强袭"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "special",
-                "moveId": "ex_special_air_assault",
-                "rowId": "damage"
-              },
-              "id": "jane-ex-special-potential-1"
-            }
-          ]
-        },
-        {
-          "id": "jane-chain_sin_flower",
-          "name": {
-            "zhCN": "连携技：罪孽生花"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "chain",
-                "moveId": "chain_sin_flower",
-                "rowId": "damage"
-              },
-              "id": "jane-chain_sin_flower-1"
-            }
-          ]
-        },
-        {
-          "id": "jane-ultimate_finale",
-          "name": {
-            "zhCN": "终结技：终幕演出"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "jane_doe",
-                "categoryId": "chain",
-                "moveId": "ultimate_finale",
-                "rowId": "damage"
-              },
-              "id": "jane-ultimate_finale-1"
-            }
-          ]
-        }
       ],
       "defaultCalculationConfig": {
         "mode": "custom",
@@ -9235,7 +9006,7 @@
         "corePassiveScaling": "official initial/A-F assault crit 20/25/28/31/34/37/40% and AP coefficients 0.10/0.11/0.12/0.13/0.14/0.15/0.16%",
         "potential": "P1 enhanced moves; P2-P6 assault crit damage 10/15/20/25/30%; first selection defaults P6",
         "unsupportedMechanics": "Frenzy Flow, Bites trigger timing, anomaly buildup timing, energy, action time and C6 1600% AP extra attack remain descriptive-only",
-        "c1Formula": "Official C1 uses every point of AP: clamp(x * 0.1, 0, 30); 120 is only the frenzy ATK threshold. User confirmed correction on 2026-10-08.",
+        "c1Formula": "Current modeled C1 uses AP above the 120-point threshold: clamp(max(x - 120, 0) * 0.1, 0, 30); 420 AP reaches the 30% cap. User confirmed this correction on 2026-10-10.",
         "potentialCoreBoundary": "Potential P2-P6 coefficients are the official stated max-Core values, used as the selected snapshot at other Core levels; no undocumented scaling inferred."
       },
       "hidden": false

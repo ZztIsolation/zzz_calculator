@@ -1306,9 +1306,13 @@
             "type": "fixed",
             "stat": "critRate",
             "value": 8,
-            "mode": "flat"
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
@@ -1321,13 +1325,26 @@
           "effects": [
             {
               "id": "effect_k4p9x1nd",
-              "type": "fixed",
+              "type": "stacked",
               "stat": "atkPct",
               "value": 9,
               "mode": "pct",
-              "basis": "baseAtk"
+              "basis": "baseAtk",
+              "target": {
+                "kind": "default"
+              },
+              "valuePerStack": 9,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         },
         "teamBuff": null
       },

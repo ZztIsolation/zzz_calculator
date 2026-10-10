@@ -119,6 +119,22 @@ afterEach(() => {
 })
 
 describe("OptimizerConfigModal", () => {
+  it("defaults manual trigger parameters to checked and hides the mode hint", async () => {
+    const wrapper = mountModal({
+      optimizerConfig: {
+        algorithm: "exact-super-bound",
+        mainStatLimits: { "4": [], "5": [], "6": [] },
+        minimums: {},
+      },
+    })
+    await openModal(wrapper)
+
+    const modeCheckbox = wrapper.findAllComponents({ name: "Checkbox" })[0]
+    expect(modeCheckbox.props("checked")).toBe(true)
+    expect(document.body.textContent).not.toContain("按下方参数参与优化")
+    expect(document.body.textContent).not.toContain("按默认触发参数参与优化")
+  })
+
   it("saves optimizer constraints from the dedicated optimization config modal", async () => {
     const wrapper = mountModal()
 

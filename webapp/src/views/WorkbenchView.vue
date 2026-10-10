@@ -10,26 +10,23 @@ import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
+import AgentSelect from "@/components/AgentSelect.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import LuminescenceParameterFields from "@/components/LuminescenceParameterFields.vue"
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
 import WEngineSelect from "@/components/WEngineSelect.vue"
-import { fallbackIcon, thumbnailForAgent, thumbnailForDriveDiscSet } from "@/utils/assets"
+import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { buffLabelForId, teammateBuffCandidates } from "@/utils/combatBuffs"
 import { inferBuffPickerState, selectedTeammateOwnerIds } from '@/utils/teammateBuffPicker'
 import { sameTeammateValue, syncEnkaTeammates, type TeammateSources } from '@/utils/enkaTeammates'
 import { readTeammateSources } from '@runtime/enka-teammate-sources'
 import { countEffectiveDriveDiscSubstats } from "@/utils/driveDiscSubstats"
 import {
-  attributeLabel,
   buffEffectLines,
   damageEventSummaryTitle,
   damageModeLabel,
-  entityMetaText,
-  entitySearchText,
-  entitySelectLabel,
   formatNumber,
   formatStoredStatValue,
   labelOf,
@@ -196,12 +193,6 @@ const activeLuminescenceEvent = computed(() => (buildStore.damageConfig.events ?
 const luminescenceParametersValid = computed(() => activeLuminescenceEvent.value
   ? resolveLuminescenceParameters(activeLuminescenceEvent.value).valid
   : true)
-const agentSelectOptions = computed(() => catalogStore.displayAgents.map((agent: any) => ({
-  label: entitySelectLabel(agent),
-  value: agent.id,
-  searchText: entitySearchText(agent),
-  agent,
-})).sort((left: { value: string }, right: { value: string }) => Number(right.value === "velina") - Number(left.value === "velina")))
 const canRunOptimization = computed(() => Boolean(
   buildStore.agentId
   && buildStore.wEngineId
@@ -260,10 +251,6 @@ const coreSkillOptions = computed(() => {
   ]
 })
 const cinemaLevelOptions = Array.from({ length: 7 }, (_, level) => ({ label: `${level} 影`, value: level }))
-const unmodeledCinemaNotice = computed(() => (selectedAgent.value?.cinemaDescriptions ?? [])
-  .filter((entry: any) => entry.modeled === false && entry.cinemaLevel <= buildStore.cinemaLevel)
-  .map((entry: any) => entry.description?.zhCN ?? "")
-  .filter(Boolean).join("；"))
 const potentialLevelOptions = computed(() => {
   const maxLevel = Math.max(0, Math.trunc(Number(selectedAgent.value?.potentialVision?.maxLevel ?? 0)))
   return Array.from({ length: maxLevel + 1 }, (_, level) => ({
@@ -773,37 +760,6 @@ function filterSelectOption(pattern: string, option: any) {
     return true
   }
   return String(option?.searchText ?? option?.label ?? option?.value ?? "").toLowerCase().includes(needle)
-}
-
-function renderEntitySelectLabel(entity: any, image: string, fallbackLabel = "") {
-  const label = labelOf(entity) || fallbackLabel
-  const isAgent = Boolean(entity?.attribute)
-  const meta = [
-    isAgent ? attributeLabel(entity.attribute) : "",
-    entityMetaText(entity),
-  ].filter(Boolean).join(" · ")
-  return h("span", { class: "workbench-entity-select-label" }, [
-    h("img", {
-      class: "workbench-entity-select-icon",
-      src: image,
-      alt: "",
-      loading: "lazy",
-      decoding: "async",
-    }),
-    h("span", { class: "workbench-entity-select-copy" }, [
-      h("span", { class: "workbench-entity-select-name", title: label }, label),
-      h("span", { class: "workbench-entity-select-meta", title: meta }, meta),
-    ]),
-  ])
-}
-
-function renderAgentSelectLabel(option: any) {
-  const agent = option?.agent ?? catalogStore.displayAgents.find((item: any) => item.id === option?.value)
-  return renderEntitySelectLabel(
-    agent,
-    thumbnailForAgent(agent),
-    String(option?.label ?? option?.value ?? ""),
-  )
 }
 
 function renderManualDiscSetLabel(option: any) {
@@ -1363,14 +1319,10 @@ function formatPercentValue(value: any) {
       <section class="workbench-section workbench-agent-section">
         <div class="panel-header workbench-section-header workbench-agent-header">
           <h1 class="panel-title">角色</h1>
-          <NSelect
+          <AgentSelect
             class="workbench-entity-select"
             :value="buildStore.agentId"
-            :options="agentSelectOptions"
-            :filter="filterSelectOption"
-            :render-label="renderAgentSelectLabel"
-            filterable
-            placeholder="选择角色"
+            :items="catalogStore.displayAgents"
             aria-label="选择角色"
             @update:value="value => selectAgent(String(value))"
           />
@@ -1830,7 +1782,6 @@ function formatPercentValue(value: any) {
             </div>
           </div>
         </section>
-        <NAlert v-if="unmodeledCinemaNotice" type="info" :show-icon="false" data-testid="unmodeled-cinema-notice">{{ unmodeledCinemaNotice }}</NAlert>
         <DamageSummaryBar class="workbench-summary-section" :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
         <section class="workbench-section workbench-whitebox-section">
           <div class="panel-header workbench-section-header">
@@ -3153,49 +3104,6 @@ function formatPercentValue(value: any) {
 .compact-field :deep(.n-select) {
   width: 100%;
   min-width: 0;
-}
-
-:global(.workbench-entity-select-label) {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-:global(.workbench-entity-select-icon) {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  border-radius: 4px;
-  background: var(--app-panel-muted);
-}
-
-:global(.workbench-entity-select-copy) {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-  line-height: 1.15;
-}
-
-:global(.workbench-entity-select-name),
-:global(.workbench-entity-select-meta) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:global(.workbench-entity-select-name) {
-  color: var(--app-text);
-  font-size: 13px;
-  font-weight: 750;
-}
-
-:global(.workbench-entity-select-meta) {
-  color: var(--app-muted);
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .workbench-entity-select :deep(.n-base-selection) {

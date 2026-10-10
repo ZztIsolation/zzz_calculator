@@ -12,6 +12,7 @@ const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
 const MINIMUM_STAT_KEYS = ["atk", "def", "anomalyProficiency", "critRate", "critDmg", "lacerationDmg"] as const
 const MINIMUM_DEFAULTS_VERSION = 2
 const TWO_PIECE_DEFAULTS_VERSION = 1
+const FOUR_PIECE_BUFF_DEFAULTS_VERSION = 1
 const CALCULATION_INPUT_FINGERPRINT_EXCLUDED_KEYS = new Set([
   "label",
   "settings",
@@ -123,6 +124,10 @@ function normalizeBrowserOptimizerAlgorithm(value: any) {
   return algorithm === "exact-super-bound-parallel" ? "exact-super-bound" : algorithm
 }
 
+function normalizeFourPieceBuffMode(value: any): "auto" | "manual" {
+  return String(value ?? "manual").trim() === "auto" ? "auto" : "manual"
+}
+
 function cleanMinimums(value: any = {}) {
   return Object.fromEntries(
     MINIMUM_STAT_KEYS
@@ -180,7 +185,7 @@ function optimizerSettingsFingerprint(settings: any = {}) {
     algorithm: normalizeBrowserOptimizerAlgorithm(settings.algorithm),
     fourPieceSetIds: normalizedSetIds(settings.fourPieceSetIds, settings.fourPieceSetId),
     twoPieceSetIds: normalizedSetIds(settings.twoPieceSetIds, settings.twoPieceSetId),
-    fourPieceBuffMode: settings.fourPieceBuffMode === "manual" ? "manual" : "auto",
+    fourPieceBuffMode: normalizeFourPieceBuffMode(settings.fourPieceBuffMode),
     fourPieceBuffRuntimeInputs: plainObject(settings.fourPieceBuffRuntimeInputs),
     mainStatLimits: Object.fromEntries(Object.entries(mainStatLimits)
       .map(([slot, values]) => [slot, [...new Set(normalizeArray(values))].sort()])),
@@ -267,6 +272,7 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
   const followsTwoPieceDefaults = migrateTwoPieceDefaults
     || saved.twoPieceSetSource === "preferred"
     || (!hasSavedTwoPieceSets && saved.twoPieceSetSource !== "manual")
+  const migrateFourPieceBuffDefaults = Number(saved.fourPieceBuffDefaultsVersion ?? 0) < FOUR_PIECE_BUFF_DEFAULTS_VERSION
   return {
     algorithm: normalizeBrowserOptimizerAlgorithm(saved.algorithm),
     fourPieceSetIds,
@@ -275,7 +281,8 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
     twoPieceSetSource: followsTwoPieceDefaults ? "preferred" : "manual",
     twoPieceDefaultsVersion: migrateTwoPieceDefaults
       ? TWO_PIECE_DEFAULTS_VERSION : Number(saved.twoPieceDefaultsVersion ?? 0),
-    fourPieceBuffMode: saved.fourPieceBuffMode === "manual" ? "manual" : "auto",
+    fourPieceBuffDefaultsVersion: FOUR_PIECE_BUFF_DEFAULTS_VERSION,
+    fourPieceBuffMode: migrateFourPieceBuffDefaults ? "manual" : normalizeFourPieceBuffMode(saved.fourPieceBuffMode),
     fourPieceBuffRuntimeInputs: plainObject(saved.fourPieceBuffRuntimeInputs),
     mainStatLimits: cleanMainStatLimits(saved.mainStatLimits),
     minimums: normalizeMinimums(
@@ -296,7 +303,8 @@ function optimizerSettingsPayload(state: any = {}, previous: any = {}) {
     twoPieceSetIds: normalizeArray(state.twoPieceSetIds),
     twoPieceSetSource: state.twoPieceSetSource === "manual" ? "manual" : "preferred",
     twoPieceDefaultsVersion: Number(state.twoPieceDefaultsVersion ?? 0),
-    fourPieceBuffMode: state.fourPieceBuffMode === "manual" ? "manual" : "auto",
+    fourPieceBuffDefaultsVersion: FOUR_PIECE_BUFF_DEFAULTS_VERSION,
+    fourPieceBuffMode: normalizeFourPieceBuffMode(state.fourPieceBuffMode),
     fourPieceBuffRuntimeInputs: plainObject(state.fourPieceBuffRuntimeInputs),
     mainStatLimits: cleanMainStatLimits(state.mainStatLimits),
     minimumDefaultsVersion: MINIMUM_DEFAULTS_VERSION,
@@ -480,7 +488,8 @@ export const useOptimizerStore = defineStore("optimizer", {
     twoPieceSetIds: [] as string[],
     twoPieceSetSource: "preferred" as "preferred" | "manual",
     twoPieceDefaultsVersion: 0,
-    fourPieceBuffMode: "auto" as "auto" | "manual",
+    fourPieceBuffDefaultsVersion: FOUR_PIECE_BUFF_DEFAULTS_VERSION,
+    fourPieceBuffMode: "manual" as "auto" | "manual",
     fourPieceBuffRuntimeInputs: {} as Record<string, any>,
     mainStatLimits: defaultMainStatLimits(),
     minimums: defaultMinimums(),
@@ -528,7 +537,8 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.twoPieceSetIds = settings.twoPieceSetIds
       this.twoPieceSetSource = settings.twoPieceSetSource
       this.twoPieceDefaultsVersion = settings.twoPieceDefaultsVersion
-      this.fourPieceBuffMode = settings.fourPieceBuffMode
+      this.fourPieceBuffDefaultsVersion = settings.fourPieceBuffDefaultsVersion
+      this.fourPieceBuffMode = normalizeFourPieceBuffMode(settings.fourPieceBuffMode)
       this.fourPieceBuffRuntimeInputs = settings.fourPieceBuffRuntimeInputs
       this.mainStatLimits = settings.mainStatLimits
       this.minimums = settings.minimums
@@ -587,7 +597,7 @@ export const useOptimizerStore = defineStore("optimizer", {
     },
     applyAdvancedSettings(settings: any = {}) {
       this.algorithm = normalizeBrowserOptimizerAlgorithm(settings.algorithm || this.algorithm)
-      this.fourPieceBuffMode = settings.fourPieceBuffMode === "manual" ? "manual" : "auto"
+      this.fourPieceBuffMode = normalizeFourPieceBuffMode(settings.fourPieceBuffMode)
       this.fourPieceBuffRuntimeInputs = plainObject(settings.fourPieceBuffRuntimeInputs)
       this.mainStatLimits = cleanMainStatLimits(settings.mainStatLimits)
       this.minimums = normalizeMinimums(settings.minimums)

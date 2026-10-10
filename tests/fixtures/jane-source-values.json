@@ -4932,7 +4932,7 @@
     }
   ],
   "confirmedModeling": {
-    "c1DamageFormula": "clamp(x * 0.1, 0, 30)",
+    "c1DamageFormula": "clamp(max(x - 120, 0) * 0.1, 0, 30)",
     "frenzyAttackFormula": "clamp(max(x - 120, 0) * 2, 0, 600)",
     "c6Modeled": false,
     "sourceVerification": "structured HoYoWiki API; no source-table interpolation"

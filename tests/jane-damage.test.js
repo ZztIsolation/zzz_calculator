@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { loadCalculatorContext, calculateInCombatPanel, createInCombatPanelCalculator } from "../backend/calculator.js"
 import { resolveDefaultCalculationConfig } from "../core/defaultCalculationConfig.js"
-import { expandCalculationConfigSkillGroups } from "../core/calculationSkillGroups.js"
+import { calculationSkillGroups } from "../core/calculationSkillGroups.js"
 import { validateMaintenanceItem } from "../core/maintenanceValidation.js"
 import { materializeCorePassiveScalingEffect } from "../core/corePassiveScaling.js"
 import { repairDynamicValueSourceFallbacks } from "../core/maintenanceValidation.js"
@@ -40,6 +40,7 @@ assert.equal(agent.potentialVision.defaultLevel, 6)
 assert.deepEqual(agent.potentialVision.scaling.levels.map(x => x.assaultCritDmgPct), [0, 0, 10, 15, 20, 25, 30])
 assert.equal(agent.potentialVision.mechanics.c6ExtraAttackModeled, false)
 assert.equal(agent.cinemaDescriptions.find(x => x.cinemaLevel === 6).modeled, false)
+assert.equal(fixture.confirmedModeling.c1DamageFormula, "clamp(max(x - 120, 0) * 0.1, 0, 30)")
 assert.deepEqual(validateMaintenanceItem("agents", agent, catalog), { ok: true, errors: [] })
 assert.deepEqual(validateMaintenanceItem("agentSkills", skills, catalog), { ok: true, errors: [] })
 assert.equal(catalog.wEnginesMap.get("zzz_wiki_760").relatedAgentId, agent.id)
@@ -133,11 +134,11 @@ approx(calc([flinch], { buffs: [] }).damage.events[0].multipliers.anomaly, 5.25,
 const c1Id = "agent:jane_doe.cinema.1"
 for (const P of [0, 119, 120, 121, 299, 300, 419, 420, 600]) {
   const result = calc([assault], { proficiency: P - 204, buffs: [baseId, frenzyId, c1Id] })
-  approx(result.inCombat.panel.dmgBonus, Math.min(Math.max(P, 0) * .1, 30) / 100, `C1 ${P}`)
+  approx(result.inCombat.panel.dmgBonus, Math.min(Math.max(P - 120, 0) * .1, 30) / 100, `C1 ${P}`)
   approx(result.inCombat.panel.atk - result.outOfCombat.panel.atk, Math.min(Math.max(P - 120, 0) * 2, 600), `Frenzy cap ${P}`)
 }
 const half = calc([assault], { buffs: [c1Id], runtimeInputs: { [c1Id]: { effects: { "jane-c1-damage-from-proficiency": { coverage: .5 } } } } })
-approx(half.inCombat.panel.dmgBonus, .102, "C1 coverage")
+approx(half.inCombat.panel.dmgBonus, .042, "C1 coverage")
 const previewBuff = materializeCorePassiveScalingEffect(agent.combatBuffs.corePassive, agent, "F")
 const attackRule = frenzy.effects.find(r => r.stat === "atkFlat")
 assert.match(storedEffectRuleText(attackRule, {}, previewBuff, {}, { inCombatPanel: { anomalyProficiency: 204 } }), /168/u)
@@ -208,14 +209,13 @@ const config = resolveDefaultCalculationConfig(agent.defaultCalculationConfig, 6
 assert.equal(config.name.zhCN, "单次物理异常")
 assert.equal(config.events.length, 1)
 assert.equal(config.events[0].anomalyEffect, "assault")
+assert.deepEqual(calculationSkillGroups(agent), [])
 assert.equal(JSON.stringify(skills).includes("requiresPotentialLevel"), false)
-for (const group of agent.skillGroups) {
-  for (const potentialLevel of [0, 1, 6]) {
-    const expanded = expandCalculationConfigSkillGroups({ events: [{ kind: "skillGroup", skillGroupId: group.id, count: 3 }] }, agent, { strict: true, potentialLevel })
-    assert.equal(expanded.events.length, group.events.length)
-    expanded.events.forEach(e => assert.equal(e.count, 3))
-  }
-}
+
+const c6 = calc([assault], { buffs: ["agent:jane_doe.cinema.6"] })
+approx(c6.inCombat.panel.critRate - c6.outOfCombat.panel.critRate, 0.2, "C6 CRIT Rate")
+approx(c6.inCombat.panel.critDmg - c6.outOfCombat.panel.critDmg, 0.4, "C6 CRIT DMG")
+assert.equal(c6.damage.events.length, 1, "C6 extra attack remains unmodeled")
 
 const statIds = ["atkPct", "anomalyProficiency", "physicalDmg", "penRatio", "critRate", "critDmg"]
 const values = Float64Array.from([30, 120, 30, 12, 24, 48])

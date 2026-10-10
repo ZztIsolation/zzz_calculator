@@ -6,10 +6,11 @@ test("four anomaly engines expose exact ranks, shared stacks and persisted runti
   const errors: string[] = []
   page.on("pageerror", error => errors.push(error.message))
   await page.goto("/")
-  const agent = page.locator(".workbench-left .n-select").first()
-  await agent.click()
+  const agent = page.locator(".agent-select")
+  await agent.locator(".n-base-selection").click()
   await agent.locator("input").fill("爱芮")
-  await page.locator(".n-base-select-option").filter({ hasText: "爱芮" }).last().click()
+  await agent.locator("input").press("ArrowDown")
+  await agent.locator("input").press("Enter")
 
   for (const [id, name, maxStacks] of [
     ["zzz_wiki_1964", "朔月裁霜", 2],

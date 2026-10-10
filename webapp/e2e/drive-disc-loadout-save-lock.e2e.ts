@@ -174,7 +174,7 @@ async function seedBrowserState(page: Page): Promise<void> {
     async () => (await readInventoryStore(page))?.driveDiscs?.length,
     { timeout: 15_000 },
   ).toBe(6)
-  await expect(page.locator(".workbench-left .n-select").first()).toContainText("叶瞬光")
+  await expect(page.locator(".agent-select")).toContainText("叶瞬光")
 }
 
 async function prepareOptimizedScheme(page: Page): Promise<void> {
