@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { adaptiveCascaderMenuHeight } from "./useAdaptiveCascaderMenu"
+import { adaptiveCascaderHorizontalOffset, adaptiveCascaderMenuHeight } from "./useAdaptiveCascaderMenu"
 
 describe("adaptive Cascader menu sizing", () => {
   it("keeps the preferred height when the viewport has enough room", () => {
@@ -20,5 +20,35 @@ describe("adaptive Cascader menu sizing", () => {
     expect(adaptiveCascaderMenuHeight(320, {}, 130)).toBe("130px")
     expect(adaptiveCascaderMenuHeight(768, {}, 400)).toBe("288px")
     expect(adaptiveCascaderMenuHeight(100, {}, 40)).toBe("40px")
+  })
+
+  it("clamps a wide menu to both viewport edges using its unshifted position", () => {
+    expect(adaptiveCascaderHorizontalOffset({
+      left: -10,
+      menuWidth: 294,
+      viewportWidth: 320,
+      gutter: 8,
+    })).toBe(18)
+    expect(adaptiveCascaderHorizontalOffset({
+      left: 40,
+      menuWidth: 294,
+      viewportWidth: 320,
+      gutter: 8,
+    })).toBe(-22)
+    expect(adaptiveCascaderHorizontalOffset({
+      left: 20,
+      marginLeft: 18,
+      menuWidth: 294,
+      viewportWidth: 320,
+      gutter: 8,
+    })).toBe(6)
+  })
+
+  it("waits for a measurable menu before applying a horizontal correction", () => {
+    expect(adaptiveCascaderHorizontalOffset({
+      left: 0,
+      menuWidth: 0,
+      viewportWidth: 320,
+    })).toBeNull()
   })
 })

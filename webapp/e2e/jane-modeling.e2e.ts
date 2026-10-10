@@ -8,7 +8,7 @@ import { janeOptimizerInput, janeOptimizerStore } from "../../tests/fixtures/jan
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
-test("Jane P6 default, explicit P0, C6 notice and single Assault survive reload", async ({ page, request }, testInfo) => {
+test("Jane P6 default, explicit P0, C6 selection and single Assault survive reload", async ({ page, request }, testInfo) => {
   const errors: string[] = []
   page.on("pageerror", error => errors.push(error.message))
   await page.addInitScript(() => {
@@ -28,10 +28,8 @@ test("Jane P6 default, explicit P0, C6 notice and single Assault survive reload"
   const cinema = page.locator(".compact-field").filter({ has: page.getByText("影画", { exact: true }) })
   await cinema.locator(".n-base-selection").click()
   await page.locator(".n-base-select-option:visible").filter({ hasText: "6" }).click()
-  await expect(page.getByTestId("unmodeled-cinema-notice")).toContainText("1600%")
   await page.reload()
   await expect(potential).toContainText("P0")
-  await expect(page.getByTestId("unmodeled-cinema-notice")).toBeVisible()
   await page.getByTestId("open-buff-picker").click()
   const frenzy = page.locator('[data-buff-id="agent:jane_doe.skill.frenzy"]')
   const core = page.locator('[data-buff-id="agent:jane_doe.corePassive"]')

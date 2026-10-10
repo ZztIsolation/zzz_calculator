@@ -54,7 +54,6 @@ describe("Jane main-character configuration", () => {
     restored.setCinemaLevel(5, meta)
     restored.setCinemaLevel(6, meta)
     expect(restored.skillLevels.basic).toBe(level)
-    expect(agent.cinemaDescriptions.at(-1).modeled).toBe(false)
   })
 
   it("materializes Core and Potential independently in the picker", () => {

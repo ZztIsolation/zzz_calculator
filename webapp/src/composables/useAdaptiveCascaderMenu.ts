@@ -35,6 +35,32 @@ export function adaptiveCascaderMenuHeight(
   return `${Math.min(resolved.preferredHeight, Math.max(minimumHeight, viewportLimit))}px`
 }
 
+export function adaptiveCascaderHorizontalOffset({
+  left,
+  marginLeft = 0,
+  menuWidth,
+  viewportLeft = 0,
+  viewportWidth,
+  gutter = DEFAULT_OPTIONS.viewportGutter,
+}: {
+  left: number
+  marginLeft?: number
+  menuWidth: number
+  viewportLeft?: number
+  viewportWidth: number
+  gutter?: number
+}) {
+  if (![left, marginLeft, menuWidth, viewportLeft, viewportWidth, gutter].every(Number.isFinite)
+    || menuWidth <= 0 || viewportWidth <= 0) {
+    return null
+  }
+  const baseLeft = left - marginLeft
+  const minLeft = viewportLeft + gutter
+  const maxLeft = Math.max(minLeft, viewportLeft + viewportWidth - gutter - menuWidth)
+  const targetLeft = Math.min(Math.max(baseLeft, minLeft), maxLeft)
+  return targetLeft - baseLeft
+}
+
 export function useAdaptiveCascaderMenu(options: AdaptiveCascaderMenuOptions = {}, anchor?: Ref<HTMLElement | null>) {
   const resolved = { ...DEFAULT_OPTIONS, ...options }
   const viewportHeight = ref<number | null>(null)
@@ -65,16 +91,28 @@ export function useAdaptiveCascaderMenu(options: AdaptiveCascaderMenuOptions = {
       observedMenu = menu
       if (menu) observer?.observe(menu)
     }
-    const follower = menu?.parentElement
+    const follower = menu?.closest<HTMLElement>(".v-binder-follower-content")
     if (menu && follower?.classList.contains("v-binder-follower-content")) {
       // Naive UI flips the popup, but does not shift a wide menu at a narrow
       // screen edge. Correct only that remaining horizontal overflow.
-      const left = menu.getBoundingClientRect().left - (Number.parseFloat(follower.style.marginLeft) || 0)
-      const minLeft = (visualViewport?.offsetLeft ?? 0) + resolved.viewportGutter
-      const maxLeft = minLeft + (visualViewport?.width ?? window.innerWidth) - 2 * resolved.viewportGutter - menu.offsetWidth
-      // Move the follower box as well: shifting only its child leaves an empty
-      // overflowing box which still creates document-level horizontal scrolling.
-      follower.style.marginLeft = `${Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft)) - left}px`
+      const rect = menu.getBoundingClientRect()
+      const offset = adaptiveCascaderHorizontalOffset({
+        left: rect.left,
+        marginLeft: Number.parseFloat(follower.style.marginLeft) || 0,
+        menuWidth: rect.width || menu.offsetWidth,
+        viewportLeft: visualViewport?.offsetLeft ?? 0,
+        viewportWidth: visualViewport?.width ?? window.innerWidth,
+        gutter: resolved.viewportGutter,
+      })
+      if (offset === null) {
+        // The follower can exist one frame before its columns have a width.
+        // Re-measure after layout instead of allowing the first frame to leak.
+        scheduleMeasure()
+      } else {
+        // Move the follower box as well: shifting only its child leaves an
+        // empty overflowing box which still creates document-level scrolling.
+        follower.style.marginLeft = `${offset}px`
+      }
     }
   }
 

@@ -8570,7 +8570,7 @@
               "zhCN": "「肮脏」技巧"
             },
             "description": {
-              "zhCN": "狂热状态下暴击率提升20%、暴击伤害提升40%；强击暴击后追加等同于简1600%异常精通的物理伤害（此伤害暂未建模）。"
+              "zhCN": "狂热状态下暴击率提升20%、暴击伤害提升40%；强击暴击后追加等同于简1600%异常精通的物理伤害。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -8729,9 +8729,8 @@
             "zhCN": "「肮脏」技巧"
           },
           "description": {
-            "zhCN": "狂热暴击率+20%、暴击伤害+40%；强击暴击后追加1600%异常精通物理伤害，暂不建模。"
-          },
-          "modeled": false
+            "zhCN": "狂热暴击率+20%、暴击伤害+40%；强击暴击后追加1600%异常精通物理伤害。"
+          }
         }
       ],
       "coreSkill": {
@@ -8940,9 +8939,7 @@
           ]
         },
         "mechanics": {
-          "levelOneUnlocksPotentialEnhancedMoves": true,
-          "c6ExtraAttackAnomalyProficiencyPct": 1600,
-          "c6ExtraAttackModeled": false
+          "levelOneUnlocksPotentialEnhancedMoves": true
         },
         "sources": [
           "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
@@ -9005,7 +9002,7 @@
         "level60Stats": "source-checked official structured page; HP 7788, ATK 805, DEF 606, Impact 86, CR 5%, CRIT DMG 50%, AP 114, AM 112",
         "corePassiveScaling": "official initial/A-F assault crit 20/25/28/31/34/37/40% and AP coefficients 0.10/0.11/0.12/0.13/0.14/0.15/0.16%",
         "potential": "P1 enhanced moves; P2-P6 assault crit damage 10/15/20/25/30%; first selection defaults P6",
-        "unsupportedMechanics": "Frenzy Flow, Bites trigger timing, anomaly buildup timing, energy, action time and C6 1600% AP extra attack remain descriptive-only",
+        "unsupportedMechanics": "Frenzy Flow, Bites trigger timing, anomaly buildup timing, energy and action time remain descriptive-only",
         "c1Formula": "Current modeled C1 uses AP above the 120-point threshold: clamp(max(x - 120, 0) * 0.1, 0, 30); 420 AP reaches the 30% cap. User confirmed this correction on 2026-10-10.",
         "potentialCoreBoundary": "Potential P2-P6 coefficients are the official stated max-Core values, used as the selected snapshot at other Core levels; no undocumented scaling inferred."
       },
