@@ -59,12 +59,23 @@ function materializePotentialVisionRule(rule = {}, agent = {}, potentialLevel) {
         ...rule,
         value,
         displayValue: value,
+        ...(rule.type === "stacked" && rule.activationStacks == null
+            ? { valuePerStack: value, displayValuePerStack: value }
+            : {}),
     }
+}
+
+function potentialRequirementMatches(value, potentialLevel) {
+    const requirement = value?.requirement
+    if (!requirement) return true
+    return (requirement.minPotentialLevel == null || potentialLevel >= Number(requirement.minPotentialLevel))
+        && (requirement.maxPotentialLevel == null || potentialLevel <= Number(requirement.maxPotentialLevel))
 }
 
 function materializePotentialVisionValue(value, agent, potentialLevel) {
     if (Array.isArray(value)) {
-        return value.map(item => materializePotentialVisionValue(item, agent, potentialLevel))
+        return value.filter(item => potentialRequirementMatches(item, potentialLevel))
+            .map(item => materializePotentialVisionValue(item, agent, potentialLevel))
     }
     if (!value || typeof value !== "object") {
         return value

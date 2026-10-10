@@ -2073,10 +2073,12 @@ async function saveMaintenanceItem(resource, item, headers = {}) {
             validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
         }
         if (resource === "agents") {
-            const [anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
+            const [anomalyEffectsPayload, driveDiscSetsPayload, combatBuffsPayload] = await Promise.all([
                 readDataFile("anomaly_effects.json"),
                 readDataFile("drive_disc_sets.json"),
+                readDataFile("combat_buffs.json"),
             ])
+            validationContext.combatBuffs = combatBuffsPayload
             validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
             validationContext.turbulenceEffects = anomalyEffectsForType(anomalyEffectsPayload, "turbulence")
             validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")

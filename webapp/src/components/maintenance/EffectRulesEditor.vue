@@ -56,7 +56,7 @@ function setCoveragePercent(rule: any, value: number | null) {
 
 function changeType(rule: any, type: string) {
   rule.type = type
-  if (type !== "fixed") delete rule.valueSource
+  if (!["fixed", "stacked"].includes(type)) delete rule.valueSource
   if (type !== "stacked") delete rule.activationStacks
   if (type === "derived") {
     rule.sourceLabel ??= { zhCN: "来源数值" }
@@ -84,6 +84,7 @@ function stackedUsesActivationValue(rule: any) {
 }
 
 function editableValueKey(rule: any) {
+  if (rule.valueSource) return "value"
   return rule.type === "stacked" && !stackedUsesActivationValue(rule) ? "valuePerStack" : "value"
 }
 
@@ -224,6 +225,19 @@ function setValueSourceField(rule: any, field: string | null) {
     rule.valueSource = { kind: "corePassiveScaling", field: normalized }
     const firstValue = Number(props.corePassiveScaling?.levels?.[0]?.[normalized])
     if (Number.isFinite(firstValue)) rule.value = firstValue
+  }
+  if (rule.type === "stacked") {
+    if (rule.valueSource) delete rule.valuePerStack
+    else if (!stackedUsesActivationValue(rule)) rule.valuePerStack ??= Number(rule.value ?? 0)
+  }
+  emit("change")
+}
+
+function setPotentialRequirement(rule: any, key: "minPotentialLevel" | "maxPotentialLevel", value: number | null) {
+  if (value != null) rule.requirement = { ...(rule.requirement ?? {}), [key]: value }
+  else if (rule.requirement) {
+    delete rule.requirement[key]
+    if (!Object.keys(rule.requirement).length) delete rule.requirement
   }
   emit("change")
 }
@@ -627,7 +641,7 @@ function setRuleLabel(rule: any, value: string) {
       <label v-if="!simple" class="maintenance-field"><span>规则生效范围</span><NSelect :value="ruleScope(rule)" :options="SCOPE_OPTIONS" :disabled="disabled || (rule.type === 'formula' && formulaSourceKind(rule) !== 'runtime')" @update:value="setRuleScope(rule, String($event))" /></label>
         <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind, rule.target?.settlementType)" :disabled="disabled || isInCombatFormulaRule(rule)" @update:value="changeStat(rule, String($event))" /></label>
         <label v-if="!simple" class="maintenance-field maintenance-field-wide"><span>效果名称</span><NInput :value="textOf(rule.label)" :disabled="disabled" placeholder="留空使用系统名称" @update:value="setRuleLabel(rule, String($event))" /></label>
-        <label v-if="valueSourceOptions().length > 1 && (rule.type ?? 'fixed') === 'fixed'" class="maintenance-field"><span>数值来源</span><NSelect :value="valueSourceOptionValue(rule)" :options="valueSourceOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
+        <label v-if="valueSourceOptions().length > 1 && ['fixed', 'stacked'].includes(rule.type ?? 'fixed')" class="maintenance-field"><span>数值来源</span><NSelect :value="valueSourceOptionValue(rule)" :options="valueSourceOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
         <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ stackedUsesActivationValue(rule) ? '激活数值' : rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule[editableValueKey(rule)]" :disabled="disabled || Boolean(rule.valueSource)" :step="0.01" @update:value="rule[editableValueKey(rule)] = $event; emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat) && !isInCombatFormulaRule(rule)" class="maintenance-field"><span>计算方式</span><NSelect v-model:value="rule.mode" :options="EFFECT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat) && !isInCombatFormulaRule(rule)" class="maintenance-field"><span>基准</span><NSelect v-model:value="rule.basis" :options="BASIS_OPTIONS" :disabled="disabled" clearable @update:value="emit('change')" /></label>
@@ -698,6 +712,10 @@ function setRuleLabel(rule: any, value: string) {
         <label class="maintenance-field"><span>排除特性</span><NSelect multiple :value="rule.requirement?.excludedSpecialties ?? []" :options="SPECIALTY_OPTIONS" :disabled="disabled" clearable @update:value="setRuleExcludedSpecialties(rule, $event)" /></label>
         <label class="maintenance-field"><span>装备者属性要求</span><NSelect :value="rule.requirement?.attribute ?? null" :options="ATTRIBUTE_OPTIONS" :disabled="disabled" clearable @update:value="setRuleAttribute(rule, $event ? String($event) : null)" /></label>
         <label class="maintenance-field"><span>失衡状态要求</span><NSelect :value="eventStunnedRequirementValue(rule)" :options="[option('true', '仅失衡'), option('false', '仅非失衡')]" :disabled="disabled" clearable placeholder="不限制" @update:value="setEventStunnedRequirement(rule, $event == null ? null : String($event) === 'true')" /></label>
+        <template v-if="potentialVisionScaling">
+          <label class="maintenance-field"><span>最低潜能等级</span><NInputNumber :value="rule.requirement?.minPotentialLevel ?? null" :min="0" :max="6" :precision="0" :disabled="disabled" clearable @update:value="setPotentialRequirement(rule, 'minPotentialLevel', $event)" /></label>
+          <label class="maintenance-field"><span>最高潜能等级</span><NInputNumber :value="rule.requirement?.maxPotentialLevel ?? null" :min="0" :max="6" :precision="0" :disabled="disabled" clearable @update:value="setPotentialRequirement(rule, 'maxPotentialLevel', $event)" /></label>
+        </template>
         <label class="maintenance-field"><span>初始属性门槛</span><NSelect :value="rule.requirement?.outOfCombatStat?.stat ?? null" :options="OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS" :disabled="disabled" clearable @update:value="setRuleOutOfCombatStat(rule, $event ? String($event) : null)" /></label>
         <label v-if="rule.requirement?.outOfCombatStat?.stat" class="maintenance-field"><span>最小值</span><NInputNumber v-model:value="rule.requirement.outOfCombatStat.min" :disabled="disabled" clearable @update:value="emit('change')" /></label>
         <label v-if="rule.requirement?.outOfCombatStat?.stat" class="maintenance-field"><span>最大值</span><NInputNumber v-model:value="rule.requirement.outOfCombatStat.max" :disabled="disabled" clearable @update:value="emit('change')" /></label>
