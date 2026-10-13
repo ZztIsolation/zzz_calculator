@@ -693,7 +693,7 @@ function setTeammateSlot(index: number, value: string | null) {
   if (teammateId) {
     for (const buff of groupedBuffs.value.teammate) {
       if (teammateOwnerId(buff) === teammateId && teammateCinemaLevel(buff) === null
-        && !isTeammatePotentialBuff(buff)) toggle(buff.id, true)
+        && !isTeammatePotentialBuff(buff)) toggle(buff.id, true, false)
     }
   }
   syncTeammates({ kind: 'select', slotIndex: index })
@@ -715,7 +715,7 @@ function setTeammateCinema(index: number, value: number) {
   }
   for (const buff of groupedBuffs.value.teammate) {
     const level = teammateCinemaLevel(buff)
-    if (teammateOwnerId(buff) === slot.teammateId && level !== null) toggle(buff.id, level <= cinemaLevel)
+    if (teammateOwnerId(buff) === slot.teammateId && level !== null) toggle(buff.id, level <= cinemaLevel, false)
   }
 }
 
@@ -1022,11 +1022,13 @@ function isTeammateOwnedBuff(buff: any): boolean {
   return Boolean(buff?.isTeammateWEngine || buff?.sourceType === 'teammate' || teammateOwnerId(buff))
 }
 
-function toggle(id: string, checked: boolean) {
+function toggle(id: string, checked: boolean, recordManual = true) {
   const next = new Set(draft.value)
   const nextRuntime = { ...draftRuntimeInputs.value }
   const buff = Object.values(groupedBuffs.value).flat().find((item: any) => item?.id === id) as any
-  if (isTeammateOwnedBuff(buff)) recordEnkaTeammateEdit(draftBuffPickerState.value, `enabled:${id}`, checked)
+  if (recordManual && isTeammateOwnedBuff(buff)) {
+    recordEnkaTeammateEdit(draftBuffPickerState.value, `enabled:${id}`, checked)
+  }
   if (checked) {
     if (imbuementBuffIds.includes(id)) {
       for (const otherId of imbuementBuffIds) {
@@ -1081,17 +1083,9 @@ function removeVisibleBuffs() {
   if (activeTab.value === "custom") {
     return
   }
-  const next = new Set(draft.value)
-  const nextRuntime = { ...draftRuntimeInputs.value }
   for (const buff of visibleBuffs.value) {
-    next.delete(buff.id)
-    delete nextRuntime[buff.id]
-    if (buff?.isTeammateWEngine) {
-      removeTeamWEngineReference(buff.id)
-    }
+    toggle(buff.id, false)
   }
-  draft.value = next
-  draftRuntimeInputs.value = nextRuntime
 }
 
 function addCustomBuff() {
@@ -1247,6 +1241,11 @@ async function apply() {
       <div class="toolbar">
         <NInput v-model:value="query" clearable placeholder="搜索来源、名称、效果" style="max-width: 360px" />
         <NTag round>已选 {{ selectedCount }} 项</NTag>
+        <NButton
+          v-if="activeTab === 'teammate' && teammateSources?.uid"
+          size="small"
+          @click="syncTeammates({ kind: 'resync' })"
+        >从导入资料重新同步</NButton>
         <NButton size="small" :disabled="!canBulkAddVisible" @click="addVisibleBuffs">添加当前列表</NButton>
         <NButton size="small" :disabled="activeTab === 'custom'" @click="removeVisibleBuffs">移除当前列表</NButton>
       </div>

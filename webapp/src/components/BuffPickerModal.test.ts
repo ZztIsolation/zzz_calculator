@@ -1777,6 +1777,71 @@ describe("BuffPickerModal", () => {
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
     expect(new Set(payload.selectedBuffIds)).toEqual(new Set(["slot_a.core", "nonstandard_alpha", "slot_a.potential", "slot_a.cinema.6"]))
     expect(payload.buffPickerState.teammateSlots).toEqual(teammateSlotState("slot_a", null, 1).teammateSlots)
+    expect(payload.buffPickerState.manualKeys).toEqual(expect.arrayContaining([
+      "slot:0:teammateId",
+      "cinema:slot_a",
+      "enabled:slot_a.additional",
+      "enabled:slot_a.potential",
+      "enabled:slot_a.cinema.6",
+    ]))
+    expect(payload.buffPickerState.manualKeys).not.toContain("enabled:slot_a.core")
+    expect(payload.buffPickerState.manualKeys).not.toContain("enabled:nonstandard_alpha")
+    expect(payload.buffPickerState.manualKeys).not.toContain("enabled:nonstandard_beta")
+  })
+
+  it('lets refresh remove automatic Buffs while keeping direct user choices after reopen', async () => {
+    const sources = {
+      ownerId: 'default', uid: 'current-uid', configs: {}, loadouts: [], discs: [],
+      history: { slot_a: { completeness: 'full', uid: 'current-uid', snapshot: { coreSkillLevel: 6, cinemaLevel: 0 } } },
+    }
+    const wrapper = mountModal({ meta: cinemaTeammateMeta(), teammateSources: sources })
+    await openTeammateTab(wrapper)
+    await teammateSlot(wrapper, 0).setValue('slot_a')
+    expect(selectedRow(wrapper, '队友甲 | 核心被动')).toBe(true)
+    // Returning to the automatic value is still a deliberate choice.
+    await buffRowByText(wrapper, '队友甲 | 额外能力').find('.buff-row-toggle').trigger('click')
+    await buffRowByText(wrapper, '队友甲 | 额外能力').find('.buff-row-toggle').trigger('click')
+    await buttonByText(wrapper, '应用选择').trigger('click')
+    const first = wrapper.emitted('apply')![0]![0] as any
+    expect(first.buffPickerState.manualKeys).toContain('enabled:slot_a.additional')
+    expect(first.buffPickerState.manualKeys).not.toContain('enabled:slot_a.core')
+    expect(first.buffPickerState.enka.overrides['enabled:slot_a.core']).toBeUndefined()
+
+    await wrapper.setProps({ show: false, selectedIds: first.selectedBuffIds, addedBuffs: first.addedBuffs,
+      runtimeInputs: first.runtimeInputs, buffPickerState: first.buffPickerState,
+      teammateSources: { ...sources, history: {} } })
+    await openTeammateTab(wrapper)
+    expect(selectedRow(wrapper, '队友甲 | 核心被动')).toBe(false)
+    expect(selectedRow(wrapper, '队友甲 | 额外能力')).toBe(true)
+    await buttonByText(wrapper, '应用选择').trigger('click')
+    const refreshed = wrapper.emitted('apply')![1]![0] as any
+    expect(refreshed.selectedBuffIds).not.toContain('slot_a.core')
+    expect(refreshed.selectedBuffIds).toContain('slot_a.additional')
+    wrapper.unmount()
+  })
+
+  it('records explicit bulk add and remove as manual choices before Enka adoption', async () => {
+    const wrapper = mountModal({ meta: cinemaTeammateMeta() })
+    await openTeammateTab(wrapper)
+    await teammateSlot(wrapper, 0).setValue('slot_a')
+    await buttonByText(wrapper, '添加当前列表').trigger('click')
+    await buttonByText(wrapper, '应用选择').trigger('click')
+    const added = wrapper.emitted('apply')![0]![0] as any
+    expect(added.buffPickerState.manualKeys).toContain('enabled:slot_a.core')
+    await wrapper.setProps({ show: false, selectedIds: added.selectedBuffIds, buffPickerState: added.buffPickerState })
+    await openTeammateTab(wrapper)
+    await buttonByText(wrapper, '移除当前列表').trigger('click')
+    await buttonByText(wrapper, '应用选择').trigger('click')
+    const removed = wrapper.emitted('apply')![1]![0] as any
+    expect(removed.selectedBuffIds).toEqual([])
+    expect(removed.buffPickerState.manualKeys).toContain('enabled:slot_a.core')
+    await wrapper.setProps({ show: false, selectedIds: removed.selectedBuffIds, buffPickerState: removed.buffPickerState,
+      teammateSources: { ownerId: 'default', uid: 'current-uid', configs: {}, loadouts: [], discs: [],
+        history: { slot_a: { completeness: 'full', uid: 'current-uid', snapshot: { coreSkillLevel: 6, cinemaLevel: 6 } } } } })
+    await openTeammateTab(wrapper)
+    expect(selectedRow(wrapper, '队友甲 | 核心被动')).toBe(false)
+    expect(selectedRow(wrapper, '最终增益')).toBe(false)
+    wrapper.unmount()
   })
 
   it('allows manual cinema changes when a complete record belongs to a different UID', async () => {

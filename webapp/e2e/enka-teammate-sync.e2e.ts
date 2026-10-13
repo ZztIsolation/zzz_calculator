@@ -37,15 +37,17 @@ async function setImportedLevel(page: Page, level: number) {
   }), { level, emptyStore: createEmptyInventoryStore() })
 }
 
-async function seed(page: Page) {
+async function seed(page: Page, origin: 'adminDefault' | 'legacyUser' = 'adminDefault') {
   await page.goto('/')
   await expect(page.getByTestId('open-buff-picker')).toBeEnabled()
   await setImportedLevel(page, 12)
-  await page.evaluate(({ special, core }) => {
+  await page.addInitScript(({ special, core, origin }) => {
+    if (sessionStorage.getItem('enka-teammate-sync-seeded')) return
+    sessionStorage.setItem('enka-teammate-sync-seeded', '1')
     const config = {
       agentLevel: 60,
       buffPickerState: {
-        origin: 'user',
+        origin,
         manualKeys: [`enabled:${core}`],
         teammateSlots: [{ teammateId: 'yaojiayin', cinemaLevel: 0 }, null],
       },
@@ -56,7 +58,7 @@ async function seed(page: Page) {
     }
     const document = { version: 2, currentOwnerId: 'default', byOwner: { default: { currentAgentId: 'ye_shunguang', byAgent: { ye_shunguang: config } } } }
     for (const key of ['zzz-calculator.webapp.build.v1', 'zzz-calculator.homeSelection.v1']) localStorage.setItem(key, JSON.stringify(document))
-  }, { special, core })
+  }, { special, core, origin })
   await page.reload()
   await expect(page.getByTestId('open-buff-picker')).toBeEnabled()
 }
@@ -79,6 +81,8 @@ test('imported teammate adoption, three refresh saves, retry and concurrent sour
     await expect(page.getByRole('dialog')).toBeHidden()
   }
   const adopted = await saved(page)
+  expect(adopted.buffPickerState.origin).toBe('adminDefault')
+  expect(adopted.buffPickerState.manualKeys).toContain(`enabled:${core}`)
   expect(adopted.buffPickerState.teammateSlots[0].cinemaLevel).toBe(2)
   expect(adopted.combat.runtimeInputs[special].effects.yaojiayin_special_aria_dmg_bonus).toMatchObject({ sourceValue: 12, coverage: 0.5 })
   await openPicker(page)
@@ -115,4 +119,43 @@ test('imported teammate adoption, three refresh saves, retry and concurrent sour
   await expect(page.getByTestId('open-buff-picker')).toBeEnabled()
   expect((await saved(page)).combat.runtimeInputs[special].effects.yaojiayin_special_aria_dmg_bonus).toMatchObject({ sourceValue: 14, coverage: 0.5 })
   expect(errors).toEqual([])
+})
+
+test('legacy teammate state keeps manual facts on refresh until explicit resync', async ({ page }) => {
+  await seed(page, 'legacyUser')
+  await openPicker(page)
+  await expect(page.locator(`[data-buff-id="${core}"]`)).not.toHaveClass(/is-selected/)
+  await page.getByRole('button', { name: '应用选择', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  const preserved = await saved(page)
+  expect(preserved.buffPickerState.origin).toBe('legacyUser')
+  expect(preserved.buffPickerState.teammateSlots[0].cinemaLevel).toBe(0)
+  expect(preserved.combat.runtimeInputs[special].effects.yaojiayin_special_aria_dmg_bonus.sourceValue).toBe(16)
+
+  await page.reload()
+  await expect(page.getByTestId('open-buff-picker')).toBeEnabled()
+  await openPicker(page)
+  await page.getByRole('button', { name: '从导入资料重新同步' }).click()
+  await expect(page.locator(`[data-buff-id="${core}"]`)).toHaveClass(/is-selected/)
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  expect((await saved(page)).buffPickerState).toEqual(preserved.buffPickerState)
+  expect((await saved(page)).combat).toEqual(preserved.combat)
+
+  await openPicker(page)
+  await expect(page.locator(`[data-buff-id="${core}"]`)).not.toHaveClass(/is-selected/)
+  await page.getByRole('button', { name: '从导入资料重新同步' }).click()
+  await page.getByRole('button', { name: '应用选择', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  const resynced = await saved(page)
+  expect(resynced.combat.activeBuffIds).toContain(core)
+  expect(resynced.buffPickerState.teammateSlots[0].cinemaLevel).toBe(2)
+  expect(resynced.combat.runtimeInputs[special].effects.yaojiayin_special_aria_dmg_bonus.sourceValue).toBe(12)
+  expect(resynced.combat.runtimeInputs[special].effects.yaojiayin_special_aria_dmg_bonus.coverage).toBe(0.5)
+  expect(resynced.combat.runtimeInputs[core].effects.yaojiayin_core_andante_atk_flat.sourceValue).toBe(2900)
+  expect(resynced.buffPickerState.manualKeys ?? []).not.toContain(`enabled:${core}`)
+  await page.reload()
+  await expect(page.getByTestId('open-buff-picker')).toBeEnabled()
+  expect((await saved(page)).buffPickerState).toEqual(resynced.buffPickerState)
+  expect((await saved(page)).combat).toEqual(resynced.combat)
 })

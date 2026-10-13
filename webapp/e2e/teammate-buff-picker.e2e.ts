@@ -275,10 +275,20 @@ test("teammates remain in their own responsive columns and preserve manual cinem
   await expect(cinemaOne).not.toHaveClass(/is-selected/)
 
   await page.getByRole("button", { name: "应用选择", exact: true }).click()
-  await expect.poll(async () => (await savedSelection(page))?.buffPickerState).toEqual({
+  await expect.poll(async () => (await savedSelection(page))?.buffPickerState).toMatchObject({
     teammateSlots: [{ teammateId: "qianxia", cinemaLevel: 2 }, { teammateId: "liuyin", cinemaLevel: 0 }],
   })
   const saved = await savedSelection(page)
+  expect(saved.buffPickerState.origin).toBe("adminDefault")
+  expect(saved.buffPickerState.manualKeys).toEqual(expect.arrayContaining([
+    "slot:0:teammateId",
+    "slot:1:teammateId",
+    "cinema:qianxia",
+    "enabled:qianxia.cinema_1.cat_gaze_def_reduction",
+  ]))
+  expect(saved.buffPickerState.manualKeys).not.toContain("enabled:buff_j8kf2r9m4q")
+  expect(saved.buffPickerState.manualKeys).not.toContain("enabled:qianxia.cinema_2.aether_curtain_atk_pct")
+  expect(saved.buffPickerState.manualKeys).not.toContain("enabled:qianxia.cinema_4.ultimate_team_dmg_bonus")
   expect(saved.combat.activeBuffIds).toContain("qianxia.cinema_2.aether_curtain_atk_pct")
   expect(saved.combat.activeBuffIds).not.toContain("qianxia.cinema_1.cat_gaze_def_reduction")
   expect(saved.combat.buffPickerState).toBeUndefined()
@@ -346,8 +356,12 @@ test("opening a legacy three-teammate configuration saves its reset immediately 
   await expect(notice).toBeVisible()
 
   // The saved reset is observable before any Apply or Cancel interaction.
-  await expect.poll(async () => (await savedSelection(page))?.buffPickerState).toEqual({ teammateSlots: [null, null] })
+  await expect.poll(async () => (await savedSelection(page))?.buffPickerState).toMatchObject({
+    origin: "legacyUser",
+    teammateSlots: [null, null],
+  })
   const reset = await savedSelection(page)
+  expect(reset.buffPickerState.origin).toBe("legacyUser")
   expect(reset.combat.activeBuffIds).toEqual([selfCinemaId, engineSelfId, engineTeamId])
   expect(reset.combat.manuallyUncheckedDefaultBuffIds).toEqual([selfId])
   expect(reset.combat.runtimeInputs).toEqual(ownRuntime)
@@ -363,7 +377,10 @@ test("opening a legacy three-teammate configuration saves its reset immediately 
   await chooseTeammate(page, 0, "千夏")
   await page.getByRole("button", { name: "取消", exact: true }).click()
   expect((await savedSelection(page)).combat).toEqual(reset.combat)
-  expect((await savedSelection(page)).buffPickerState).toEqual({ teammateSlots: [null, null] })
+  expect((await savedSelection(page)).buffPickerState).toMatchObject({
+    origin: "legacyUser",
+    teammateSlots: [null, null],
+  })
 
   await page.reload()
   await openTeammates(page)
@@ -371,6 +388,9 @@ test("opening a legacy three-teammate configuration saves its reset immediately 
   await expect(page.locator(".teammate-buff-column .buff-row")).toHaveCount(0)
   const restored = await savedSelection(page)
   expect(restored.combat).toEqual(reset.combat)
-  expect(restored.buffPickerState).toEqual({ teammateSlots: [null, null] })
+  expect(restored.buffPickerState).toMatchObject({
+    origin: "legacyUser",
+    teammateSlots: [null, null],
+  })
   await page.getByRole("button", { name: "取消", exact: true }).click()
 })

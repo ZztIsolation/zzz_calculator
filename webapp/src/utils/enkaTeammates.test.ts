@@ -241,8 +241,9 @@ describe('Enka synchronization operations and calculation regressions', () => {
     expect(result.runtimeInputs['remielle_dan.special.timeflow_hymn'].effects.remielle_dan_special_team_dmg.sourceValue).toBe(15)
   })
 
-  it('adopts imported facts on first refresh while preserving all existing selections and scenario inputs', () => {
+  it('preserves legacy teammate facts on refresh while keeping existing selections and scenario inputs', () => {
     const input: any = draft()
+    input.buffPickerState.origin = 'legacyUser'
     input.selectedBuffIds.push('yaojiayin.special_aria_buff')
     input.buffPickerState.teammateSlots[0].cinemaLevel = 6
     input.runtimeInputs['yaojiayin.special_aria_buff'] = { effects: { yaojiayin_special_aria_dmg_bonus: { sourceValue: 16, coverage: 0.5 } } }
@@ -277,7 +278,7 @@ describe('Enka synchronization operations and calculation regressions', () => {
     const input: any = {
       selectedBuffIds: [], addedBuffs: [], runtimeInputs: {},
       buffPickerState: {
-        origin: 'user', defaultFingerprint: 'ellen-default',
+        origin: 'adminDefault', defaultFingerprint: 'ellen-default',
         manualKeys: ['cinema:yaojiayin', 'enabled:yaojiayin.cinema_1.enemy_res_reduction'],
         teammateSlots: [{ teammateId: 'yaojiayin', cinemaLevel: 0 }, null],
       },
@@ -286,6 +287,8 @@ describe('Enka synchronization operations and calculation regressions', () => {
     source.history.yaojiayin.snapshot.cinemaLevel = 1
     const result = syncEnkaTeammates(input, source, meta, 'ye_shunguang').payload
     expect(result.buffPickerState.teammateSlots[0].cinemaLevel).toBe(0)
+    expect(result.buffPickerState.enka.applied['cinema:yaojiayin']).toBe(0)
+    expect(result.runtimeInputs['yaojiayin.special_aria_buff'].effects.yaojiayin_special_aria_dmg_bonus.sourceValue).toBe(12)
     expect(result.selectedBuffIds).not.toContain('yaojiayin.cinema_1.enemy_res_reduction')
     expect(result.buffPickerState.manualKeys).toEqual(expect.arrayContaining([
       'cinema:yaojiayin', 'enabled:yaojiayin.cinema_1.enemy_res_reduction',
