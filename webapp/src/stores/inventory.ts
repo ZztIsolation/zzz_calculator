@@ -651,14 +651,26 @@ export const useInventoryStore = defineStore("inventory", {
       reservedForAgentId: string | null,
       allowTransfer = false,
       allowExclusionOverride = false,
+      options: { ownerId?: string, expectedReservedForAgentId?: string } = {},
     ) {
+      const activeOwnerId = String(this.store?.currentOwnerId
+        ?? (await loadUserDriveDiscStoreFresh()).currentOwnerId ?? "default")
+      const ownerId = String(options.ownerId ?? activeOwnerId)
+      if (options.ownerId !== undefined && ownerId !== activeOwnerId) {
+        throw new Error("账号已切换，请重新选择方案后操作")
+      }
       const result = await setDriveDiscReservations({
-        ownerId: this.store?.currentOwnerId,
+        ownerId,
         discIds,
         reservedForAgentId,
         allowTransfer,
         allowExclusionOverride,
+        expectedReservedForAgentId: options.expectedReservedForAgentId,
       })
+      if (String(this.store?.currentOwnerId ?? "default") !== ownerId) {
+        await this.load()
+        return result
+      }
       this.store = result.store
       if (result.applied) {
         await this.load()

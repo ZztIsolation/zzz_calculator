@@ -167,20 +167,23 @@ function rankTooltip(value: number) {
         :format-tooltip="rankTooltip"
         @update:value="updateRank"
       />
-      <NInputNumber
-        class="optimizer-result-rank-input"
-        data-testid="optimizer-result-rank-input"
-        :value="currentRank"
-        :min="minRank"
-        :max="maxRank"
-        :step="1"
-        :precision="0"
-        :disabled="!hasMultipleResults"
-        button-placement="both"
-        size="small"
-        aria-label="优化结果套数"
-        @update:value="updateRank"
-      />
+      <div class="optimizer-result-rank-controls">
+        <slot name="rank-actions" />
+        <NInputNumber
+          class="optimizer-result-rank-input"
+          data-testid="optimizer-result-rank-input"
+          :value="currentRank"
+          :min="minRank"
+          :max="maxRank"
+          :step="1"
+          :precision="0"
+          :disabled="!hasMultipleResults"
+          button-placement="both"
+          size="small"
+          aria-label="优化结果套数"
+          @update:value="updateRank"
+        />
+      </div>
     </div>
 
     <div
@@ -220,7 +223,7 @@ function rankTooltip(value: number) {
 
 .optimizer-result-control-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 132px;
+  grid-template-columns: minmax(160px, 1fr) auto;
   align-items: center;
   gap: 18px;
   min-width: 0;
@@ -233,6 +236,17 @@ function rankTooltip(value: number) {
 
 .optimizer-result-rank-input {
   width: 132px;
+  flex: 0 0 132px;
+}
+
+.optimizer-result-rank-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .optimizer-result-ratio {
@@ -301,7 +315,7 @@ function rankTooltip(value: number) {
     gap: 12px;
   }
 
-  .optimizer-result-rank-input {
+  .optimizer-result-rank-controls {
     justify-self: end;
   }
 }

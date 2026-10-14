@@ -25,6 +25,10 @@
       "sourceHash": "f099d5a28ecd0b6b5e370feb1be815c6fb768641695dcef660b42db4bd0fc385",
       "thumbnailUrl": "/assets/thumbs/agents/aria.6e0d4bda8bc9b4f0.webp"
     },
+    "/assets/agents/asaba_harumasa.webp": {
+      "sourceHash": "e2d18d780d69ecd2ec399a1720d1e36c8de1109f9a96939f10e97cd01fb4ba10",
+      "thumbnailUrl": "/assets/thumbs/agents/asaba_harumasa.ea122deb77330a1c.webp"
+    },
     "/assets/agents/burnice_white.png": {
       "sourceHash": "aac8c7920c34ae7ce41e8d6ea4fb380b92264f81411baf805db2bf526d17f48e",
       "thumbnailUrl": "/assets/thumbs/agents/burnice_white.b136bf707c584936.webp"
@@ -40,6 +44,10 @@
     "/assets/agents/ellen_joe.webp": {
       "sourceHash": "f96613bf7550983aa2b1f5679b2d6d3acedc0880bbb375aa010b2b120abf2818",
       "thumbnailUrl": "/assets/thumbs/agents/ellen_joe.09a5507303d80877.webp"
+    },
+    "/assets/agents/evelyn_chevalier.webp": {
+      "sourceHash": "46c6089381bfdff5d626fb50b9ea6bbfe6f4ae50e50bec6173ffe75ddfd33da7",
+      "thumbnailUrl": "/assets/thumbs/agents/evelyn_chevalier.f39572fe0c20769c.webp"
     },
     "/assets/agents/hoshimi_miyabi.png": {
       "sourceHash": "f5ef77e9c9f85051f34ac0ba1df757a51be3fa0eeea9f1621300ce234d280ae1",
@@ -80,6 +88,10 @@
     "/assets/agents/nangongyu.png": {
       "sourceHash": "3b2266f04a5f7a1109622c123b73b009ba4bae6bc52bed534562483f68e2a05c",
       "thumbnailUrl": "/assets/thumbs/agents/nangongyu.ddf1e156ad378ae3.webp"
+    },
+    "/assets/agents/nekomata.webp": {
+      "sourceHash": "ef231fea869ff91ff8d78418b9e07d6d86e5fd2ce2fa1586f3e93fca13cc3ae7",
+      "thumbnailUrl": "/assets/thumbs/agents/nekomata.44dc052fe6dc5db9.webp"
     },
     "/assets/agents/nicole.png": {
       "sourceHash": "f3d2480608b0039d838fb1d378e2b91905492e59bfb0f2e625911901d0944045",

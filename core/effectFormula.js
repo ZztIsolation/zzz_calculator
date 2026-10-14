@@ -1,8 +1,8 @@
 import { evaluateFormulaExpression } from "./formulaEvaluator.js"
 
-// These are the panel values that are fully determined before dynamic damage
-// bonuses are evaluated. Output-only values such as dmgBonus are deliberately
-// excluded so an in-combat formula cannot create a dependency cycle.
+// Static panel values precede dynamic formulas. AP -> flat ATK conversions run
+// before damage/crit formulas; their source is restricted to AP. Output-only
+// damage and crit modifiers are excluded to prevent dependency cycles.
 export const IN_COMBAT_FORMULA_SOURCE_STATS = Object.freeze([
     "hp",
     "atk",
@@ -97,6 +97,11 @@ export function isAllowedInCombatFormulaSourceType(sourceType) {
 export function isAllowedInCombatFormulaOutput(rule = {}, sourceType = "self") {
     if ((rule.mode ?? "flat") !== "flat") return false
     const target = rule.target?.kind ?? "default"
+    if (rule.stat === "skillMultiplierScaleBonus") {
+        return sourceType === "self" && target === "skill"
+            && rule.source?.stat === "critRate" && rule.source?.unit === "storedPercent"
+            && rule.formula?.valueUnit === "storedPercent"
+    }
     if (rule.stat === "dmgBonus") return target === "default"
     if (sourceType !== "self" || rule.source?.stat !== "anomalyProficiency"
         || rule.source?.unit !== "storedValue") return false

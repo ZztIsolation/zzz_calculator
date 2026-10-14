@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NInput, NSelect, NSwitch } from "naive-ui"
+import { NButton, NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import { Plus, Trash2 } from "lucide-vue-next"
 import { DAMAGE_ELEMENT_OPTIONS, option } from "./maintenance-options"
 import ReleaseExpressionEditor from "./ReleaseExpressionEditor.vue"
@@ -56,6 +56,7 @@ function setDefault(index: number, value: boolean) {
         <label class="maintenance-switch-field"><span>默认方案</span><NSwitch :value="profile.default === true" :disabled="disabled" @update:value="setDefault(index, Boolean($event))" /></label>
         <label class="maintenance-field maintenance-field-wide"><span>支持属性</span><NSelect multiple v-model:value="profile.supportedElements" :options="DAMAGE_ELEMENT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>倍率结果</span><NSelect v-model:value="profile.resultMode" :options="resultModeOptions" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label class="maintenance-field"><span>最低影画</span><NInputNumber :value="profile.minCinemaLevel ?? 0" :min="0" :max="6" :step="1" :disabled="disabled" @update:value="profile.minCinemaLevel = $event ?? 0; emit('change')" /></label>
       </div>
       <ReleaseExpressionEditor :node="profile.expression" :core-scaling="model.coreSkill?.corePassiveScaling" :disabled="disabled" @change="emit('change')" />
       <div class="maintenance-row-head">

@@ -234,8 +234,8 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "sharp", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["imbuementDmgBonus", "enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", "sharpDmgBonus", "lacerationDmg", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
-const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["imbuementDmgBonus", "enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", "skillMultiplierScaleBonus", "sharpDmgBonus", "lacerationDmg", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus", "skillMultiplierScaleBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
 const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["imbuementDmgBonus", "enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
@@ -278,6 +278,7 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     ...ELEMENT_CRIT_DMG_STATS,
     ...ELEMENT_DEF_IGNORE_STATS,
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
 ])
 const ANOMALY_TARGET_STAT_VALUES = new Set([
     "allResIgnore",

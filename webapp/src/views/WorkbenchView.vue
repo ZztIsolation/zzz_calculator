@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { NAlert, NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NTag, useMessage } from "naive-ui"
-import { Ban, CheckSquare, ChevronDown, ChevronUp, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
+import { Ban, CheckSquare, ChevronDown, ChevronUp, LineChart, LockKeyhole, UnlockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
 import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
@@ -149,6 +149,7 @@ const saveLoadoutBusy = ref(false)
 const saveLoadoutError = ref("")
 const OPTIMIZED_RESULT_LIMIT = 10
 const OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]
+const DRIVE_DISC_DISPLAY_SLOTS = [1, 6, 2, 5, 3, 4]
 const SAVE_LOADOUT_WAIT_TIMEOUT_MS = 5_000
 const SAVE_LOADOUT_STORAGE_TIMEOUT_MS = 15_000
 
@@ -359,11 +360,25 @@ const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>
       return [Number(disc.partition), displayDisc] as [number, any]
     }),
   )
-  return OPTIMIZER_RESULT_SLOTS.map(slot => ({
+  return DRIVE_DISC_DISPLAY_SLOTS.map(slot => ({
     slot,
     disc: bySlot.get(slot) ?? null,
   }))
 })
+const selectedSchemeInventoryDiscs = computed(() => {
+  const inventoryById = new Map<string, any>(inventoryStore.driveDiscs.map((disc: any) => [String(disc.id), disc]))
+  return selectedDriveDiscRows.value.map(row => {
+    const disc = inventoryById.get(String(row.disc?.id ?? ""))
+    return disc && Number(disc.partition) === row.slot ? disc : null
+  })
+})
+const selectedSchemeCanBeLocked = computed(() => buildStore.discMode === "optimized"
+  && Boolean(buildStore.agentId)
+  && accountStore.currentOwnerId === inventoryStore.store?.currentOwnerId
+  && selectedSchemeInventoryDiscs.value.every(disc => Boolean(disc?.id))
+  && new Set(selectedSchemeInventoryDiscs.value.map(disc => disc?.id)).size === 6)
+const selectedSchemeIsLocked = computed(() => selectedSchemeCanBeLocked.value
+  && selectedSchemeInventoryDiscs.value.every(disc => disc.reservedForAgentId === buildStore.agentId))
 const calculationModeLabel = computed(() => {
   if (buildStore.damageConfig.mode !== "adminDefault") {
     return damageModeLabel(buildStore.damageConfig.mode)
@@ -1041,14 +1056,33 @@ function agentNameForId(agentId: string | null | undefined) {
 }
 
 async function applySchemeDiscReservation(action: any, options: any = {}) {
+  if (schemeReservationBusy.value) return false
+  const contextAgentId = action.contextAgentId ?? action.agentId
+  if (action.ownerId && (action.ownerId !== accountStore.currentOwnerId
+    || action.ownerId !== inventoryStore.store?.currentOwnerId || contextAgentId !== buildStore.agentId)) {
+    showSchemeReservationConflict.value = false
+    pendingSchemeReservation.value = null
+    schemeReservationConflicts.value = []
+    message.warning("账号或角色已切换，请重新选择方案后操作")
+    return false
+  }
+  const discIds = action.discIds ?? [action.discId]
   schemeReservationBusy.value = true
   try {
     const result = await inventoryStore.reserveDiscs(
-      [action.discId],
+      discIds,
       action.agentId,
       options.allowTransfer === true,
       options.allowExclusionOverride === true,
+      { ownerId: action.ownerId, expectedReservedForAgentId: action.expectedReservedForAgentId },
     )
+    if (action.ownerId && (action.ownerId !== accountStore.currentOwnerId || contextAgentId !== buildStore.agentId)) {
+      await inventoryStore.load()
+      showSchemeReservationConflict.value = false
+      schemeReservationConflicts.value = []
+      pendingSchemeReservation.value = null
+      return result.applied
+    }
     if (!result.applied) {
       pendingSchemeReservation.value = action
       schemeReservationConflicts.value = result.conflicts ?? []
@@ -1056,8 +1090,10 @@ async function applySchemeDiscReservation(action: any, options: any = {}) {
       return false
     }
     message.success(action.agentId
-      ? `已锁定给${agentNameForId(action.agentId)}`
-      : "已解除角色专属")
+      ? discIds.length > 1
+        ? `已将${discIds.length}张盘锁定给${agentNameForId(action.agentId)}`
+        : `已锁定给${agentNameForId(action.agentId)}`
+      : discIds.length > 1 ? `已解锁${discIds.length}张盘` : "已解除角色专属")
     showSchemeReservationConflict.value = false
     schemeReservationConflicts.value = []
     pendingSchemeReservation.value = null
@@ -1068,6 +1104,20 @@ async function applySchemeDiscReservation(action: any, options: any = {}) {
   } finally {
     schemeReservationBusy.value = false
   }
+}
+
+async function toggleSelectedSchemeReservation() {
+  if (!reservationUiEnabled.value || !selectedSchemeCanBeLocked.value
+    || schemeReservationBusy.value) return
+  const releasing = selectedSchemeIsLocked.value
+  await applySchemeDiscReservation({
+    kind: "reservation",
+    discIds: selectedSchemeInventoryDiscs.value.map(disc => String(disc.id)),
+    agentId: releasing ? null : buildStore.agentId,
+    contextAgentId: buildStore.agentId,
+    expectedReservedForAgentId: releasing ? buildStore.agentId : undefined,
+    ownerId: accountStore.currentOwnerId,
+  })
 }
 
 async function applySchemeDiscExclusion(action: any, allowReservationRelease = false) {
@@ -1123,6 +1173,13 @@ async function toggleSchemeDiscExclusion(disc: any) {
 }
 
 const schemeRestrictionConfirmMode = computed(() => {
+  if ((pendingSchemeReservation.value?.discIds?.length ?? 0) > 1) {
+    return {
+      title: "整套锁定存在冲突",
+      copy: "当前方案含其他角色专属盘或已主动排除的盘。确认后会转移列出的专属关系、取消当前角色对这些盘的排除，并将本方案六张盘一起锁定给当前角色。取消不会改动任何盘。",
+      action: "确认锁定当前方案",
+    }
+  }
   const kind = schemeReservationConflicts.value[0]?.kind
   if (pendingSchemeReservation.value?.kind === "exclusion" || kind === "reserved-current") {
     return {
@@ -1685,7 +1742,23 @@ function formatPercentValue(value: any) {
             :score-digits="isLuminescenceScore ? 3 : 0"
             :effective-substat-counts="effectiveDriveDiscSubstats"
             @update:model-value="buildStore.selectOptimizedRank"
-          />
+          >
+            <template v-if="reservationUiEnabled" #rank-actions>
+              <NButton
+                size="small"
+                type="primary"
+                secondary
+                data-testid="lock-optimized-scheme"
+                :loading="schemeReservationBusy"
+                :disabled="!selectedSchemeCanBeLocked || schemeReservationBusy"
+                :title="selectedSchemeIsLocked ? '解除当前方案六张盘对当前角色的专属锁定' : '将当前方案六张盘锁定给当前角色'"
+                @click="toggleSelectedSchemeReservation"
+              >
+                <template #icon><UnlockKeyhole v-if="selectedSchemeIsLocked" :size="16" /><LockKeyhole v-else :size="16" /></template>
+                {{ selectedSchemeIsLocked ? '一键解锁' : '一键锁定' }}
+              </NButton>
+            </template>
+          </OptimizerResultSelector>
           <OptimizerResultSelector
             v-else
             class="drive-disc-mode-control"
@@ -1920,12 +1993,13 @@ function formatPercentValue(value: any) {
         {{ schemeRestrictionConfirmMode.copy }}
       </NAlert>
       <div class="scheme-reservation-conflict-list">
-        <div v-for="conflict in schemeReservationConflicts" :key="conflict.discId" class="scheme-reservation-conflict-row">
+        <div v-for="conflict in schemeReservationConflicts" :key="`${conflict.kind ?? 'reservation'}-${conflict.discId}`" class="scheme-reservation-conflict-row">
           <div>
             <strong>{{ driveDiscSetName(schemeConflictDisc(conflict)) }} · {{ schemeConflictDisc(conflict)?.partition }}号位</strong>
             <span>{{ driveDiscStatText(schemeConflictDisc(conflict)?.mainStat) }}</span>
           </div>
-          <span>{{ agentNameForId(conflict.currentAgentId) }} → {{ agentNameForId(conflict.requestedAgentId) }}</span>
+          <span v-if="conflict.kind === 'excluded-current'">已被{{ agentNameForId(conflict.requestedAgentId) }}主动排除</span>
+          <span v-else>{{ agentNameForId(conflict.currentAgentId) }} → {{ agentNameForId(conflict.requestedAgentId) }}</span>
         </div>
       </div>
     </div>
@@ -2746,6 +2820,34 @@ function formatPercentValue(value: any) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  container-type: inline-size;
+  container-name: drive-disc-slots;
+}
+
+@container drive-disc-slots (max-width: 540px) {
+  .drive-disc-slot-grid :deep(.disc-slot-card) {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 8px;
+  }
+
+  .drive-disc-slot-grid :deep(.disc-slot-card-meta) {
+    grid-column: 1;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .drive-disc-slot-grid :deep(.disc-slot-card-actions) {
+    grid-column: 1 / -1;
+    justify-content: start;
+  }
+
+  .drive-disc-slot-grid :deep(.disc-slot-card-meta .n-tag__content) {
+    text-align: left;
+  }
 }
 
 .drive-disc-restriction-hints {
@@ -3625,7 +3727,6 @@ function formatPercentValue(value: any) {
   }
 
   .optimizer-run-row,
-  .drive-disc-slot-grid,
   .manual-disc-filter-row {
     grid-template-columns: 1fr;
   }

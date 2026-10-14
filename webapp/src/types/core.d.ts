@@ -83,7 +83,7 @@ declare module "@core/anomalyRelease.js" {
   export function isReleaseSettlement(event?: any): boolean
   export function anomalyReleaseProfiles(agent?: any): any[]
   export function defaultAnomalyReleaseProfile(agent?: any, damageElement?: string): any
-  export function anomalyReleaseProfile(agent?: any, profileId?: string, damageElement?: string): any
+  export function anomalyReleaseProfile(agent?: any, profileId?: string, damageElement?: string, options?: { cinemaLevel?: number }): any
   export function isAriaReleaseSourceLocked(agent?: any): boolean
   export function isVelinaReleaseAgent(agent?: any): boolean
   export function velinaReleaseSourceId(event?: any): string
@@ -424,7 +424,7 @@ declare module "@runtime/local-store.js" {
   export function importScannerExportToStore(input: any, options?: any): Promise<any>
   export function upsertUserDriveDisc(driveDisc: any, options?: LocalStoreOperationOptions): Promise<any>
   export function deleteUserDriveDisc(id: string, options?: LocalStoreOperationOptions): Promise<any>
-  export function setDriveDiscReservations(input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean; allowExclusionOverride?: boolean }, options?: LocalStoreOperationOptions): Promise<any>
+  export function setDriveDiscReservations(input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean; allowExclusionOverride?: boolean; expectedReservedForAgentId?: string }, options?: LocalStoreOperationOptions): Promise<any>
   export function setDriveDiscExclusions(input: { ownerId?: string; discIds: string[]; excludedForAgentId: string; excluded: boolean; allowReservationRelease?: boolean }, options?: LocalStoreOperationOptions): Promise<any>
   export function upsertDriveDiscLoadout(loadout: any, options?: LocalStoreOperationOptions & { reserveDiscs?: boolean; allowTransfer?: boolean }): Promise<any>
   export function deleteDriveDiscLoadout(id: string, options?: LocalStoreOperationOptions): Promise<any>
@@ -566,7 +566,7 @@ declare module "@core/inventory-model.js" {
   export function buildScannerImportPlan(store: any, input: any, options?: any): any
   export function clearOwnerInventory(store: any, ownerId?: string | null): any
   export function upsertDriveDisc(store: any, driveDisc: any, options?: any): any
-  export function setDriveDiscReservations(store: any, input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean; allowExclusionOverride?: boolean }): any
+  export function setDriveDiscReservations(store: any, input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean; allowExclusionOverride?: boolean; expectedReservedForAgentId?: string }): any
   export function setDriveDiscExclusions(store: any, input: { ownerId?: string; discIds: string[]; excludedForAgentId: string; excluded: boolean; allowReservationRelease?: boolean }): any
   export function driveDiscUsageStateForAgent(disc: any, agentId: string): any
   export function driveDiscOptimizationInventoryFingerprint(store: any, input: { ownerId?: string; agentId?: string }): string

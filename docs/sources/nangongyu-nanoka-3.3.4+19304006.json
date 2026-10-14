@@ -1,0 +1,1973 @@
+{
+  "id": 1511,
+  "icon": "IconRole59",
+  "name": "南宫羽",
+  "code_name": "NangongYu",
+  "rarity": 4,
+  "weapon_type": {
+    "2": "击破"
+  },
+  "element_type": {
+    "205": "以太"
+  },
+  "special_element_type": {},
+  "hit_type": {
+    "102": "打击"
+  },
+  "camp": {
+    "13": "妄想天使"
+  },
+  "gender": 2,
+  "partner_info": {
+    "birthday": "9/29",
+    "full_name": "南宫羽",
+    "gender": "女",
+    "icon_path": "UI/Sprite/A1DynamicLoad/IconRoleCircle/UnPacker/IconRoleCircle59.png",
+    "inter_knot_icon": "UI/Sprite/A1DynamicLoad/InterKnot/UnPacker/IconInterknotAvatar/IconInterKnotRole0059.png",
+    "impression_f": "南宫做什么都能做得又好又轻松，要是哥哥也有这样的才能，我也能轻松一点吧？开玩笑的，哥哥已经很棒啦~",
+    "impression_m": "没能为铃分忧还真是我的不是…我会多多向南宫学习的！",
+    "impressions": [
+      "对南宫羽的印象：\n · 业务超群的偶像队长，兴趣使然的「人生赢家」。",
+      " · 她懂得所有让舞台闪耀的法则，包括那些从未写在聚光灯下的付出。",
+      " · 将借来的梦想紧握在手，本身就是无可替代的天赋。"
+    ],
+    "profile_desc": "南宫羽，偶像团体「妄想天使」的队长与编舞担当，拥有罕见以太适性体质、敏锐商业嗅觉和卓越偶像才能的「天才」。\n\n虽然总以一副慵懒神态示人，调侃队友、玩笑不断，收到的恶评却往往是团队中最少的。虽然总宣称自己的梦想是「借来的」，却为这个小小的舞台倾注了超越常人的心血与感情。\n\n南宫拥有一种举重若轻的天赋——无论是舞蹈、说唱、投资，还是洞察人心。这份天赋曾是支撑她轻松扮演「队长」角色的面具，却也一度让她与内心真实的渴望隔阂相望。\n\n但无论最初是出于对挚友的责任，还是后来对舞台难以割舍的眷恋，她都已在灯光与观众的注视下，将借来的星火淬炼成了属于自己的光芒。",
+    "role_icon": "IconRole/UnPacker/IconRole59",
+    "stature": "156",
+    "unlock_condition": [
+      "获得代理人",
+      "完成主线委托第二季·间章 旧梦的安可曲",
+      "完成委托「安比的困扰」"
+    ],
+    "trust_lv": {
+      "1": "南宫羽，偶像团体「妄想天使」的队长与编舞担当，拥有罕见以太适性体质、敏锐商业嗅觉和卓越偶像才能的「天才」。\n\n虽然总以一副慵懒神态示人，调侃队友、玩笑不断，收到的恶评却往往是团队中最少的。虽然总宣称自己的梦想是「借来的」，却为这个小小的舞台倾注了超越常人的心血与感情。\n\n南宫拥有一种举重若轻的天赋——无论是舞蹈、说唱、投资，还是洞察人心。这份天赋曾是支撑她轻松扮演「队长」角色的面具，却也一度让她与内心真实的渴望隔阂相望。\n\n但无论最初是出于对挚友的责任，还是后来对舞台难以割舍的眷恋，她都已在灯光与观众的注视下，将借来的星火淬炼成了属于自己的光芒。",
+      "2": "",
+      "3": "「天赋」是令南宫游刃有余的光环，也曾是遮蔽她感知真实心意的雾障。她善于为一切事物估值与规划，却唯独无法为「梦想」这个看似虚无的概念标价。\n\n在妄想天使成立之初，面对那个抠门到需要向练习生倒收教学费的事务所，南宫羽第一次感到自己那套「总能抓住商机」的天赋失效了。她可以计算出最优的舞步编排，能预判哪支股票会涨，却无法算出如何让这个承载千夏梦想的脆弱组合活下去。当最后的积蓄见底，而唯一的主唱即将因经济压力退出时，一个危险的「机会」找上了门——利用她们未被登记的以太适性体质，进入空洞，为一笔高额报酬执行一次「物资回收」委托。\n\n那并非舞蹈练习室，而是真正的生死场。手中用于防身的简陋武器，其重量与舞台道具天差地别；而身边千夏因恐惧而急促的呼吸声，比任何观众的欢呼都更揪紧她的神经。那次委托，她们最终侥幸完成了任务，带回了足以维系组合存续的报酬。但当她们跌跌撞撞地回到安全区，看着手中沾满尘垢的酬金时，南宫感到的并非喜悦。\n\n她意识到，自己愿意为之赌上性命、承受恐惧的，早已不再是「帮助朋友实现梦想」这个抽象的责任。而是在那个破旧练习室里，千夏写下的旋律，爱芮唱出的歌声，是尚未到来的、属于她们自己的歌声与舞台。那份渴望本身，已经有了无法用任何投资回报率来衡量的重量。 从那天起，她依然会计算：如何用最小的代价，守护住这个由她亲手拉入局、并已无法割舍的「廉价梦想」。",
+      "4": ""
+    }
+  },
+  "skin": {
+    "3115110": {
+      "name": "南宫羽·绮梦领舞",
+      "desc": "梦想既廉价又昂贵，触不可及，地上的人儿总把梦唤作星星。\n于是天使漫步繁星，从无穷远的银河里捧起一抹妄想——那便是最初照耀她的虹光。",
+      "obtain_desc": "",
+      "image": "IconRole59"
+    },
+    "3115111": {
+      "name": "南宫羽·狂想缪斯",
+      "desc": "在失序的节拍中起舞，于狂想的舞台上回旋。\n天使与恶魔的界限，随灯光倾斜，在她的倒影中溶解。",
+      "obtain_desc": "",
+      "image": "IconRole59_01"
+    },
+    "3115112": {
+      "name": "南宫羽·心动应援中",
+      "desc": "天使团规第一则：章鱼小队长必须以身作则！拥抱粉色、拥抱夏天！",
+      "obtain_desc": "",
+      "image": "IconRole59_02"
+    }
+  },
+  "stats": {
+    "armor": 0,
+    "armor_growth": 0,
+    "attack": 107,
+    "attack_growth": 63136,
+    "avatar_piece_id": 5511,
+    "break_stun": 120,
+    "crit": 500,
+    "crit_damage": 5000,
+    "crit_dmg_res": 0,
+    "crit_res": 0,
+    "defence": 50,
+    "defence_growth": 67901,
+    "element_abnormal_power": 90,
+    "element_mystery": 93,
+    "endurance": 0,
+    "hp_growth": 913706,
+    "hp_max": 673,
+    "pen_delta": 0,
+    "pen_rate": 0,
+    "rbl": 1,
+    "rbl_correction_factor": 10000,
+    "rbl_probability": 0,
+    "shield": 0,
+    "shield_growth": 0,
+    "sp_bar_point": 120,
+    "sp_recover": 120,
+    "stun": 0,
+    "tags": [
+      "NangongYu",
+      "Punch",
+      "Ether",
+      "Female",
+      "Camp13",
+      "Size1",
+      "AidTypeParry",
+      "NangongYu",
+      "EtherEyesSize1"
+    ],
+    "rp_max": 0,
+    "rp_recover": 0,
+    "ep_max": 0,
+    "ep_recover": 0,
+    "sharp_critical_damage": 0
+  },
+  "level": {
+    "1": {
+      "hp_max": 0,
+      "attack": 0,
+      "defence": 0,
+      "level_max": 10,
+      "level_min": 0,
+      "materials": {
+        "10": 24000,
+        "100212": 4
+      }
+    },
+    "2": {
+      "hp_max": 462,
+      "attack": 38,
+      "defence": 34,
+      "level_max": 20,
+      "level_min": 10,
+      "materials": {
+        "10": 56000,
+        "100222": 12
+      }
+    },
+    "3": {
+      "hp_max": 924,
+      "attack": 77,
+      "defence": 69,
+      "level_max": 30,
+      "level_min": 20,
+      "materials": {
+        "10": 120000,
+        "100222": 20
+      }
+    },
+    "4": {
+      "hp_max": 1386,
+      "attack": 115,
+      "defence": 103,
+      "level_max": 40,
+      "level_min": 30,
+      "materials": {
+        "10": 200000,
+        "100232": 10
+      }
+    },
+    "5": {
+      "hp_max": 1848,
+      "attack": 153,
+      "defence": 137,
+      "level_max": 50,
+      "level_min": 40,
+      "materials": {
+        "10": 400000,
+        "100232": 20
+      }
+    },
+    "6": {
+      "hp_max": 2310,
+      "attack": 192,
+      "defence": 172,
+      "level_max": 60,
+      "level_min": 50,
+      "materials": {}
+    }
+  },
+  "extra_level": {
+    "1": {
+      "max_level": 15,
+      "extra": {
+        "31401": {
+          "prop": 31401,
+          "name": "异常掌控",
+          "format": "{0:0.#}",
+          "value": 12
+        },
+        "12101": {
+          "prop": 12101,
+          "name": "基础攻击力",
+          "format": "{0:0.#}",
+          "value": 0
+        }
+      }
+    },
+    "2": {
+      "max_level": 25,
+      "extra": {
+        "31401": {
+          "prop": 31401,
+          "name": "异常掌控",
+          "format": "{0:0.#}",
+          "value": 12
+        },
+        "12101": {
+          "prop": 12101,
+          "name": "基础攻击力",
+          "format": "{0:0.#}",
+          "value": 25
+        }
+      }
+    },
+    "3": {
+      "max_level": 35,
+      "extra": {
+        "31401": {
+          "prop": 31401,
+          "name": "异常掌控",
+          "format": "{0:0.#}",
+          "value": 24
+        },
+        "12101": {
+          "prop": 12101,
+          "name": "基础攻击力",
+          "format": "{0:0.#}",
+          "value": 25
+        }
+      }
+    },
+    "4": {
+      "max_level": 45,
+      "extra": {
+        "31401": {
+          "prop": 31401,
+          "name": "异常掌控",
+          "format": "{0:0.#}",
+          "value": 24
+        },
+        "12101": {
+          "prop": 12101,
+          "name": "基础攻击力",
+          "format": "{0:0.#}",
+          "value": 50
+        }
+      }
+    },
+    "5": {
+      "max_level": 55,
+      "extra": {
+        "31401": {
+          "prop": 31401,
+          "name": "异常掌控",
+          "format": "{0:0.#}",
+          "value": 36
+        },
+        "12101": {
+          "prop": 12101,
+          "name": "基础攻击力",
+          "format": "{0:0.#}",
+          "value": 50
+        }
+      }
+    },
+    "6": {
+      "max_level": 60,
+      "extra": {
+        "31401": {
+          "prop": 31401,
+          "name": "异常掌控",
+          "format": "{0:0.#}",
+          "value": 36
+        },
+        "12101": {
+          "prop": 12101,
+          "name": "基础攻击力",
+          "format": "{0:0.#}",
+          "value": 75
+        }
+      }
+    }
+  },
+  "level_exp": [
+    50,
+    150,
+    250,
+    400,
+    600,
+    800,
+    1000,
+    1250,
+    1500,
+    1800,
+    1935,
+    2065,
+    2200,
+    2335,
+    2465,
+    2600,
+    2735,
+    2865,
+    3000,
+    4680,
+    4975,
+    5265,
+    5560,
+    5855,
+    6145,
+    6440,
+    6735,
+    7025,
+    7320,
+    10800,
+    11400,
+    12000,
+    12600,
+    13200,
+    13800,
+    14400,
+    15000,
+    15600,
+    16200,
+    17100,
+    18300,
+    19500,
+    20700,
+    21900,
+    23100,
+    24300,
+    25500,
+    26700,
+    27900,
+    34200,
+    36600,
+    39000,
+    41400,
+    43800,
+    46200,
+    48600,
+    51000,
+    53400,
+    55800,
+    0
+  ],
+  "skill": {
+    "basic": {
+      "description": [
+        {
+          "name": "普通攻击：流星舞步",
+          "desc": "点按 <IconMap:Icon_Normal> 发动：\n向前方进行至多三段的攻击，造成<color=#FE437E>以太属性伤害</color>。",
+          "potential": []
+        },
+        {
+          "name": "普通攻击：可爱地雷飞天撞",
+          "desc": "长按 <IconMap:Icon_Normal> 发动蓄力攻击，造成<color=#FE437E>以太属性伤害</color>，在恰当的时机松开按键，可以触发精准蓄力，使得招式造成的失衡值提升20%；\n南宫羽至多可以发动三段攻击，第二段和第三段攻击各需要消耗50点<color=#FFFFFF>[重拍]</color>；\n<color=#FFFFFF>[连携技]</color>、<color=#FFFFFF>[终结技]</color>和<color=#FFFFFF>[强化特殊技]</color>发动后，若<color=#FFFFFF>[重拍]</color>足够，长按 <IconMap:Icon_Normal> 可跳过第一段攻击，直接发动第二段和第三段攻击，且必定触发精准蓄力；\n南宫羽为操作中的角色时，<color=#FFFFFF>[连携技]</color>、<color=#FFFFFF>[终结技]</color>和<color=#FFFFFF>[强化特殊技]</color>不会打断<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>的连段计数；\n第一段攻击蓄力期间抗打断等级提升，受到的伤害降低60%；\n第二段和第三段攻击蓄力期间拥有无敌效果；\n第一段攻击冲刺阶段能够格挡敌人攻击，成功格挡则此次攻击也被视为精准蓄力攻击；\n所有攻击发动期间均拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "普通攻击：流星舞步",
+          "param": [
+            {
+              "name": "一段伤害倍率",
+              "desc": "{Skill:1511001, Prop:1001}",
+              "param": {
+                "1511001": {
+                  "main": 11490,
+                  "growth": 1050,
+                  "format": "%",
+                  "damage_percentage": 11490,
+                  "damage_percentage_growth": 1050,
+                  "stun_ratio": 8270,
+                  "stun_ratio_growth": 380,
+                  "sp_recovery": 27050,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 186175,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 5933,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 7512
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "二段伤害倍率",
+              "desc": "{Skill:1511002, Prop:1001}",
+              "param": {
+                "1511002": {
+                  "main": 13690,
+                  "growth": 1250,
+                  "format": "%",
+                  "damage_percentage": 13690,
+                  "damage_percentage_growth": 1250,
+                  "stun_ratio": 8410,
+                  "stun_ratio_growth": 390,
+                  "sp_recovery": 27530,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 189475,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 6215,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 7645
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "三段伤害倍率",
+              "desc": "{Skill:1511003, Prop:1001}",
+              "param": {
+                "1511003": {
+                  "main": 26380,
+                  "growth": 2400,
+                  "format": "%",
+                  "damage_percentage": 26380,
+                  "damage_percentage_growth": 2400,
+                  "stun_ratio": 16890,
+                  "stun_ratio_growth": 770,
+                  "sp_recovery": 55260,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 380050,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 12907,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 15348
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "一段失衡倍率",
+              "desc": "{Skill:1511001, Prop:1002}",
+              "param": {
+                "1511001": {
+                  "main": 8270,
+                  "growth": 380,
+                  "format": "%",
+                  "damage_percentage": 11490,
+                  "damage_percentage_growth": 1050,
+                  "stun_ratio": 8270,
+                  "stun_ratio_growth": 380,
+                  "sp_recovery": 27050,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 186175,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 5933,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 7512
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "二段失衡倍率",
+              "desc": "{Skill:1511002, Prop:1002}",
+              "param": {
+                "1511002": {
+                  "main": 8410,
+                  "growth": 390,
+                  "format": "%",
+                  "damage_percentage": 13690,
+                  "damage_percentage_growth": 1250,
+                  "stun_ratio": 8410,
+                  "stun_ratio_growth": 390,
+                  "sp_recovery": 27530,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 189475,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 6215,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 7645
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "三段失衡倍率",
+              "desc": "{Skill:1511003, Prop:1002}",
+              "param": {
+                "1511003": {
+                  "main": 16890,
+                  "growth": 770,
+                  "format": "%",
+                  "damage_percentage": 26380,
+                  "damage_percentage_growth": 2400,
+                  "stun_ratio": 16890,
+                  "stun_ratio_growth": 770,
+                  "sp_recovery": 55260,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 380050,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 12907,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 15348
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        },
+        {
+          "name": "普通攻击：可爱地雷飞天撞",
+          "param": [
+            {
+              "name": "一段伤害倍率",
+              "desc": "{Skill:1511004, Prop:1001}",
+              "param": {
+                "1511004": {
+                  "main": 10400,
+                  "growth": 950,
+                  "format": "%",
+                  "damage_percentage": 10400,
+                  "damage_percentage_growth": 950,
+                  "stun_ratio": 4400,
+                  "stun_ratio_growth": 200,
+                  "sp_recovery": 10080,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 99000,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 4000,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 4000
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "二段伤害倍率",
+              "desc": "{Skill:1511005, Prop:1001}",
+              "param": {
+                "1511005": {
+                  "main": 30440,
+                  "growth": 2770,
+                  "format": "%",
+                  "damage_percentage": 30440,
+                  "damage_percentage_growth": 2770,
+                  "stun_ratio": 21080,
+                  "stun_ratio_growth": 960,
+                  "sp_recovery": 16800,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 288750,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 19163,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 11664
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "三段伤害倍率",
+              "desc": "{Skill:1511006, Prop:1001}",
+              "param": {
+                "1511006": {
+                  "main": 51080,
+                  "growth": 4650,
+                  "format": "%",
+                  "damage_percentage": 51080,
+                  "damage_percentage_growth": 4650,
+                  "stun_ratio": 41080,
+                  "stun_ratio_growth": 1870,
+                  "sp_recovery": 26710,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 367400,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 37336,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 14837
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "三段伤害倍率（协同）",
+              "desc": "{Skill:1511006, Prop:1001} + {Skill:1511018, Prop:1001}",
+              "param": {
+                "1511006": {
+                  "main": 51080,
+                  "growth": 4650,
+                  "format": "%",
+                  "damage_percentage": 51080,
+                  "damage_percentage_growth": 4650,
+                  "stun_ratio": 41080,
+                  "stun_ratio_growth": 1870,
+                  "sp_recovery": 26710,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 367400,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 37336,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 14837
+                },
+                "1511018": {
+                  "main": 7670,
+                  "growth": 700,
+                  "format": "%",
+                  "damage_percentage": 7670,
+                  "damage_percentage_growth": 700,
+                  "stun_ratio": 2060,
+                  "stun_ratio_growth": 100,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 0,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 0,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 0
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "一段失衡倍率",
+              "desc": "{Skill:1511004, Prop:1002}",
+              "param": {
+                "1511004": {
+                  "main": 4400,
+                  "growth": 200,
+                  "format": "%",
+                  "damage_percentage": 10400,
+                  "damage_percentage_growth": 950,
+                  "stun_ratio": 4400,
+                  "stun_ratio_growth": 200,
+                  "sp_recovery": 10080,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 99000,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 4000,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 4000
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "二段失衡倍率",
+              "desc": "{Skill:1511005, Prop:1002}",
+              "param": {
+                "1511005": {
+                  "main": 21080,
+                  "growth": 960,
+                  "format": "%",
+                  "damage_percentage": 30440,
+                  "damage_percentage_growth": 2770,
+                  "stun_ratio": 21080,
+                  "stun_ratio_growth": 960,
+                  "sp_recovery": 16800,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 288750,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 19163,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 11664
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "三段失衡倍率",
+              "desc": "{Skill:1511006, Prop:1002}",
+              "param": {
+                "1511006": {
+                  "main": 41080,
+                  "growth": 1870,
+                  "format": "%",
+                  "damage_percentage": 51080,
+                  "damage_percentage_growth": 4650,
+                  "stun_ratio": 41080,
+                  "stun_ratio_growth": 1870,
+                  "sp_recovery": 26710,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 367400,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 37336,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 14837
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "三段失衡倍率（协同）",
+              "desc": "{Skill:1511006, Prop:1002}+{Skill:1511018, Prop:1002}",
+              "param": {
+                "1511006": {
+                  "main": 41080,
+                  "growth": 1870,
+                  "format": "%",
+                  "damage_percentage": 51080,
+                  "damage_percentage_growth": 4650,
+                  "stun_ratio": 41080,
+                  "stun_ratio_growth": 1870,
+                  "sp_recovery": 26710,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 367400,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 37336,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 14837
+                },
+                "1511018": {
+                  "main": 2060,
+                  "growth": 100,
+                  "format": "%",
+                  "damage_percentage": 7670,
+                  "damage_percentage_growth": 700,
+                  "stun_ratio": 2060,
+                  "stun_ratio_growth": 100,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 0,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 0,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 0
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        }
+      ],
+      "material": {
+        "1": {
+          "10": 2000,
+          "100115": 2
+        },
+        "2": {
+          "10": 3000,
+          "100115": 3
+        },
+        "3": {
+          "10": 6000,
+          "100125": 2
+        },
+        "4": {
+          "10": 9000,
+          "100125": 3
+        },
+        "5": {
+          "10": 12000,
+          "100125": 4
+        },
+        "6": {
+          "10": 18000,
+          "100125": 6
+        },
+        "7": {
+          "10": 45000,
+          "100135": 5
+        },
+        "8": {
+          "10": 67500,
+          "100135": 8
+        },
+        "9": {
+          "10": 90000,
+          "100135": 10
+        },
+        "10": {
+          "10": 112500,
+          "100135": 12
+        },
+        "11": {
+          "10": 135000,
+          "100135": 15,
+          "100941": 1
+        },
+        "12": {}
+      }
+    },
+    "dodge": {
+      "description": [
+        {
+          "name": "闪避：天生舞者",
+          "desc": "点按 <IconMap:Icon_Evade> 发动：\n快速的冲刺闪避；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "冲刺攻击：回转流星",
+          "desc": "闪避时，点按 <IconMap:Icon_Normal> 发动：\n向前进行快速攻击，造成<color=#FE437E>以太属性伤害</color>。",
+          "potential": []
+        },
+        {
+          "name": "闪避反击：流星华尔兹",
+          "desc": "触发<color=#FFFFFF>[极限闪避]</color>后，点按 <IconMap:Icon_Normal> 发动：\n对目标发动连续攻击，造成<color=#FE437E>以太属性伤害</color>；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "冲刺攻击：回转流星",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511009, Prop:1001}",
+              "param": {
+                "1511009": {
+                  "main": 19070,
+                  "growth": 1740,
+                  "format": "%",
+                  "damage_percentage": 19070,
+                  "damage_percentage_growth": 1740,
+                  "stun_ratio": 2570,
+                  "stun_ratio_growth": 120,
+                  "sp_recovery": 8400,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 57750,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 2331,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 2332
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511009, Prop:1002}",
+              "param": {
+                "1511009": {
+                  "main": 2570,
+                  "growth": 120,
+                  "format": "%",
+                  "damage_percentage": 19070,
+                  "damage_percentage_growth": 1740,
+                  "stun_ratio": 2570,
+                  "stun_ratio_growth": 120,
+                  "sp_recovery": 8400,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 57750,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 2331,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 2332
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        },
+        {
+          "name": "闪避反击：流星华尔兹",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511010, Prop:1001}",
+              "param": {
+                "1511010": {
+                  "main": 35530,
+                  "growth": 3230,
+                  "format": "%",
+                  "damage_percentage": 35530,
+                  "damage_percentage_growth": 3230,
+                  "stun_ratio": 25670,
+                  "stun_ratio_growth": 1170,
+                  "sp_recovery": 47990,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 330000,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 13330,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 28331
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511010, Prop:1002}",
+              "param": {
+                "1511010": {
+                  "main": 25670,
+                  "growth": 1170,
+                  "format": "%",
+                  "damage_percentage": 35530,
+                  "damage_percentage_growth": 3230,
+                  "stun_ratio": 25670,
+                  "stun_ratio_growth": 1170,
+                  "sp_recovery": 47990,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 330000,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 13330,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 28331
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        }
+      ],
+      "material": {
+        "1": {
+          "10": 2000,
+          "100115": 2
+        },
+        "2": {
+          "10": 3000,
+          "100115": 3
+        },
+        "3": {
+          "10": 6000,
+          "100125": 2
+        },
+        "4": {
+          "10": 9000,
+          "100125": 3
+        },
+        "5": {
+          "10": 12000,
+          "100125": 4
+        },
+        "6": {
+          "10": 18000,
+          "100125": 6
+        },
+        "7": {
+          "10": 45000,
+          "100135": 5
+        },
+        "8": {
+          "10": 67500,
+          "100135": 8
+        },
+        "9": {
+          "10": 90000,
+          "100135": 10
+        },
+        "10": {
+          "10": 112500,
+          "100135": 12
+        },
+        "11": {
+          "10": 135000,
+          "100135": 15,
+          "100941": 1
+        },
+        "12": {}
+      }
+    },
+    "special": {
+      "description": [
+        {
+          "name": "特殊技：有点沉重的爱意",
+          "desc": "点按 <IconMap:Icon_Special> 发动：\n挥动锤子发动攻击， 造成<color=#FE437E>以太属性伤害</color>。",
+          "potential": []
+        },
+        {
+          "name": "强化特殊技：相当沉重的爱意",
+          "desc": "能量足够时，点按 <IconMap:Icon_SpecialReady> 发动：\n挥动锤子发动攻击，造成<color=#FE437E>以太属性伤害</color>；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "特殊技：有点沉重的爱意",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511007, Prop:1001}",
+              "param": {
+                "1511007": {
+                  "main": 8350,
+                  "growth": 760,
+                  "format": "%",
+                  "damage_percentage": 8350,
+                  "damage_percentage_growth": 760,
+                  "stun_ratio": 7070,
+                  "stun_ratio_growth": 330,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 158950,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 6418,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 6419
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511007, Prop:1002}",
+              "param": {
+                "1511007": {
+                  "main": 7070,
+                  "growth": 330,
+                  "format": "%",
+                  "damage_percentage": 8350,
+                  "damage_percentage_growth": 760,
+                  "stun_ratio": 7070,
+                  "stun_ratio_growth": 330,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 158950,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 6418,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 6419
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        },
+        {
+          "name": "强化特殊技：相当沉重的爱意",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511008, Prop:1001}",
+              "param": {
+                "1511008": {
+                  "main": 53300,
+                  "growth": 4850,
+                  "format": "%",
+                  "damage_percentage": 53300,
+                  "damage_percentage_growth": 4850,
+                  "stun_ratio": 41430,
+                  "stun_ratio_growth": 1890,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 948750,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 46327,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 11664
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511008, Prop:1002}",
+              "param": {
+                "1511008": {
+                  "main": 41430,
+                  "growth": 1890,
+                  "format": "%",
+                  "damage_percentage": 53300,
+                  "damage_percentage_growth": 4850,
+                  "stun_ratio": 41430,
+                  "stun_ratio_growth": 1890,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 948750,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 46327,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 11664
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "能量消耗",
+              "desc": "40点",
+              "potential": []
+            }
+          ],
+          "potential": []
+        }
+      ],
+      "material": {
+        "1": {
+          "10": 2000,
+          "100115": 2
+        },
+        "2": {
+          "10": 3000,
+          "100115": 3
+        },
+        "3": {
+          "10": 6000,
+          "100125": 2
+        },
+        "4": {
+          "10": 9000,
+          "100125": 3
+        },
+        "5": {
+          "10": 12000,
+          "100125": 4
+        },
+        "6": {
+          "10": 18000,
+          "100125": 6
+        },
+        "7": {
+          "10": 45000,
+          "100135": 5
+        },
+        "8": {
+          "10": 67500,
+          "100135": 8
+        },
+        "9": {
+          "10": 90000,
+          "100135": 10
+        },
+        "10": {
+          "10": 112500,
+          "100135": 12
+        },
+        "11": {
+          "10": 135000,
+          "100135": 15,
+          "100941": 1
+        },
+        "12": {}
+      }
+    },
+    "chain": {
+      "description": [
+        {
+          "name": "连携技：慧星引力",
+          "desc": "触发<color=#FFFFFF>[连携技]</color>时，选择对应角色发动：\n向前方进行多段攻击，造成大量<color=#FE437E>以太属性伤害</color>；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "终结技：流落星群",
+          "desc": "喧响等级达到<color=#FFFFFF>[极]</color>时，点按 <IconMap:Icon_UltimateReady> 发动：\n向前方进行多段攻击，造成大量<color=#FE437E>以太属性伤害</color>；\n招式发动时，南宫羽会开启<color=#FFFFFF>[以太帷幕·妄想重奏]</color>，<color=#FFFFFF>[以太帷幕·妄想重奏]</color>生效期间，全队角色攻击力额外提升50点，持续30秒，南宫羽重复开启<color=#FFFFFF>[以太帷幕·妄想重奏]</color>前，将关闭已有的<color=#FFFFFF>[以太帷幕·妄想重奏]</color>；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "连携技：慧星引力",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511011, Prop:1001}",
+              "param": {
+                "1511011": {
+                  "main": 79820,
+                  "growth": 7260,
+                  "format": "%",
+                  "damage_percentage": 79820,
+                  "damage_percentage_growth": 7260,
+                  "stun_ratio": 23650,
+                  "stun_ratio_growth": 1080,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 2178000,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 41446,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 21497
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511011, Prop:1002}",
+              "param": {
+                "1511011": {
+                  "main": 23650,
+                  "growth": 1080,
+                  "format": "%",
+                  "damage_percentage": 79820,
+                  "damage_percentage_growth": 7260,
+                  "stun_ratio": 23650,
+                  "stun_ratio_growth": 1080,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 2178000,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 41446,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 21497
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        },
+        {
+          "name": "终结技：流落星群",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511012, Prop:1001}",
+              "param": {
+                "1511012": {
+                  "main": 210170,
+                  "growth": 19110,
+                  "format": "%",
+                  "damage_percentage": 210170,
+                  "damage_percentage_growth": 19110,
+                  "stun_ratio": 119610,
+                  "stun_ratio_growth": 5440,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 0,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 29333,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 64667
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511012, Prop:1002}",
+              "param": {
+                "1511012": {
+                  "main": 119610,
+                  "growth": 5440,
+                  "format": "%",
+                  "damage_percentage": 210170,
+                  "damage_percentage_growth": 19110,
+                  "stun_ratio": 119610,
+                  "stun_ratio_growth": 5440,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 0,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 29333,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 64667
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        }
+      ],
+      "material": {
+        "1": {
+          "10": 2000,
+          "100115": 2
+        },
+        "2": {
+          "10": 3000,
+          "100115": 3
+        },
+        "3": {
+          "10": 6000,
+          "100125": 2
+        },
+        "4": {
+          "10": 9000,
+          "100125": 3
+        },
+        "5": {
+          "10": 12000,
+          "100125": 4
+        },
+        "6": {
+          "10": 18000,
+          "100125": 6
+        },
+        "7": {
+          "10": 45000,
+          "100135": 5
+        },
+        "8": {
+          "10": 67500,
+          "100135": 8
+        },
+        "9": {
+          "10": 90000,
+          "100135": 10
+        },
+        "10": {
+          "10": 112500,
+          "100135": 12
+        },
+        "11": {
+          "10": 135000,
+          "100135": 15,
+          "100941": 1
+        },
+        "12": {}
+      }
+    },
+    "assist": {
+      "description": [
+        {
+          "name": "快速支援：救场技巧",
+          "desc": "当前操作中的角色被击飞时，点按 <IconMap:Icon_Switch> 发动：\n对目标发动连续攻击，造成<color=#FE437E>以太属性伤害</color>；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "招架支援：完美舞步",
+          "desc": "前场角色即将被攻击时，点按 <IconMap:Icon_Switch> 发动：\n招架敌人的攻击，累积大量失衡值；\n具有较为优秀的招架性能，承受高强度攻击时<color=#FFFFFF>[支援点数]</color>的消耗量降低；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "支援突击：即兴演出",
+          "desc": "发动<color=#FFFFFF>[招架支援]</color>后，点按 <IconMap:Icon_Normal> 发动：\n对目标发动连续攻击，造成大量<color=#FE437E>以太属性伤害</color>；\n招式发动期间拥有无敌效果。",
+          "potential": []
+        },
+        {
+          "name": "快速支援：救场技巧",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511013, Prop:1001}",
+              "param": {
+                "1511013": {
+                  "main": 7480,
+                  "growth": 680,
+                  "format": "%",
+                  "damage_percentage": 7480,
+                  "damage_percentage_growth": 680,
+                  "stun_ratio": 6330,
+                  "stun_ratio_growth": 290,
+                  "sp_recovery": 20700,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 142450,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 5748,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 5749
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511013, Prop:1002}",
+              "param": {
+                "1511013": {
+                  "main": 6330,
+                  "growth": 290,
+                  "format": "%",
+                  "damage_percentage": 7480,
+                  "damage_percentage_growth": 680,
+                  "stun_ratio": 6330,
+                  "stun_ratio_growth": 290,
+                  "sp_recovery": 20700,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 142450,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 5748,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 5749
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        },
+        {
+          "name": "招架支援：完美舞步",
+          "param": [
+            {
+              "name": "轻招架失衡倍率",
+              "desc": "{Skill:1511014, Prop:1002}",
+              "param": {
+                "1511014": {
+                  "main": 27130,
+                  "growth": 1240,
+                  "format": "%",
+                  "damage_percentage": 0,
+                  "damage_percentage_growth": 0,
+                  "stun_ratio": 27130,
+                  "stun_ratio_growth": 1240,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 0,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 0,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 36664
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "重招架失衡倍率",
+              "desc": "{Skill:1511015, Prop:1002}",
+              "param": {
+                "1511015": {
+                  "main": 34280,
+                  "growth": 1560,
+                  "format": "%",
+                  "damage_percentage": 0,
+                  "damage_percentage_growth": 0,
+                  "stun_ratio": 34280,
+                  "stun_ratio_growth": 1560,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 0,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 0,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 41664
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "连续招架失衡倍率",
+              "desc": "{Skill:1511016, Prop:1002}",
+              "param": {
+                "1511016": {
+                  "main": 16680,
+                  "growth": 760,
+                  "format": "%",
+                  "damage_percentage": 0,
+                  "damage_percentage_growth": 0,
+                  "stun_ratio": 16680,
+                  "stun_ratio_growth": 760,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 0,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 0,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 11664
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        },
+        {
+          "name": "支援突击：即兴演出",
+          "param": [
+            {
+              "name": "伤害倍率",
+              "desc": "{Skill:1511017, Prop:1001}",
+              "param": {
+                "1511017": {
+                  "main": 53580,
+                  "growth": 4880,
+                  "format": "%",
+                  "damage_percentage": 53580,
+                  "damage_percentage_growth": 4880,
+                  "stun_ratio": 39920,
+                  "stun_ratio_growth": 1820,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 1142075,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 38747,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 21500
+                }
+              },
+              "potential": []
+            },
+            {
+              "name": "失衡倍率",
+              "desc": "{Skill:1511017, Prop:1002}",
+              "param": {
+                "1511017": {
+                  "main": 39920,
+                  "growth": 1820,
+                  "format": "%",
+                  "damage_percentage": 53580,
+                  "damage_percentage_growth": 4880,
+                  "stun_ratio": 39920,
+                  "stun_ratio_growth": 1820,
+                  "sp_recovery": 0,
+                  "sp_recovery_growth": 0,
+                  "fever_recovery": 1142075,
+                  "fever_recovery_growth": 0,
+                  "attribute_infliction": 38747,
+                  "sp_consume": 0,
+                  "attack_data": [],
+                  "rp_recovery": 0,
+                  "rp_recovery_growth": 0,
+                  "ether_purify": 21500
+                }
+              },
+              "potential": []
+            }
+          ],
+          "potential": []
+        }
+      ],
+      "material": {
+        "1": {
+          "10": 2000,
+          "100115": 2
+        },
+        "2": {
+          "10": 3000,
+          "100115": 3
+        },
+        "3": {
+          "10": 6000,
+          "100125": 2
+        },
+        "4": {
+          "10": 9000,
+          "100125": 3
+        },
+        "5": {
+          "10": 12000,
+          "100125": 4
+        },
+        "6": {
+          "10": 18000,
+          "100125": 6
+        },
+        "7": {
+          "10": 45000,
+          "100135": 5
+        },
+        "8": {
+          "10": 67500,
+          "100135": 8
+        },
+        "9": {
+          "10": 90000,
+          "100135": 10
+        },
+        "10": {
+          "10": 112500,
+          "100135": 12
+        },
+        "11": {
+          "10": 135000,
+          "100135": 15,
+          "100941": 1
+        },
+        "12": {}
+      }
+    }
+  },
+  "skill_priority": [
+    {
+      "id": 1511001,
+      "avatar_id": 1511,
+      "first_priority": [
+        5,
+        0
+      ],
+      "second_priority": [
+        3,
+        1
+      ],
+      "third_priority": [
+        6,
+        2
+      ],
+      "potential_levels": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    }
+  ],
+  "skill_list": {
+    "1511001": {
+      "name": "普通攻击：流星舞步",
+      "desc": "<IconMap:Icon_Normal>",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511002": {
+      "name": "普通攻击：可爱地雷飞天撞",
+      "desc": "<IconMap:Icon_Normal>（长按） ; <IconMap:Icon_Normal>（长按，[重拍]足够时） ; <IconMap:Icon_Normal>（长按，[重拍]足够时）",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511003": {
+      "name": "特殊技：有点沉重的爱意",
+      "desc": "<IconMap:Icon_Special>",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511004": {
+      "name": "强化特殊技：相当沉重的爱意",
+      "desc": "<IconMap:Icon_SpecialReady>",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511005": {
+      "name": "冲刺攻击：回转流星",
+      "desc": "<IconMap:Icon_Evade> ; <IconMap:Icon_Normal>",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511006": {
+      "name": "闪避反击：流星华尔兹",
+      "desc": "<IconMap:Icon_Evade>（极限） ; <IconMap:Icon_Normal>",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511007": {
+      "name": "连携技：慧星引力",
+      "desc": "<IconMap:Icon_QTE>",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511008": {
+      "name": "终结技：流落星群",
+      "desc": "<IconMap:Icon_UltimateReady>",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511009": {
+      "name": "快速支援：救场技巧",
+      "desc": "<IconMap:Icon_Switch>（触发快速支援时）",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    },
+    "1511010": {
+      "name": "招架支援：完美舞步",
+      "desc": "<IconMap:Icon_Switch>（触发招架支援时）",
+      "element_type": 0,
+      "hit_type": 0,
+      "potential": []
+    },
+    "1511011": {
+      "name": "支援突击：即兴演出",
+      "desc": "<IconMap:Icon_Normal>（发动招架支援后）",
+      "element_type": 205,
+      "hit_type": 102,
+      "potential": []
+    }
+  },
+  "passive": {
+    "level": {
+      "1511049": {
+        "level": 1,
+        "id": 1511049,
+        "name": [
+          "核心被动：天才偶像",
+          "额外能力：天使队长"
+        ],
+        "desc": [
+          "南宫羽的异常精通提升<color=#2BAD00>60</color>点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害、<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音]</color>；\n同一敌人最多可被叠加4层<color=#FFFFFF>[颤音]</color>；\n若<color=#FFFFFF>[颤音]</color>叠加到最大层数且敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下时或当敌人持有<color=#FFFFFF>[颤音]</color>并从失衡状态恢复时，所有<color=#FFFFFF>[颤音]</color>会被清除；\n<color=#FFFFFF>[颤音]</color>被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>720%</color>/<color=#2EB6FF>360%</color>/<color=#FF5521>900%</color>/<color=#F0D12B>63%</color>/<color=#98EFF0>90%</color>/<color=#A6C5FD>36%</color>，敌人身上每有1层<color=#FFFFFF>[颤音]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%，同一次失衡期间，若<color=#FFFFFF>[颤音]</color>已被清除，则敌人无法再被施加<color=#FFFFFF>[颤音]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>命中敌人时，会使自身的属性异常积蓄效率提升<color=#2BAD00>17%</color>，造成的失衡值提升<color=#2BAD00>11%</color>，使全队造成的伤害提升<color=#2BAD00>13%</color>，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点<color=#FFFFFF>[重拍]</color>，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点<color=#FFFFFF>[重拍]</color>，该效果每6秒最多触发一次；\n南宫羽最多拥有100点<color=#FFFFFF>[重拍]</color>，进入战场时，初始拥有30点<color=#FFFFFF>[重拍]</color>。",
+          "队伍中存在<color=#FFFFFF>[异常]</color>角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，<color=#FFFFFF>[连携技]</color>攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层<color=#FFFFFF>[舞力全开]</color>效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有<color=#FFFFFF>[舞力全开]</color>时，南宫羽发动<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>、<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[快速支援：救场技巧]</color>且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发特殊的<color=#FFFFFF>[紊乱]</color>效果<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，并触发队伍中上一位角色的<color=#FFFFFF>[快速支援]</color>，<color=#FFFFFF>[极性紊乱]</color>不会清除目标所处的属性异常状态，若该招式未能触发<color=#FFFFFF>[极性紊乱]</color>则不会消耗<color=#FFFFFF>[舞力全开]</color>，当南宫羽拥有<color=#FFFFFF>[舞力全开]</color>时，下一次换入前场将直接发动<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动<color=#FFFFFF>[强化特殊技]</color>不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的<color=#FFFFFF>[普通攻击：绝对音准]</color>重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发<color=#FFFFFF>[极性紊乱]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第三段攻击或<color=#FFFFFF>[终结技：流落星群]</color>命中敌人时，敌人获得<color=#FFFFFF>[踉跄]</color>效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前<color=#FFFFFF>[踉跄]</color>效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有<color=#FFFFFF>[踉跄]</color>效果的敌人失衡结束时<color=#FFFFFF>[踉跄]</color>效果结束。"
+        ],
+        "extra_property": {},
+        "potential": []
+      },
+      "1511050": {
+        "level": 2,
+        "id": 1511050,
+        "name": [
+          "核心被动：天才偶像",
+          "额外能力：天使队长"
+        ],
+        "desc": [
+          "南宫羽的异常精通提升<color=#2BAD00>70</color>点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害、<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音]</color>；\n同一敌人最多可被叠加4层<color=#FFFFFF>[颤音]</color>；\n若<color=#FFFFFF>[颤音]</color>叠加到最大层数且敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下时或当敌人持有<color=#FFFFFF>[颤音]</color>并从失衡状态恢复时，所有<color=#FFFFFF>[颤音]</color>会被清除；\n<color=#FFFFFF>[颤音]</color>被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>720%</color>/<color=#2EB6FF>360%</color>/<color=#FF5521>900%</color>/<color=#F0D12B>63%</color>/<color=#98EFF0>90%</color>/<color=#A6C5FD>36%</color>，敌人身上每有1层<color=#FFFFFF>[颤音]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%，同一次失衡期间，若<color=#FFFFFF>[颤音]</color>已被清除，则敌人无法再被施加<color=#FFFFFF>[颤音]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>命中敌人时，会使自身的属性异常积蓄效率提升<color=#2BAD00>20%</color>，造成的失衡值提升<color=#2BAD00>12.5%</color>，使全队造成的伤害提升<color=#2BAD00>15%</color>，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点<color=#FFFFFF>[重拍]</color>，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点<color=#FFFFFF>[重拍]</color>，该效果每6秒最多触发一次；\n南宫羽最多拥有100点<color=#FFFFFF>[重拍]</color>，进入战场时，初始拥有30点<color=#FFFFFF>[重拍]</color>。",
+          "队伍中存在<color=#FFFFFF>[异常]</color>角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，<color=#FFFFFF>[连携技]</color>攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层<color=#FFFFFF>[舞力全开]</color>效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有<color=#FFFFFF>[舞力全开]</color>时，南宫羽发动<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>、<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[快速支援：救场技巧]</color>且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发特殊的<color=#FFFFFF>[紊乱]</color>效果<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，并触发队伍中上一位角色的<color=#FFFFFF>[快速支援]</color>，<color=#FFFFFF>[极性紊乱]</color>不会清除目标所处的属性异常状态，若该招式未能触发<color=#FFFFFF>[极性紊乱]</color>则不会消耗<color=#FFFFFF>[舞力全开]</color>，当南宫羽拥有<color=#FFFFFF>[舞力全开]</color>时，下一次换入前场将直接发动<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动<color=#FFFFFF>[强化特殊技]</color>不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的<color=#FFFFFF>[普通攻击：绝对音准]</color>重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发<color=#FFFFFF>[极性紊乱]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第三段攻击或<color=#FFFFFF>[终结技：流落星群]</color>命中敌人时，敌人获得<color=#FFFFFF>[踉跄]</color>效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前<color=#FFFFFF>[踉跄]</color>效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有<color=#FFFFFF>[踉跄]</color>效果的敌人失衡结束时<color=#FFFFFF>[踉跄]</color>效果结束。"
+        ],
+        "extra_property": {},
+        "potential": []
+      },
+      "1511051": {
+        "level": 3,
+        "id": 1511051,
+        "name": [
+          "核心被动：天才偶像",
+          "额外能力：天使队长"
+        ],
+        "desc": [
+          "南宫羽的异常精通提升<color=#2BAD00>80</color>点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害、<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音]</color>；\n同一敌人最多可被叠加4层<color=#FFFFFF>[颤音]</color>；\n若<color=#FFFFFF>[颤音]</color>叠加到最大层数且敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下时或当敌人持有<color=#FFFFFF>[颤音]</color>并从失衡状态恢复时，所有<color=#FFFFFF>[颤音]</color>会被清除；\n<color=#FFFFFF>[颤音]</color>被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>720%</color>/<color=#2EB6FF>360%</color>/<color=#FF5521>900%</color>/<color=#F0D12B>63%</color>/<color=#98EFF0>90%</color>/<color=#A6C5FD>36%</color>，敌人身上每有1层<color=#FFFFFF>[颤音]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%，同一次失衡期间，若<color=#FFFFFF>[颤音]</color>已被清除，则敌人无法再被施加<color=#FFFFFF>[颤音]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>命中敌人时，会使自身的属性异常积蓄效率提升<color=#2BAD00>23%</color>，造成的失衡值提升<color=#2BAD00>14%</color>，使全队造成的伤害提升<color=#2BAD00>17%</color>，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点<color=#FFFFFF>[重拍]</color>，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点<color=#FFFFFF>[重拍]</color>，该效果每6秒最多触发一次；\n南宫羽最多拥有100点<color=#FFFFFF>[重拍]</color>，进入战场时，初始拥有30点<color=#FFFFFF>[重拍]</color>。",
+          "队伍中存在<color=#FFFFFF>[异常]</color>角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，<color=#FFFFFF>[连携技]</color>攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层<color=#FFFFFF>[舞力全开]</color>效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有<color=#FFFFFF>[舞力全开]</color>时，南宫羽发动<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>、<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[快速支援：救场技巧]</color>且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发特殊的<color=#FFFFFF>[紊乱]</color>效果<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，并触发队伍中上一位角色的<color=#FFFFFF>[快速支援]</color>，<color=#FFFFFF>[极性紊乱]</color>不会清除目标所处的属性异常状态，若该招式未能触发<color=#FFFFFF>[极性紊乱]</color>则不会消耗<color=#FFFFFF>[舞力全开]</color>，当南宫羽拥有<color=#FFFFFF>[舞力全开]</color>时，下一次换入前场将直接发动<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动<color=#FFFFFF>[强化特殊技]</color>不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的<color=#FFFFFF>[普通攻击：绝对音准]</color>重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发<color=#FFFFFF>[极性紊乱]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第三段攻击或<color=#FFFFFF>[终结技：流落星群]</color>命中敌人时，敌人获得<color=#FFFFFF>[踉跄]</color>效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前<color=#FFFFFF>[踉跄]</color>效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有<color=#FFFFFF>[踉跄]</color>效果的敌人失衡结束时<color=#FFFFFF>[踉跄]</color>效果结束。"
+        ],
+        "extra_property": {},
+        "potential": []
+      },
+      "1511052": {
+        "level": 4,
+        "id": 1511052,
+        "name": [
+          "核心被动：天才偶像",
+          "额外能力：天使队长"
+        ],
+        "desc": [
+          "南宫羽的异常精通提升<color=#2BAD00>90</color>点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害、<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音]</color>；\n同一敌人最多可被叠加4层<color=#FFFFFF>[颤音]</color>；\n若<color=#FFFFFF>[颤音]</color>叠加到最大层数且敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下时或当敌人持有<color=#FFFFFF>[颤音]</color>并从失衡状态恢复时，所有<color=#FFFFFF>[颤音]</color>会被清除；\n<color=#FFFFFF>[颤音]</color>被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>720%</color>/<color=#2EB6FF>360%</color>/<color=#FF5521>900%</color>/<color=#F0D12B>63%</color>/<color=#98EFF0>90%</color>/<color=#A6C5FD>36%</color>，敌人身上每有1层<color=#FFFFFF>[颤音]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%，同一次失衡期间，若<color=#FFFFFF>[颤音]</color>已被清除，则敌人无法再被施加<color=#FFFFFF>[颤音]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>命中敌人时，会使自身的属性异常积蓄效率提升<color=#2BAD00>26%</color>，造成的失衡值提升<color=#2BAD00>15.5%</color>，使全队造成的伤害提升<color=#2BAD00>19%</color>，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点<color=#FFFFFF>[重拍]</color>，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点<color=#FFFFFF>[重拍]</color>，该效果每6秒最多触发一次；\n南宫羽最多拥有100点<color=#FFFFFF>[重拍]</color>，进入战场时，初始拥有30点<color=#FFFFFF>[重拍]</color>。",
+          "队伍中存在<color=#FFFFFF>[异常]</color>角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，<color=#FFFFFF>[连携技]</color>攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层<color=#FFFFFF>[舞力全开]</color>效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有<color=#FFFFFF>[舞力全开]</color>时，南宫羽发动<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>、<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[快速支援：救场技巧]</color>且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发特殊的<color=#FFFFFF>[紊乱]</color>效果<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，并触发队伍中上一位角色的<color=#FFFFFF>[快速支援]</color>，<color=#FFFFFF>[极性紊乱]</color>不会清除目标所处的属性异常状态，若该招式未能触发<color=#FFFFFF>[极性紊乱]</color>则不会消耗<color=#FFFFFF>[舞力全开]</color>，当南宫羽拥有<color=#FFFFFF>[舞力全开]</color>时，下一次换入前场将直接发动<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动<color=#FFFFFF>[强化特殊技]</color>不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的<color=#FFFFFF>[普通攻击：绝对音准]</color>重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发<color=#FFFFFF>[极性紊乱]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第三段攻击或<color=#FFFFFF>[终结技：流落星群]</color>命中敌人时，敌人获得<color=#FFFFFF>[踉跄]</color>效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前<color=#FFFFFF>[踉跄]</color>效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有<color=#FFFFFF>[踉跄]</color>效果的敌人失衡结束时<color=#FFFFFF>[踉跄]</color>效果结束。"
+        ],
+        "extra_property": {},
+        "potential": []
+      },
+      "1511053": {
+        "level": 5,
+        "id": 1511053,
+        "name": [
+          "核心被动：天才偶像",
+          "额外能力：天使队长"
+        ],
+        "desc": [
+          "南宫羽的异常精通提升<color=#2BAD00>100</color>点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害、<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音]</color>；\n同一敌人最多可被叠加4层<color=#FFFFFF>[颤音]</color>；\n若<color=#FFFFFF>[颤音]</color>叠加到最大层数且敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下时或当敌人持有<color=#FFFFFF>[颤音]</color>并从失衡状态恢复时，所有<color=#FFFFFF>[颤音]</color>会被清除；\n<color=#FFFFFF>[颤音]</color>被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>720%</color>/<color=#2EB6FF>360%</color>/<color=#FF5521>900%</color>/<color=#F0D12B>63%</color>/<color=#98EFF0>90%</color>/<color=#A6C5FD>36%</color>，敌人身上每有1层<color=#FFFFFF>[颤音]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%，同一次失衡期间，若<color=#FFFFFF>[颤音]</color>已被清除，则敌人无法再被施加<color=#FFFFFF>[颤音]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>命中敌人时，会使自身的属性异常积蓄效率提升<color=#2BAD00>29%</color>，造成的失衡值提升<color=#2BAD00>17%</color>，使全队造成的伤害提升<color=#2BAD00>21%</color>，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点<color=#FFFFFF>[重拍]</color>，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点<color=#FFFFFF>[重拍]</color>，该效果每6秒最多触发一次；\n南宫羽最多拥有100点<color=#FFFFFF>[重拍]</color>，进入战场时，初始拥有30点<color=#FFFFFF>[重拍]</color>。",
+          "队伍中存在<color=#FFFFFF>[异常]</color>角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，<color=#FFFFFF>[连携技]</color>攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层<color=#FFFFFF>[舞力全开]</color>效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有<color=#FFFFFF>[舞力全开]</color>时，南宫羽发动<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>、<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[快速支援：救场技巧]</color>且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发特殊的<color=#FFFFFF>[紊乱]</color>效果<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，并触发队伍中上一位角色的<color=#FFFFFF>[快速支援]</color>，<color=#FFFFFF>[极性紊乱]</color>不会清除目标所处的属性异常状态，若该招式未能触发<color=#FFFFFF>[极性紊乱]</color>则不会消耗<color=#FFFFFF>[舞力全开]</color>，当南宫羽拥有<color=#FFFFFF>[舞力全开]</color>时，下一次换入前场将直接发动<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动<color=#FFFFFF>[强化特殊技]</color>不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的<color=#FFFFFF>[普通攻击：绝对音准]</color>重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发<color=#FFFFFF>[极性紊乱]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第三段攻击或<color=#FFFFFF>[终结技：流落星群]</color>命中敌人时，敌人获得<color=#FFFFFF>[踉跄]</color>效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前<color=#FFFFFF>[踉跄]</color>效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有<color=#FFFFFF>[踉跄]</color>效果的敌人失衡结束时<color=#FFFFFF>[踉跄]</color>效果结束。"
+        ],
+        "extra_property": {},
+        "potential": []
+      },
+      "1511054": {
+        "level": 6,
+        "id": 1511054,
+        "name": [
+          "核心被动：天才偶像",
+          "额外能力：天使队长"
+        ],
+        "desc": [
+          "南宫羽的异常精通提升<color=#2BAD00>110</color>点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害、<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音]</color>；\n同一敌人最多可被叠加4层<color=#FFFFFF>[颤音]</color>；\n若<color=#FFFFFF>[颤音]</color>叠加到最大层数且敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下时或当敌人持有<color=#FFFFFF>[颤音]</color>并从失衡状态恢复时，所有<color=#FFFFFF>[颤音]</color>会被清除；\n<color=#FFFFFF>[颤音]</color>被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>720%</color>/<color=#2EB6FF>360%</color>/<color=#FF5521>900%</color>/<color=#F0D12B>63%</color>/<color=#98EFF0>90%</color>/<color=#A6C5FD>36%</color>，敌人身上每有1层<color=#FFFFFF>[颤音]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%，同一次失衡期间，若<color=#FFFFFF>[颤音]</color>已被清除，则敌人无法再被施加<color=#FFFFFF>[颤音]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>命中敌人时，会使自身的属性异常积蓄效率提升<color=#2BAD00>32%</color>，造成的失衡值提升<color=#2BAD00>18.5%</color>，使全队造成的伤害提升<color=#2BAD00>23%</color>，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点<color=#FFFFFF>[重拍]</color>，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点<color=#FFFFFF>[重拍]</color>，该效果每6秒最多触发一次；\n南宫羽最多拥有100点<color=#FFFFFF>[重拍]</color>，进入战场时，初始拥有30点<color=#FFFFFF>[重拍]</color>。",
+          "队伍中存在<color=#FFFFFF>[异常]</color>角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，<color=#FFFFFF>[连携技]</color>攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层<color=#FFFFFF>[舞力全开]</color>效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有<color=#FFFFFF>[舞力全开]</color>时，南宫羽发动<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>、<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[快速支援：救场技巧]</color>且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发特殊的<color=#FFFFFF>[紊乱]</color>效果<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，并触发队伍中上一位角色的<color=#FFFFFF>[快速支援]</color>，<color=#FFFFFF>[极性紊乱]</color>不会清除目标所处的属性异常状态，若该招式未能触发<color=#FFFFFF>[极性紊乱]</color>则不会消耗<color=#FFFFFF>[舞力全开]</color>，当南宫羽拥有<color=#FFFFFF>[舞力全开]</color>时，下一次换入前场将直接发动<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动<color=#FFFFFF>[强化特殊技]</color>不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的<color=#FFFFFF>[普通攻击：绝对音准]</color>重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发<color=#FFFFFF>[极性紊乱]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第三段攻击或<color=#FFFFFF>[终结技：流落星群]</color>命中敌人时，敌人获得<color=#FFFFFF>[踉跄]</color>效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前<color=#FFFFFF>[踉跄]</color>效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有<color=#FFFFFF>[踉跄]</color>效果的敌人失衡结束时<color=#FFFFFF>[踉跄]</color>效果结束。"
+        ],
+        "extra_property": {},
+        "potential": []
+      },
+      "1511055": {
+        "level": 7,
+        "id": 1511055,
+        "name": [
+          "核心被动：天才偶像",
+          "额外能力：天使队长"
+        ],
+        "desc": [
+          "南宫羽的异常精通提升<color=#2BAD00>120</color>点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害、<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音]</color>；\n同一敌人最多可被叠加4层<color=#FFFFFF>[颤音]</color>；\n若<color=#FFFFFF>[颤音]</color>叠加到最大层数且敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下时或当敌人持有<color=#FFFFFF>[颤音]</color>并从失衡状态恢复时，所有<color=#FFFFFF>[颤音]</color>会被清除；\n<color=#FFFFFF>[颤音]</color>被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>720%</color>/<color=#2EB6FF>360%</color>/<color=#FF5521>900%</color>/<color=#F0D12B>63%</color>/<color=#98EFF0>90%</color>/<color=#A6C5FD>36%</color>，敌人身上每有1层<color=#FFFFFF>[颤音]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%，同一次失衡期间，若<color=#FFFFFF>[颤音]</color>已被清除，则敌人无法再被施加<color=#FFFFFF>[颤音]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>命中敌人时，会使自身的属性异常积蓄效率提升<color=#2BAD00>35%</color>，造成的失衡值提升<color=#2BAD00>20%</color>，使全队造成的伤害提升<color=#2BAD00>25%</color>，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点<color=#FFFFFF>[重拍]</color>，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点<color=#FFFFFF>[重拍]</color>，该效果每6秒最多触发一次；\n南宫羽最多拥有100点<color=#FFFFFF>[重拍]</color>，进入战场时，初始拥有30点<color=#FFFFFF>[重拍]</color>。",
+          "队伍中存在<color=#FFFFFF>[异常]</color>角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，<color=#FFFFFF>[连携技]</color>攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层<color=#FFFFFF>[舞力全开]</color>效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有<color=#FFFFFF>[舞力全开]</color>时，南宫羽发动<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>、<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>或<color=#FFFFFF>[快速支援：救场技巧]</color>且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发特殊的<color=#FFFFFF>[紊乱]</color>效果<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，并触发队伍中上一位角色的<color=#FFFFFF>[快速支援]</color>，<color=#FFFFFF>[极性紊乱]</color>不会清除目标所处的属性异常状态，若该招式未能触发<color=#FFFFFF>[极性紊乱]</color>则不会消耗<color=#FFFFFF>[舞力全开]</color>，当南宫羽拥有<color=#FFFFFF>[舞力全开]</color>时，下一次换入前场将直接发动<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动<color=#FFFFFF>[强化特殊技]</color>不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的<color=#FFFFFF>[普通攻击：绝对音准]</color>重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层<color=#FFFFFF>[舞力全开]</color>对满足条件的所有敌人触发<color=#FFFFFF>[极性紊乱]</color>；\n南宫羽的<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>第三段攻击或<color=#FFFFFF>[终结技：流落星群]</color>命中敌人时，敌人获得<color=#FFFFFF>[踉跄]</color>效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前<color=#FFFFFF>[踉跄]</color>效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有<color=#FFFFFF>[踉跄]</color>效果的敌人失衡结束时<color=#FFFFFF>[踉跄]</color>效果结束。"
+        ],
+        "extra_property": {},
+        "potential": []
+      }
+    },
+    "materials": {
+      "1": {
+        "10": 5000
+      },
+      "2": {
+        "10": 12000,
+        "110513": 2
+      },
+      "3": {
+        "10": 28000,
+        "110513": 4
+      },
+      "4": {
+        "10": 60000,
+        "110513": 9,
+        "110009": 2
+      },
+      "5": {
+        "10": 100000,
+        "110513": 15,
+        "110009": 3
+      },
+      "6": {
+        "10": 200000,
+        "110513": 30,
+        "110009": 4
+      }
+    }
+  },
+  "talent": {
+    "1": {
+      "level": 1,
+      "name": "慵懒的聚光灯",
+      "desc": "<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>或<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>命中敌人时，使敌人的全属性伤害抗性降低18%，持续40秒，重复触发时刷新持续时间；进入战场时，南宫羽的<color=#FFFFFF>[重拍]</color>回复至最大值，在勘域模式中此效果180秒内最多触发一次。",
+      "desc2": "梦想是太麻烦又昂贵的东西，聚光灯打在身上，也只是觉得有点暖和而已。比起这个，看千夏被逗到脸红，看爱芮紧张到宕机，或者发现下一个拓金的际遇，或许才更有趣意。"
+    },
+    "2": {
+      "level": 2,
+      "name": "无痛的泪水",
+      "desc": "每层<color=#FFFFFF>[颤音]</color>使<color=#FFFFFF>[核心被动：天才偶像]</color>中<color=#FFFFFF>[异放]</color>的伤害比例额外提升10%；<color=#FFFFFF>[额外能力：天使队长]</color>提供的失衡易伤倍率额外提升30%；操作中的角色<color=#FFFFFF>[连携技]</color>重击命中同时处于属性异常和失衡状态下的敌人时，会对敌人触发<color=#FFFFFF>[极性紊乱]</color>，对目标造成原本<color=#FFFFFF>[紊乱]</color>效果25%的伤害，敌人在同一失衡期间仅能触发一次该效果。",
+      "desc2": "眼泪是珍贵的演出道具，可惜她的库存天生不足。好在偶像的演技足够精湛，能让它在需要的时候准时落下——为了安慰真正的小哭包，或者骗取一点观众的同情。"
+    },
+    "3": {
+      "level": 3,
+      "name": "天秤上的筹码",
+      "desc": "<color=#FFFFFF>[普通攻击]</color>、<color=#FFFFFF>[闪避]</color>、<color=#FFFFFF>[支援技]</color>、<color=#FFFFFF>[特殊技]</color>、<color=#FFFFFF>[连携技]</color> 技能等级+2",
+      "desc2": "舞步可以编排，走位可以设计，连人气和未来似乎都可以用钱摆平。数字在账户里跳动，是种令人安心的游戏，直到发现未被明码标价的难题…把玩着这叠最擅用的「筹码」，动摇了「只是生意」的天平。"
+    },
+    "4": {
+      "level": 4,
+      "name": "共犯的舞步",
+      "desc": "异常精通提升40点；<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>命中敌人造成的属性异常积蓄值提升35%。",
+      "desc2": "总习惯为千夏设计最闪耀的站位，为爱芮预留穿透夜空的高音。我的「梦想」是从她们那里借来的，但守护这份借来之物的决心，百分百属于我自己。"
+    },
+    "5": {
+      "level": 5,
+      "name": "舞台中央",
+      "desc": "<color=#FFFFFF>[普通攻击]</color>、<color=#FFFFFF>[闪避]</color>、<color=#FFFFFF>[支援技]</color>、<color=#FFFFFF>[特殊技]</color>、<color=#FFFFFF>[连携技]</color> 技能等级+2",
+      "desc2": "启岁的灯火升上天空，舞台的幕布终于拉开。舞台、灯光、她们的侧脸…一切从未如此清晰。原来我早已站在光芒中央，从未袖手旁观。"
+    },
+    "6": {
+      "level": 6,
+      "name": "天使的妄想",
+      "desc": "南宫羽攻击造成的失衡值提升50%；敌人不处于失衡状态时，任意角色对其造成一次<color=#FFFFFF>[异放]</color>伤害或<color=#FFFFFF>[紊乱]</color>伤害、使其进入一次属性异常状态时会为其累计1层<color=#FFFFFF>[颤音：改]</color>，被<color=#FFFFFF>[强化特殊技：相当沉重的爱意]</color>或<color=#FFFFFF>[普通攻击：可爱地雷飞天撞]</color>重击命中时会累计1层<color=#FFFFFF>[颤音：改]</color>，被<color=#FFFFFF>[终结技：流落星群]</color>重击命中时会累计2层<color=#FFFFFF>[颤音：改]</color>；<color=#FFFFFF>[颤音：改]</color>最多累计4层，当敌人进入失衡状态时，<color=#FFFFFF>[颤音：改]</color>会被全部清除，<color=#FFFFFF>[颤音：改]</color>被清除时，若敌人处于<color=#FE437E>以太异常状态</color>、<color=#2EB6FF>电属性异常状态</color>、<color=#FF5521>火属性异常状态</color>、<color=#F0D12B>物理属性异常状态</color>、<color=#98EFF0>冰属性异常状态</color>、<color=#A6C5FD>风属性异常状态</color>下，南宫羽会对目标造成一次<color=#FFFFFF>[异放]</color>伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为<color=#FE437E>800%</color>/<color=#2EB6FF>400%</color>/<color=#FF5521>1000%</color>/<color=#F0D12B>70%</color>/<color=#98EFF0>100%</color>/<color=#A6C5FD>40%</color>，敌人身上每有1层<color=#FFFFFF>[颤音：改]</color>，该次<color=#FFFFFF>[异放]</color>的伤害比例额外提升25%；<color=#FFFFFF>[颤音：改]</color>与<color=#FFFFFF>[颤音]</color>无法相互叠加。",
+      "desc2": "镜头、欢呼、荧光棒…遥远的暖意化作灼人的焰火。从别人那里借来的梦想——早已与我骨血相融。令人沉醉的「妄想」，现在由南宫队长亲自定义。"
+    }
+  },
+  "fairy_recommend": {
+    "slot4": 33600,
+    "slot2": 33000,
+    "slot_sub": 33200,
+    "part_sub_list": [
+      31203,
+      12102
+    ],
+    "alt_build": [
+      {
+        "suit_list": [
+          33000,
+          31300
+        ],
+        "part_sub_list": [
+          31203
+        ]
+      },
+      {
+        "suit_list": [],
+        "part_sub_list": [
+          31903
+        ]
+      },
+      {
+        "suit_list": [],
+        "part_sub_list": [
+          31402
+        ]
+      }
+    ],
+    "part4": {
+      "prop": 31402,
+      "name": "异常掌控",
+      "format": "{0:0.#%}",
+      "icon": "UI/Sprite/A1DynamicLoad/IconAttribute/UnPacker/Role/IconElementAbnormalPower.png"
+    },
+    "part5": {
+      "prop": 31203,
+      "name": "异常精通",
+      "format": "{0:0}",
+      "icon": "UI/Sprite/A1DynamicLoad/IconAttribute/UnPacker/Role/IconElementMystery.png"
+    },
+    "part6": {
+      "prop": 31903,
+      "name": "以太伤害加成",
+      "format": "{0:0.#%}",
+      "icon": "UI/Sprite/A1DynamicLoad/IconGeneralBuff/Packer/IconDungeonBuffEther.png"
+    },
+    "part_sub": {
+      "prop": 12102,
+      "name": "攻击力",
+      "format": "{0:0.#%}",
+      "icon": "UI/Sprite/A1DynamicLoad/IconAttribute/UnPacker/Role/IconAttack.png"
+    }
+  },
+  "strategy": [
+    "07",
+    "<IconMap:Icon_GeneralBuff_DungeonBuffEther>以太属性，<IconMap:Icon_AvatarClass_Stun><Term:3000012></Term>击破",
+    "提高失衡持续时间和失衡易伤倍率",
+    "可触发<Term:3000002></Term>和<Term:3000008></Term>"
+  ],
+  "potential": [],
+  "potential_detail": {},
+  "live2_d": "UISpine_NangongYu"
+}

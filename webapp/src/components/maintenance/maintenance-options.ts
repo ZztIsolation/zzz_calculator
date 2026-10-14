@@ -169,7 +169,7 @@ export const SKILL_TARGET_STATS: Array<[string, string, "flat"]> = [
   ["fireDmg", "火属性伤害加成%", "flat"], ["iceDmg", "冰属性伤害加成%", "flat"],
   ["electricDmg", "电属性伤害加成%", "flat"], ["etherDmg", "以太伤害加成%", "flat"], ["windDmg", "风属性伤害加成%", "flat"],
   ["critRate", "暴击率%", "flat"], ["critDmg", "暴击伤害%", "flat"],
-  ...EVENT_STATS.filter(([value]) => !["anomalyDamageBonus", "alienationCoefficientBonus"].includes(value)), ["skillMultiplierBonus", "技能倍率加算%", "flat"], ["lacerationDmg", "锐暴伤害%", "flat"],
+  ...EVENT_STATS.filter(([value]) => !["anomalyDamageBonus", "alienationCoefficientBonus"].includes(value)), ["skillMultiplierBonus", "技能倍率加算%", "flat"], ["skillMultiplierScaleBonus", "直伤技能倍率乘算%", "flat"], ["lacerationDmg", "锐暴伤害%", "flat"],
   ["enemyDefReduction", "敌方防御力降低%", "flat"], ["enemyDefIgnore", "无视防御率%", "flat"],
   ["enemyResReduction", "敌方全属性抗性降低%", "flat"],
   ["allResIgnore", "全属性抗性无视%", "flat"],

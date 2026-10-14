@@ -1622,6 +1622,13 @@ export function setDriveDiscReservations(store, input = {}) {
         throw new Error(`Drive Disc reservation references missing ids: ${missingIds.join(", ")}.`)
     }
 
+    if (!targetAgentId && input.expectedReservedForAgentId !== undefined) {
+        const expectedAgentId = cleanReservedForAgentId(input.expectedReservedForAgentId)
+        if (!expectedAgentId || ownerDiscs.some(disc => cleanReservedForAgentId(disc.reservedForAgentId) !== expectedAgentId)) {
+            throw new Error("盘的专属关系已变化，请刷新后重新操作。")
+        }
+    }
+
     const reservationConflicts = targetAgentId
         ? ownerDiscs
             .filter(disc => cleanReservedForAgentId(disc.reservedForAgentId)

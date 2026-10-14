@@ -1214,7 +1214,8 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
+      },
+      "relatedAgentId": "nangongyu"
     },
     {
       "id": "zzz_wiki_217",
@@ -3152,7 +3153,13 @@
               "mode": "flat",
               "value": 70,
               "modificationValues": {
-                "value": [70, 80, 90, 100, 110]
+                "value": [
+                  70,
+                  80,
+                  90,
+                  100,
+                  110
+                ]
               }
             },
             {
@@ -3161,7 +3168,9 @@
               "target": {
                 "kind": "anomaly",
                 "settlementType": "attribute",
-                "anomalyEffects": ["wind_corrosion"]
+                "anomalyEffects": [
+                  "wind_corrosion"
+                ]
               },
               "stat": "anomalyDamageBonus",
               "mode": "flat",
@@ -3169,13 +3178,26 @@
               "maxStacks": 2,
               "defaultStacks": 2,
               "stackGroup": "wiki_2030_wind_ex_special",
-              "stackLabel": { "zhCN": "无懈之礼层数" },
+              "stackLabel": {
+                "zhCN": "无懈之礼层数"
+              },
               "condition": "装备者发动强化特殊技造成风属性伤害；同一招式内最多触发一次，重复触发刷新持续时间",
               "durationSeconds": 40,
               "modificationValues": {
-                "valuePerStack": [7, 8, 9, 10, 11]
+                "valuePerStack": [
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ]
               },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_wiki_2030_turbulence_damage",
@@ -3190,13 +3212,26 @@
               "maxStacks": 2,
               "defaultStacks": 2,
               "stackGroup": "wiki_2030_wind_ex_special",
-              "stackLabel": { "zhCN": "无懈之礼层数" },
+              "stackLabel": {
+                "zhCN": "无懈之礼层数"
+              },
               "condition": "装备者发动强化特殊技造成风属性伤害；同一招式内最多触发一次，重复触发刷新持续时间",
               "durationSeconds": 40,
               "modificationValues": {
-                "valuePerStack": [7, 8, 9, 10, 11]
+                "valuePerStack": [
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ]
               },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -4773,7 +4808,13 @@
                   50
                 ]
               },
-              "condition": "从背后攻击命中"
+              "condition": "从背后攻击命中",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -4789,7 +4830,8 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
+      },
+      "relatedAgentId": "nekomata"
     },
     {
       "id": "zzz_wiki_225",
@@ -5390,7 +5432,13 @@
                 ]
               },
               "condition": "队伍任意角色施加属性异常或造成失衡",
-              "durationSeconds": 15
+              "durationSeconds": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -5406,7 +5454,8 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
+      },
+      "relatedAgentId": "asaba_harumasa"
     },
     {
       "id": "zzz_wiki_995",
@@ -5606,7 +5655,13 @@
               "stackLabel": {
                 "zhCN": "心弦层数"
               },
-              "durationSeconds": 30
+              "durationSeconds": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -5622,7 +5677,8 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
+      },
+      "relatedAgentId": "evelyn_chevalier"
     },
     {
       "id": "zzz_wiki_1197",
@@ -6594,12 +6650,12 @@
     },
     {
       "id": "zzz_wiki_760",
+      "relatedAgentId": "jane_doe",
       "name": {
         "zhCN": "淬锋钳刺"
       },
       "rarity": "S",
       "specialty": "anomaly",
-      "relatedAgentId": "jane_doe",
       "attribute": "physical",
       "images": {
         "icon": "/assets/w-engines/zzz_wiki_760.png",
@@ -8820,47 +8876,47 @@
         "description": {
           "zhCN": "生命值上限提升8%/9%/10%/11%/12.5%；受到敌方攻击时，装备者的冲击力提升10%/11.5%/13%/14.5%/16%，持续12秒。"
         },
-      "selfBuff": {
-        "scope": "inCombat",
-        "effects": [
-          {
-            "id": "effect_wiki_139_self_hp",
-            "type": "fixed",
-            "stat": "hpPct",
-            "mode": "pct",
-            "value": 8,
-            "modificationValues": {
-              "value": [
-                8,
-                9,
-                10,
-                11,
-                12.5
-              ]
-            }
-          },
-          {
-            "id": "effect_wiki_139_self_impact",
-            "type": "fixed",
-            "stat": "impactPct",
-            "mode": "flat",
-            "value": 10,
-            "modificationValues": {
-              "value": [
-                10,
-                11.5,
-                13,
-                14.5,
-                16
-              ]
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_139_self_hp",
+              "type": "fixed",
+              "stat": "hpPct",
+              "mode": "pct",
+              "value": 8,
+              "modificationValues": {
+                "value": [
+                  8,
+                  9,
+                  10,
+                  11,
+                  12.5
+                ]
+              }
             },
-            "condition": "hitByEnemy",
-            "durationSeconds": 12
-          }
-        ],
-        "appliesToOutOfCombatPanel": false,
-        "buffModifiers": []
-      },
+            {
+              "id": "effect_wiki_139_self_impact",
+              "type": "fixed",
+              "stat": "impactPct",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              },
+              "condition": "hitByEnemy",
+              "durationSeconds": 12
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
         "teamBuff": null
       },
       "sources": [

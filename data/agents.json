@@ -8392,7 +8392,8 @@
           "mechanics": {
             "bitesDurationSeconds": 10,
             "flinchDurationBonusSeconds": 5
-          }
+          },
+          "defaultChecked": true
         },
         "additionalAbility": {
           "scope": "inCombat",
@@ -8446,7 +8447,7 @@
               "zhCN": "萨霍夫跳可使用次数增加一次；狂热状态下物理异常积蓄效率额外提升15%，每点异常精通使自身伤害提升0.1%，最多30%。"
             },
             "scope": "inCombat",
-            "defaultChecked": false,
+            "defaultChecked": true,
             "effects": [
               {
                 "id": "jane-c1-damage-from-proficiency",
@@ -8489,7 +8490,7 @@
               "zhCN": "强击目标无视15%防御；强击暴击伤害额外提升50%。"
             },
             "scope": "inCombat",
-            "defaultChecked": false,
+            "defaultChecked": true,
             "effects": [
               {
                 "id": "jane-c2-assault-def-ignore",
@@ -8543,7 +8544,7 @@
               "zhCN": "触发强击或紊乱后，全队属性异常伤害提升18%，持续15秒。"
             },
             "scope": "inCombat",
-            "defaultChecked": false,
+            "defaultChecked": true,
             "effects": [
               {
                 "id": "jane-c4-anomaly-damage",
@@ -8573,7 +8574,7 @@
               "zhCN": "狂热状态下暴击率提升20%、暴击伤害提升40%；强击暴击后追加等同于简1600%异常精通的物理伤害。"
             },
             "scope": "inCombat",
-            "defaultChecked": false,
+            "defaultChecked": true,
             "effects": [
               {
                 "id": "effect_dc6dd7f820",
@@ -8947,7 +8948,8 @@
       },
       "preferredDriveDiscs": {
         "defaultSetIds": [
-          "fanged_metal"
+          "fanged_metal",
+          "zzz_wiki_2121"
         ],
         "mainStatLimits": {
           "4": [
@@ -8956,32 +8958,33 @@
           ],
           "5": [
             "physicalDmg",
-            "atkPct",
-            "penRatio"
+            "penRatio",
+            "atkPct"
           ],
           "6": [
-            "anomalyMastery"
+            "atkPct"
           ]
         }
       },
       "importantSubStats": [
         "atkPct",
-        "anomalyProficiency"
+        "anomalyProficiency",
+        "penFlat"
       ],
       "importantPanelStats": [
         "atk",
         "anomalyProficiency",
-        "anomalyMastery"
+        "penRatio"
       ],
       "defaultCalculationConfig": {
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "单次物理异常"
+          "zhCN": "单次强击（默认）"
         },
         "events": [
           {
-            "id": "jane-default-assault",
+            "id": "jane_assault",
             "kind": "anomaly",
             "count": 1,
             "stunned": true,
@@ -8991,7 +8994,7 @@
             "procCount": 1
           }
         ],
-        "selectedEventId": "jane-default-assault"
+        "selectedEventId": "jane_assault"
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
@@ -9004,9 +9007,11 @@
         "potential": "P1 enhanced moves; P2-P6 assault crit damage 10/15/20/25/30%; first selection defaults P6",
         "unsupportedMechanics": "Frenzy Flow, Bites trigger timing, anomaly buildup timing, energy and action time remain descriptive-only",
         "c1Formula": "Current modeled C1 uses AP above the 120-point threshold: clamp(max(x - 120, 0) * 0.1, 0, 30); 420 AP reaches the 30% cap. User confirmed this correction on 2026-10-10.",
-        "potentialCoreBoundary": "Potential P2-P6 coefficients are the official stated max-Core values, used as the selected snapshot at other Core levels; no undocumented scaling inferred."
+        "potentialCoreBoundary": "Potential P2-P6 coefficients are the official stated max-Core values, used as the selected snapshot at other Core levels; no undocumented scaling inferred.",
+        "localDefaultPreservation": "2026-10-12: user defaults, rotation order, teammates and disc candidates retained while merging upstream d9e296a589655e88f1f2c0b6994cbca49cefe8bd"
       },
-      "hidden": false
+      "hidden": false,
+      "defaultTeammates": []
     },
     {
       "id": "ellen_joe",
@@ -9709,13 +9714,13 @@
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "0影原版参考轴：2大＋2套急冻A＋强化E两段＋单连携"
+          "zhCN": "0影原版参考轴：2大＋2套急冻A＋强化E两段＋连携"
         },
         "events": [
           {
             "id": "ultimate_1",
             "kind": "direct",
-            "count": 2,
+            "count": 1,
             "stunned": true,
             "critMode": "expected",
             "skillRef": {
@@ -9729,7 +9734,7 @@
             "id": "basic_string_1",
             "kind": "skillGroup",
             "skillGroupId": "flash_freeze_full",
-            "count": 2,
+            "count": 1,
             "stunned": true
           },
           {
@@ -9770,6 +9775,26 @@
               "moveId": "chain_avalanche",
               "rowId": "damage"
             }
+          },
+          {
+            "id": "ultimate_2",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ellen_joe",
+              "categoryId": "chain",
+              "moveId": "ultimate_endless_winter",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "basic_string_2",
+            "kind": "skillGroup",
+            "skillGroupId": "flash_freeze_full",
+            "count": 1,
+            "stunned": true
           }
         ],
         "selectedEventId": "ultimate_1",
@@ -9778,13 +9803,13 @@
             "mode": "custom",
             "cinemaLevel": 0,
             "name": {
-              "zhCN": "0影带琉音轴：2大2套A2冰刃浪（含3霜锋）"
+              "zhCN": "0影艾莲＋琉音＋千夏：2大2套A2冰刃浪（大体型，含3霜锋）"
             },
             "events": [
               {
                 "id": "ultimate_1",
                 "kind": "direct",
-                "count": 2,
+                "count": 1,
                 "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
@@ -9798,13 +9823,13 @@
                 "id": "basic_string_1",
                 "kind": "skillGroup",
                 "skillGroupId": "flash_freeze_full",
-                "count": 2,
+                "count": 1,
                 "stunned": true
               },
               {
                 "id": "frost_edge_1",
                 "kind": "direct",
-                "count": 3,
+                "count": 1,
                 "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
@@ -9818,7 +9843,7 @@
                 "id": "icy_waves_1",
                 "kind": "skillGroup",
                 "skillGroupId": "icy_waves_full",
-                "count": 2,
+                "count": 1,
                 "stunned": true
               },
               {
@@ -9848,6 +9873,19 @@
                 }
               },
               {
+                "id": "frost_edge_2",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "basic",
+                  "moveId": "frost_edge_large",
+                  "rowId": "damage"
+                }
+              },
+              {
                 "id": "chain_1",
                 "kind": "direct",
                 "count": 1,
@@ -9859,6 +9897,46 @@
                   "moveId": "chain_avalanche",
                   "rowId": "damage"
                 }
+              },
+              {
+                "id": "ultimate_2",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_endless_winter",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "basic_string_2",
+                "kind": "skillGroup",
+                "skillGroupId": "flash_freeze_full",
+                "count": 1,
+                "stunned": true
+              },
+              {
+                "id": "frost_edge_3",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ellen_joe",
+                  "categoryId": "basic",
+                  "moveId": "frost_edge_large",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "icy_waves_2",
+                "kind": "skillGroup",
+                "skillGroupId": "icy_waves_full",
+                "count": 1,
+                "stunned": true
               }
             ],
             "selectedEventId": "ultimate_1",
@@ -9871,24 +9949,8 @@
         "defaultSetIds": [
           "shadow_harmony",
           "polar_metal",
-          "hormone_punk"
+          "zzz_wiki_2029"
         ],
-        "defaultFourPieceBuffRuntimeInputs": {
-          "driveDisc4pc:polar_metal.self": {
-            "effects": {
-              "effect_wiki_189_4pc_frozen_shatter_dmg": {
-                "coverage": 0.7
-              }
-            }
-          },
-          "driveDisc4pc:hormone_punk.self": {
-            "effects": {
-              "effect_w8d5k2lm": {
-                "coverage": 0.7
-              }
-            }
-          }
-        },
         "mainStatLimits": {
           "4": [
             "critRate",
@@ -9932,7 +9994,3418 @@
         "teammateAssumption": "Default teammates are Liuyin and Qianxia at Cinema 0 because teammate Cinemas were not supplied. Existing saved build selections take precedence; adjust teammate Cinema, snapshots and equipment in Buff picker.",
         "driveDiscs": "Default set IDs are search candidates, not a proven optimal set or panel. Sixth slot defaults to attack for the damage objective.",
         "unsupported": "Resource/Decibel regeneration, animation timing, duration feasibility and automatic buff application are not simulated. Two Ultimates are explicit user events; no automatic second Ultimate is granted. P0 reference omits enhanced waves/Frost Edge and requires manual Additional Ability disable in this all-physical teammate team.",
-        "cinemaBoundary": "C2 EX Crit DMG assumes >=3 Flash Freeze charges at cast; edit its coverage otherwise. No alternate C1-C6 rotations authored."
+        "cinemaBoundary": "C2 EX Crit DMG assumes >=3 Flash Freeze charges at cast; edit its coverage otherwise. No alternate C1-C6 rotations authored.",
+        "localDefaultPreservation": "2026-10-12: user defaults, rotation order, teammates and disc candidates retained while merging upstream d9e296a589655e88f1f2c0b6994cbca49cefe8bd"
+      }
+    },
+    {
+      "id": "nangongyu",
+      "name": {
+        "zhCN": "南宫羽"
+      },
+      "rarity": "S",
+      "attribute": "ether",
+      "damageElement": "ether",
+      "specialty": "stun",
+      "attackTypes": [
+        "strike"
+      ],
+      "faction": "妄想天使",
+      "images": {
+        "portrait": "/assets/agents/nangongyu.png",
+        "source": "https://zzz.nanoka.cc/character/1511"
+      },
+      "level60": {
+        "hpBase": 8373,
+        "atkBase": 671,
+        "defBase": 622,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 120,
+        "anomalyProficiency": 93,
+        "anomalyMastery": 90,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "天才偶像"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "天才偶像"
+          },
+          "defaultLevelAtCoreSkill": "F",
+          "levels": [
+            {
+              "level": 1,
+              "anomalyProficiencyFlat": 60,
+              "teamDmgBonusPct": 13,
+              "anomalyBuildupEfficiencyPct": 17,
+              "dazeBonusPct": 11,
+              "releaseCoefficientPctByElement": {
+                "ether": 720,
+                "electric": 360,
+                "fire": 900,
+                "physical": 63,
+                "ice": 90,
+                "wind": 36
+              },
+              "cinema6ReleaseCoefficientPctByElement": {
+                "ether": 800,
+                "electric": 400,
+                "fire": 1000,
+                "physical": 70,
+                "ice": 100,
+                "wind": 40
+              }
+            },
+            {
+              "level": 2,
+              "anomalyProficiencyFlat": 70,
+              "teamDmgBonusPct": 15,
+              "anomalyBuildupEfficiencyPct": 20,
+              "dazeBonusPct": 12.5,
+              "releaseCoefficientPctByElement": {
+                "ether": 720,
+                "electric": 360,
+                "fire": 900,
+                "physical": 63,
+                "ice": 90,
+                "wind": 36
+              },
+              "cinema6ReleaseCoefficientPctByElement": {
+                "ether": 800,
+                "electric": 400,
+                "fire": 1000,
+                "physical": 70,
+                "ice": 100,
+                "wind": 40
+              }
+            },
+            {
+              "level": 3,
+              "anomalyProficiencyFlat": 80,
+              "teamDmgBonusPct": 17,
+              "anomalyBuildupEfficiencyPct": 23,
+              "dazeBonusPct": 14,
+              "releaseCoefficientPctByElement": {
+                "ether": 720,
+                "electric": 360,
+                "fire": 900,
+                "physical": 63,
+                "ice": 90,
+                "wind": 36
+              },
+              "cinema6ReleaseCoefficientPctByElement": {
+                "ether": 800,
+                "electric": 400,
+                "fire": 1000,
+                "physical": 70,
+                "ice": 100,
+                "wind": 40
+              }
+            },
+            {
+              "level": 4,
+              "anomalyProficiencyFlat": 90,
+              "teamDmgBonusPct": 19,
+              "anomalyBuildupEfficiencyPct": 26,
+              "dazeBonusPct": 15.5,
+              "releaseCoefficientPctByElement": {
+                "ether": 720,
+                "electric": 360,
+                "fire": 900,
+                "physical": 63,
+                "ice": 90,
+                "wind": 36
+              },
+              "cinema6ReleaseCoefficientPctByElement": {
+                "ether": 800,
+                "electric": 400,
+                "fire": 1000,
+                "physical": 70,
+                "ice": 100,
+                "wind": 40
+              }
+            },
+            {
+              "level": 5,
+              "anomalyProficiencyFlat": 100,
+              "teamDmgBonusPct": 21,
+              "anomalyBuildupEfficiencyPct": 29,
+              "dazeBonusPct": 17,
+              "releaseCoefficientPctByElement": {
+                "ether": 720,
+                "electric": 360,
+                "fire": 900,
+                "physical": 63,
+                "ice": 90,
+                "wind": 36
+              },
+              "cinema6ReleaseCoefficientPctByElement": {
+                "ether": 800,
+                "electric": 400,
+                "fire": 1000,
+                "physical": 70,
+                "ice": 100,
+                "wind": 40
+              }
+            },
+            {
+              "level": 6,
+              "anomalyProficiencyFlat": 110,
+              "teamDmgBonusPct": 23,
+              "anomalyBuildupEfficiencyPct": 32,
+              "dazeBonusPct": 18.5,
+              "releaseCoefficientPctByElement": {
+                "ether": 720,
+                "electric": 360,
+                "fire": 900,
+                "physical": 63,
+                "ice": 90,
+                "wind": 36
+              },
+              "cinema6ReleaseCoefficientPctByElement": {
+                "ether": 800,
+                "electric": 400,
+                "fire": 1000,
+                "physical": 70,
+                "ice": 100,
+                "wind": 40
+              }
+            },
+            {
+              "level": 7,
+              "anomalyProficiencyFlat": 120,
+              "teamDmgBonusPct": 25,
+              "anomalyBuildupEfficiencyPct": 35,
+              "dazeBonusPct": 20,
+              "releaseCoefficientPctByElement": {
+                "ether": 720,
+                "electric": 360,
+                "fire": 900,
+                "physical": 63,
+                "ice": 90,
+                "wind": 36
+              },
+              "cinema6ReleaseCoefficientPctByElement": {
+                "ether": 800,
+                "electric": 400,
+                "fire": 1000,
+                "physical": 70,
+                "ice": 100,
+                "wind": 40
+              }
+            }
+          ]
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1511",
+          "https://static.nanoka.cc/zzz/3.3.4+19304006/zh/character/1511.json"
+        ]
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：天才偶像"
+          },
+          "description": {
+            "zhCN": "南宫羽的异常精通提升120点；\n南宫羽的初始异常掌控大于110点时，每超过1点初始异常掌控会使自身的冲击力提升1点；\n敌人处于失衡状态时，任意角色对其造成一次[异放]伤害、[紊乱]伤害、使其进入一次属性异常状态时会为其累计1层[颤音]；\n同一敌人最多可被叠加4层[颤音]；\n若[颤音]叠加到最大层数且敌人处于以太异常状态、电属性异常状态、火属性异常状态、物理属性异常状态、冰属性异常状态、风属性异常状态下时或当敌人持有[颤音]并从失衡状态恢复时，所有[颤音]会被清除；\n[颤音]被清除时，若敌人处于上述属性异常状态下，南宫羽会对目标造成一次[异放]伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为720%/360%/900%/63%/90%/36%，敌人身上每有1层[颤音]，该次[异放]的伤害比例额外提升25%，同一次失衡期间，若[颤音]已被清除，则敌人无法再被施加[颤音]；\n南宫羽的[普通攻击：可爱地雷飞天撞]或[强化特殊技：相当沉重的爱意]命中敌人时，会使自身的属性异常积蓄效率提升35%，造成的失衡值提升20%，使全队造成的伤害提升25%，持续30秒，重复触发时刷新持续时间；\n处于接战状态时，南宫羽每秒回复3.8点[重拍]，队伍中任意角色使敌人进入属性异常状态会额外为南宫羽回复12点[重拍]，该效果每6秒最多触发一次；\n南宫羽最多拥有100点[重拍]，进入战场时，初始拥有30点[重拍]。\n计算说明：精通加成随核心技成长，掌控转换自动读取局外初始面板。颤音异放在计算事件中单列，继承原异常来源，不额外乘南宫羽的精通。默认采用原异常属性系数 × (1 + 层数 × 25%)；二影后核心颤音每层35%。积蓄、失衡值、重拍恢复和自动叠层仅保留文字，不模拟战斗轴。"
+          },
+          "defaultChecked": true,
+          "effects": [
+            {
+              "id": "core-anomaly-proficiency",
+              "type": "fixed",
+              "stat": "anomalyProficiency",
+              "value": 60,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "anomalyProficiencyFlat"
+              }
+            },
+            {
+              "id": "initial-mastery-to-impact",
+              "type": "formula",
+              "stat": "impactFlat",
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "anomalyMastery",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "南宫羽初始异常掌控"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "max(x - 110, 0)",
+                "valueUnit": "storedValue"
+              }
+            },
+            {
+              "id": "core-team-damage",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 13,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "teamDmgBonusPct"
+              },
+              "condition": "蓄力普通攻击或强化特殊技命中后30秒",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：天使队长"
+          },
+          "description": {
+            "zhCN": "队伍中存在[异常]角色或与自身阵营相同的角色时触发：\n队伍中任意角色攻击命中处于失衡状态的敌人造成的属性异常积蓄值提升30%，[连携技]攻击命中处于失衡状态的敌人造成的属性异常积蓄值额外提升30%；\n队伍中任意角色使敌人进入失衡状态时，南宫羽获得2层[舞力全开]效果，最多拥有2层，持续15秒，重复触发时刷新持续时间，拥有[舞力全开]时，南宫羽发动[强化特殊技：相当沉重的爱意]、[普通攻击：可爱地雷飞天撞]或[快速支援：救场技巧]且重击命中同时处于属性异常和失衡状态下的敌人时，会消耗1层[舞力全开]对满足条件的所有敌人触发特殊的[紊乱]效果[极性紊乱]，对目标造成原本[紊乱]效果25%的伤害，并触发队伍中上一位角色的[快速支援]，[极性紊乱]不会清除目标所处的属性异常状态，若该招式未能触发[极性紊乱]则不会消耗[舞力全开]，当南宫羽拥有[舞力全开]时，下一次换入前场将直接发动[普通攻击：可爱地雷飞天撞]第一段蓄力攻击且必定触发精准蓄力；\n队伍中任意角色使敌人进入失衡状态后，南宫羽下一次发动[强化特殊技]不会消耗能量，该效果持续15秒，每15秒最多触发一次；\n当南宫羽与爱芮共同处于队伍中时，爱芮的[普通攻击：绝对音准]重击命中处于属性异常和失衡状态下的敌人时，若南宫羽完整参与此次攻击，也会消耗1层[舞力全开]对满足条件的所有敌人触发[极性紊乱]；\n南宫羽的[普通攻击：可爱地雷飞天撞]第三段攻击或[终结技：流落星群]命中敌人时，敌人获得[踉跄]效果，失衡易伤倍率提升30%，该效果下的敌人进入失衡状态后的失衡持续时间提升3秒，从失衡状态恢复前[踉跄]效果对同一目标最多触发一次，失衡持续时间提升效果与同类效果不可叠加，拥有[踉跄]效果的敌人失衡结束时[踉跄]效果结束。\n计算说明：极性紊乱使用单独紊乱事件，选择原异常并设置25%倍率；外部异常来源的跨角色紊乱自动继承尚不支持。"
+          },
+          "defaultChecked": true,
+          "effects": [
+            {
+              "id": "stagger-stun-multiplier",
+              "type": "fixed",
+              "stat": "stunDmgMultiplierBonus",
+              "value": 30,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "condition": "踉跄生效时",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "慵懒的聚光灯"
+            },
+            "scope": "inCombat",
+            "description": {
+              "zhCN": "[强化特殊技：相当沉重的爱意]或[普通攻击：可爱地雷飞天撞]命中敌人时，使敌人的全属性伤害抗性降低18%，持续40秒，重复触发时刷新持续时间；进入战场时，南宫羽的[重拍]回复至最大值，在勘域模式中此效果180秒内最多触发一次。"
+            },
+            "defaultChecked": true,
+            "effects": [
+              {
+                "id": "cinema1-all-res-reduction",
+                "type": "fixed",
+                "stat": "enemyResReduction",
+                "value": 18,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "蓄力普通攻击或强化特殊技命中后40秒"
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "无痛的泪水"
+            },
+            "scope": "inCombat",
+            "description": {
+              "zhCN": "每层[颤音]使[核心被动：天才偶像]中[异放]的伤害比例额外提升10%；[额外能力：天使队长]提供的失衡易伤倍率额外提升30%；操作中的角色[连携技]重击命中同时处于属性异常和失衡状态下的敌人时，会对敌人触发[极性紊乱]，对目标造成原本[紊乱]效果25%的伤害，敌人在同一失衡期间仅能触发一次该效果。"
+            },
+            "defaultChecked": true,
+            "effects": [
+              {
+                "id": "cinema2-stagger-stun-multiplier",
+                "type": "fixed",
+                "stat": "stunDmgMultiplierBonus",
+                "value": 30,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "踉跄生效时"
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 3,
+            "cinemaName": {
+              "zhCN": "天秤上的筹码"
+            },
+            "scope": "inCombat",
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2"
+            },
+            "defaultChecked": true,
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "共犯的舞步"
+            },
+            "scope": "inCombat",
+            "description": {
+              "zhCN": "异常精通提升40点；[普通攻击：可爱地雷飞天撞]命中敌人造成的属性异常积蓄值提升35%。"
+            },
+            "defaultChecked": true,
+            "effects": [
+              {
+                "id": "cinema4-anomaly-proficiency",
+                "type": "fixed",
+                "stat": "anomalyProficiency",
+                "value": 40,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 5,
+            "cinemaName": {
+              "zhCN": "舞台中央"
+            },
+            "scope": "inCombat",
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2"
+            },
+            "defaultChecked": true,
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "天使的妄想"
+            },
+            "scope": "inCombat",
+            "description": {
+              "zhCN": "南宫羽攻击造成的失衡值提升50%；敌人不处于失衡状态时，任意角色对其造成一次[异放]伤害或[紊乱]伤害、使其进入一次属性异常状态时会为其累计1层[颤音：改]，被[强化特殊技：相当沉重的爱意]或[普通攻击：可爱地雷飞天撞]重击命中时会累计1层[颤音：改]，被[终结技：流落星群]重击命中时会累计2层[颤音：改]；[颤音：改]最多累计4层，当敌人进入失衡状态时，[颤音：改]会被全部清除，[颤音：改]被清除时，若敌人处于以太异常状态、电属性异常状态、火属性异常状态、物理属性异常状态、冰属性异常状态、风属性异常状态下，南宫羽会对目标造成一次[异放]伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为800%/400%/1000%/70%/100%/40%，敌人身上每有1层[颤音：改]，该次[异放]的伤害比例额外提升25%；[颤音：改]与[颤音]无法相互叠加。"
+            },
+            "defaultChecked": true,
+            "effects": [],
+            "buffModifiers": []
+          }
+        ],
+        "skillBuffs": [
+          {
+            "id": "ether-veil",
+            "scope": "inCombat",
+            "name": {
+              "zhCN": "以太帷幕·妄想重奏"
+            },
+            "description": {
+              "zhCN": "终结技开启以太帷幕后，全队攻击力增加50点，持续30秒。"
+            },
+            "defaultChecked": false,
+            "sourceSkillRef": {
+              "agentSkillId": "nangongyu",
+              "categoryId": "chain",
+              "moveId": "ultimate_falling_stars"
+            },
+            "effects": [
+              {
+                "id": "ether-veil-atk",
+                "type": "fixed",
+                "stat": "atkFlat",
+                "value": 50,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ]
+      },
+      "anomalyReleaseProfiles": [
+        {
+          "id": "core_tremolo_1",
+          "name": {
+            "zhCN": "颤音：1层"
+          },
+          "default": false,
+          "minCinemaLevel": 0,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 1,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        },
+                        "cinemaValues": [
+                          25,
+                          25,
+                          35,
+                          35,
+                          35,
+                          35,
+                          35
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "core_tremolo_2",
+          "name": {
+            "zhCN": "颤音：2层"
+          },
+          "default": false,
+          "minCinemaLevel": 0,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 2,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        },
+                        "cinemaValues": [
+                          25,
+                          25,
+                          35,
+                          35,
+                          35,
+                          35,
+                          35
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "core_tremolo_3",
+          "name": {
+            "zhCN": "颤音：3层"
+          },
+          "default": false,
+          "minCinemaLevel": 0,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 3,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        },
+                        "cinemaValues": [
+                          25,
+                          25,
+                          35,
+                          35,
+                          35,
+                          35,
+                          35
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "core_tremolo_4",
+          "name": {
+            "zhCN": "颤音：4层"
+          },
+          "default": true,
+          "minCinemaLevel": 0,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 4,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        },
+                        "cinemaValues": [
+                          25,
+                          25,
+                          35,
+                          35,
+                          35,
+                          35,
+                          35
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "cinema6_tremolo_1",
+          "name": {
+            "zhCN": "颤音改（六影）：1层"
+          },
+          "default": false,
+          "minCinemaLevel": 6,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "cinema6ReleaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 1,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音改层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "cinema6_tremolo_2",
+          "name": {
+            "zhCN": "颤音改（六影）：2层"
+          },
+          "default": false,
+          "minCinemaLevel": 6,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "cinema6ReleaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 2,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音改层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "cinema6_tremolo_3",
+          "name": {
+            "zhCN": "颤音改（六影）：3层"
+          },
+          "default": false,
+          "minCinemaLevel": 6,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "cinema6ReleaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 3,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音改层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "cinema6_tremolo_4",
+          "name": {
+            "zhCN": "颤音改（六影）：4层"
+          },
+          "default": false,
+          "minCinemaLevel": 6,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "颤音异放比例"
+            },
+            "args": [
+              {
+                "kind": "coreSkillScaling",
+                "field": "cinema6ReleaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "原异常属性系数"
+                }
+              },
+              {
+                "op": "add",
+                "label": {
+                  "zhCN": "颤音层数修正"
+                },
+                "args": [
+                  {
+                    "kind": "constant",
+                    "value": 1,
+                    "unit": "decimal"
+                  },
+                  {
+                    "op": "multiply",
+                    "args": [
+                      {
+                        "kind": "constant",
+                        "value": 4,
+                        "unit": "raw",
+                        "whiteBoxRole": "conversionSource",
+                        "label": {
+                          "zhCN": "颤音改层数"
+                        }
+                      },
+                      {
+                        "kind": "constant",
+                        "value": 25,
+                        "unit": "percent",
+                        "label": {
+                          "zhCN": "每层比例提升"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "skillGroups": [
+        {
+          "id": "meteor_steps_full",
+          "name": {
+            "zhCN": "流星舞步：三段普攻"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "meteor-1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nangongyu",
+                "categoryId": "basic",
+                "moveId": "meteor_steps",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "meteor-2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nangongyu",
+                "categoryId": "basic",
+                "moveId": "meteor_steps",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "meteor-3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nangongyu",
+                "categoryId": "basic",
+                "moveId": "meteor_steps",
+                "rowId": "hit_3"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cute_landmine_full",
+          "name": {
+            "zhCN": "可爱地雷飞天撞：三段蓄力"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "charged-1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nangongyu",
+                "categoryId": "basic",
+                "moveId": "cute_landmine",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "charged-2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nangongyu",
+                "categoryId": "basic",
+                "moveId": "cute_landmine",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "charged-3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nangongyu",
+                "categoryId": "basic",
+                "moveId": "cute_landmine",
+                "rowId": "hit_3"
+              }
+            }
+          ]
+        }
+      ],
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "phaethons_melody"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "etherDmg",
+            "penRatio",
+            "atkPct"
+          ],
+          "6": [
+            "anomalyMastery",
+            "atkPct"
+          ]
+        }
+      },
+      "defaultCalculationConfig": {
+        "mode": "anomaly",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "自身侵蚀异放：4层颤音"
+        },
+        "events": [
+          {
+            "id": "nangongyu_corruption_release",
+            "kind": "anomaly",
+            "count": 1,
+            "stunned": true,
+            "settlementType": "release",
+            "anomalyEffect": "corruption",
+            "triggerActorRef": {
+              "agentId": "nangongyu",
+              "profileId": "core_tremolo_4"
+            },
+            "anomalySource": {
+              "actorRef": {
+                "agentId": "nangongyu"
+              }
+            }
+          }
+        ],
+        "selectedEventId": "nangongyu_corruption_release"
+      },
+      "importantSubStats": [
+        "anomalyProficiency",
+        "atkPct",
+        "penFlat"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "anomalyProficiency",
+        "anomalyMastery",
+        "impact",
+        "penRatio"
+      ],
+      "hidden": false,
+      "sources": [
+        "https://zzz.nanoka.cc/character/1511",
+        "https://static.nanoka.cc/zzz/3.3.4+19304006/zh/character/1511.json"
+      ],
+      "verification": {
+        "dataVersion": "3.3.4+19304006",
+        "acquiredAt": "2026-10-10",
+        "sourceSha256": "f730215830f8a54eecb4c34bdc5c7d8246e087a8554c817cd0acaf5dd9c84c3c",
+        "basePanel": "L60 excludes core A-F stats; A/C/E each add 12 base mastery, B/D/F each add 25 base ATK.",
+        "releaseAssumption": "Per-stack extra proportion interpreted multiplicatively: base ratio * (1 + n * .25), core tremolo n * .35 at C2+. This convention is explicit; not independently game-tested.",
+        "masteryConversion": "Reads unrounded initial/out-of-combat mastery; source states no cap and no flooring. Combat-only mastery does not increase impact conversion.",
+        "defaultObjective": "One self-sourced corruption Abloom at four tremolo stacks. Not a whole team rotation or automatic stun simulation.",
+        "unsupportedMechanics": "Automatic buildup, stun generation/duration, resource/tremolo transitions and multi-actor disorder source snapshots remain descriptive."
+      }
+    },
+    {
+      "id": "nekomata",
+      "name": {
+        "zhCN": "猫又"
+      },
+      "rarity": "S",
+      "attribute": "physical",
+      "damageElement": "physical",
+      "specialty": "attack",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "狡兔屋",
+      "images": {
+        "portrait": "/assets/agents/nekomata.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/IconRole11.webp"
+      },
+      "level60": {
+        "hpBase": 7560,
+        "atkBase": 835,
+        "defBase": 587,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 92,
+        "anomalyProficiency": 96,
+        "anomalyMastery": 97,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "猫步诡影"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：猫步诡影"
+          },
+          "defaultLevelAtCoreSkill": "F",
+          "levels": [
+            {
+              "level": 1,
+              "coreDmgBonusPct": 30
+            },
+            {
+              "level": 2,
+              "coreDmgBonusPct": 35
+            },
+            {
+              "level": 3,
+              "coreDmgBonusPct": 40
+            },
+            {
+              "level": 4,
+              "coreDmgBonusPct": 45
+            },
+            {
+              "level": 5,
+              "coreDmgBonusPct": 50
+            },
+            {
+              "level": 6,
+              "coreDmgBonusPct": 55
+            },
+            {
+              "level": 7,
+              "coreDmgBonusPct": 60
+            }
+          ]
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1021",
+          "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1021.json"
+        ]
+      },
+      "potentialVision": {
+        "name": {
+          "zhCN": "猫的报恩"
+        },
+        "defaultLevel": 6,
+        "maxLevel": 6,
+        "mechanicUnlockLevel": 1,
+        "scaling": {
+          "name": {
+            "zhCN": "潜能觉醒：夜行习性"
+          },
+          "levels": [
+            {
+              "level": 0,
+              "meatballCritDmgPct": 0
+            },
+            {
+              "level": 1,
+              "meatballCritDmgPct": 0
+            },
+            {
+              "level": 2,
+              "meatballCritDmgPct": 20
+            },
+            {
+              "level": 3,
+              "meatballCritDmgPct": 30
+            },
+            {
+              "level": 4,
+              "meatballCritDmgPct": 40
+            },
+            {
+              "level": 5,
+              "meatballCritDmgPct": 50
+            },
+            {
+              "level": 6,
+              "meatballCritDmgPct": 60
+            }
+          ]
+        },
+        "mechanics": {
+          "levelOneUnlocksEnhancedMoves": true,
+          "meatballTreatsHitsAsBackAttack": true,
+          "clawMarkAtkRatioPct": 30,
+          "clawMarkCooldownSeconds": 1,
+          "referenceClawMarkCount": 10,
+          "referenceClawMarkWindowSeconds": 10,
+          "clawMarkFormalFollowUpTag": "unconfirmed"
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1021",
+          "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1021.json"
+        ]
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：猫步诡影／肉球突袭"
+          },
+          "defaultChecked": true,
+          "description": {
+            "zhCN": "闪避反击或快速支援命中后，自身伤害提升30%/35%/40%/45%/50%/55%/60%。原版持续6秒，潜能1后持续40秒。潜能1后绒爪穿刺触发肉球突袭40秒，攻击均视为背后命中，并可每秒触发一次30%攻击力爪印。潜能2至6肉球状态暴伤提升20%/30%/40%/50%/60%。默认已在失衡前完成铺垫；爪印次数独立维护，不自动增加事件。"
+          },
+          "effects": [
+            {
+              "id": "nekomata-core-damage",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 30,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "coreDmgBonusPct"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "nekomata-meatball-potential-crit-dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 0,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "valueSource": {
+                "kind": "potentialVisionScaling",
+                "field": "meatballCritDmgPct"
+              },
+              "requirement": {
+                "minPotentialLevel": 1
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：猫步秀"
+          },
+          "defaultChecked": false,
+          "description": {
+            "zhCN": "原版需同属性或同阵营队友；强击后下一次强化特殊技每层增伤35%，最多2层。原版两次强化技参考组合只覆盖下一次，启用时该规则默认50%覆盖，可按实际次数调整。潜能1后支援队友也满足条件；尾巴失踪术或强击可叠层，强化特殊技和闪避反击获得每层35%增伤，最多2层，持续30秒。队友和叠层前提尚未确认，默认关闭。"
+          },
+          "effects": [
+            {
+              "id": "nekomata-catwalk-original",
+              "type": "stacked",
+              "stat": "dmgBonus",
+              "value": 35,
+              "valuePerStack": 35,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "exSpecial"
+                  }
+                ]
+              },
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "stackGroup": "nekomata_catwalk",
+              "stackLabel": {
+                "zhCN": "猫步秀层数"
+              },
+              "coverage": {
+                "default": 0.5,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "requirement": {
+                "maxPotentialLevel": 0
+              }
+            },
+            {
+              "id": "nekomata-catwalk-potential",
+              "type": "stacked",
+              "stat": "dmgBonus",
+              "value": 35,
+              "valuePerStack": 35,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "exSpecial"
+                  },
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "dodgeCounter"
+                  }
+                ]
+              },
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "stackGroup": "nekomata_catwalk",
+              "stackLabel": {
+                "zhCN": "猫步秀层数"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "requirement": {
+                "minPotentialLevel": 1
+              },
+              "durationSeconds": 30
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "猎鸟技巧"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "从背后攻击命中敌人时，猫又无视目标16%物理伤害抗性；敌方处于失衡状态时，猫又对其的所有攻击均被视为背后攻击。"
+            },
+            "effects": [
+              {
+                "id": "nekomata-c1-physical-res-ignore",
+                "type": "fixed",
+                "stat": "physicalResIgnore",
+                "value": 16,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "从背后命中；失衡或肉球突袭状态满足该参考条件"
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "猫鼠游戏"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "当场上只有一名敌人且自身位于前场时，猫又的能量获得效率提升25%。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 3,
+            "cinemaName": {
+              "zhCN": "好奇的左尾"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能输入为最终等级，不在计算中重复加级。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "磨爪"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "发动[强化特殊技]时，猫又的暴击率提升7%，最多叠加2层，持续15秒，每层效果单独结算持续时间。"
+            },
+            "effects": [
+              {
+                "id": "nekomata-c4-crit-rate",
+                "type": "stacked",
+                "stat": "critRate",
+                "value": 7,
+                "valuePerStack": 7,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "maxStacks": 2,
+                "defaultStacks": 2,
+                "stackGroup": "nekomata_c4",
+                "stackLabel": {
+                  "zhCN": "四影暴击层数"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "durationSeconds": 15
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 5,
+            "cinemaName": {
+              "zhCN": "幸运的右尾"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能输入为最终等级，不在计算中重复加级。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "捕食者血统"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "发动[连携技]或[终结技]时，猫又的暴击伤害提升18%，最多叠加3层，退出接战状态时增益效果结束；猫又击败敌人时，该增益效果直接叠加至层数上限。"
+            },
+            "effects": [
+              {
+                "id": "nekomata-c6-crit-dmg",
+                "type": "stacked",
+                "stat": "critDmg",
+                "value": 18,
+                "valuePerStack": 18,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "maxStacks": 3,
+                "defaultStacks": 3,
+                "stackGroup": "nekomata_c6",
+                "stackLabel": {
+                  "zhCN": "六影暴伤层数"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ]
+      },
+      "skillGroups": [
+        {
+          "id": "basic_single",
+          "name": {
+            "zhCN": "普攻五段（末段一次，不含爪印）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "a1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "a2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "a3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "a4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_4"
+              }
+            },
+            {
+              "id": "a5",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_5"
+              }
+            }
+          ]
+        },
+        {
+          "id": "basic_expected",
+          "name": {
+            "zhCN": "原版普攻五段（末段三连概率期望，不含爪印）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "a1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "a2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "a3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "a4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_4"
+              }
+            },
+            {
+              "id": "a5",
+              "kind": "direct",
+              "count": 1.6666666666666665,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_5"
+              }
+            }
+          ]
+        },
+        {
+          "id": "basic_potential_stunned",
+          "name": {
+            "zhCN": "潜能失衡普攻五段（末段三次，不含爪印）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "a1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "a2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "a3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "a4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_4"
+              }
+            },
+            {
+              "id": "a5",
+              "kind": "direct",
+              "count": 3,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "nekomata",
+                "categoryId": "basic",
+                "moveId": "basic_claw",
+                "rowId": "hit_5"
+              }
+            }
+          ]
+        }
+      ],
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "固定失衡组合：1大2强化技3套普攻（原版末段概率期望）"
+        },
+        "events": [
+          {
+            "id": "ultimate_1",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "nekomata",
+              "categoryId": "chain",
+              "moveId": "ultimate_claw",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "ex_2",
+            "kind": "direct",
+            "count": 2,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "nekomata",
+              "categoryId": "special",
+              "moveId": "ex_ambush",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "basic_3",
+            "kind": "skillGroup",
+            "skillGroupId": "basic_expected",
+            "count": 3,
+            "stunned": true
+          }
+        ],
+        "selectedEventId": "ultimate_1",
+        "potentialVariants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 0,
+            "minPotentialLevel": 1,
+            "maxPotentialLevel": 6,
+            "name": {
+              "zhCN": "固定失衡组合：1大2强化技3套普攻（末段三连）＋10爪印"
+            },
+            "events": [
+              {
+                "id": "ultimate_1",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "nekomata",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_claw",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "ex_2",
+                "kind": "direct",
+                "count": 2,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "nekomata",
+                  "categoryId": "special",
+                  "moveId": "ex_ambush",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "basic_3",
+                "kind": "skillGroup",
+                "skillGroupId": "basic_potential_stunned",
+                "count": 3,
+                "stunned": true
+              },
+              {
+                "id": "claw_marks_10",
+                "kind": "direct",
+                "count": 10,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "nekomata",
+                  "categoryId": "core_skill",
+                  "moveId": "claw_mark",
+                  "rowId": "damage"
+                }
+              }
+            ],
+            "selectedEventId": "ultimate_1"
+          }
+        ]
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "shadow_harmony",
+          "woodpecker_electro",
+          "fanged_metal"
+        ],
+        "defaultFourPieceBuffRuntimeInputs": {
+          "driveDisc4pc:shadow_harmony.self": {
+            "effects": {
+              "effect_shadow_harmony_4pc_atk_pct": {
+                "stacks": 3,
+                "coverage": 1
+              },
+              "effect_shadow_harmony_4pc_crit_rate": {
+                "stacks": 3,
+                "coverage": 1
+              }
+            }
+          },
+          "driveDisc4pc:woodpecker_electro.self": {
+            "effects": {
+              "effect_k4p9x1nd": {
+                "stacks": 3,
+                "coverage": 1
+              }
+            }
+          },
+          "driveDisc4pc:fanged_metal.self": {
+            "effects": {
+              "effect_03c221a712": {
+                "coverage": 1
+              }
+            }
+          }
+        },
+        "mainStatLimits": {
+          "4": [
+            "atkPct",
+            "critRate",
+            "critDmg"
+          ],
+          "5": [
+            "physicalDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "atkPct"
+          ]
+        }
+      },
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg",
+        "penFlat"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg"
+      ],
+      "hidden": false,
+      "sources": [
+        "https://zzz.nanoka.cc/character/1021",
+        "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1021.json"
+      ],
+      "verification": {
+        "dataVersion": "3.3.12+19520738",
+        "acquiredAt": "2026-10-13",
+        "level60Stats": "floor(base + published growth * 59 / 10000 + promotion tier 6), excluding core nodes. This matches existing Ellen and Soldier 11 source arithmetic.",
+        "reference": "User-confirmed 0 Cinema / P6 / core F / final skills 12 / R1 signature; 1 Ultimate + 2 EX + 3 five-hit Basic strings during stun, plus 10 Claw Marks as a 10-second active-hit reference.",
+        "buffState": "User-confirmed core damage and Meatball state at full coverage; no default teammates. Catwalk extra ability is disabled until team condition and stacks are specified.",
+        "driveDiscs": "User-confirmed all three set Buffs pre-stacked at full coverage; comparison candidates, not a proven best set.",
+        "boundaries": "No action times, decibels, energy or automatic buildup simulation. Claw Mark formal follow-up classification remains unconfirmed; it is not assigned that tag.",
+        "defaultRotationFallback": "When user says a future character rotation is uncertain: one Ultimate, two EX Specials and three complete Basic strings, all stunned. Ask each new character before implementation."
+      }
+    },
+    {
+      "id": "asaba_harumasa",
+      "name": {
+        "zhCN": "浅羽悠真"
+      },
+      "rarity": "S",
+      "attribute": "electric",
+      "damageElement": "electric",
+      "specialty": "attack",
+      "attackTypes": [
+        "slash",
+        "pierce"
+      ],
+      "faction": "对空洞特别行动部第六课",
+      "level60": {
+        "hpBase": 7405,
+        "atkBase": 840,
+        "defBase": 600,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 90,
+        "anomalyProficiency": 95,
+        "anomalyMastery": 80,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "images": {
+        "portrait": "/assets/agents/asaba_harumasa.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/IconRole35.webp"
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "破晓"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：破晓"
+          },
+          "defaultLevelAtCoreSkill": "F",
+          "levels": [
+            {
+              "level": 1,
+              "coreCritRatePct": 10.6,
+              "edgeCritDmgPerStackPct": 6
+            },
+            {
+              "level": 2,
+              "coreCritRatePct": 13,
+              "edgeCritDmgPerStackPct": 7
+            },
+            {
+              "level": 3,
+              "coreCritRatePct": 15.4,
+              "edgeCritDmgPerStackPct": 8
+            },
+            {
+              "level": 4,
+              "coreCritRatePct": 17.8,
+              "edgeCritDmgPerStackPct": 9
+            },
+            {
+              "level": 5,
+              "coreCritRatePct": 20.2,
+              "edgeCritDmgPerStackPct": 10
+            },
+            {
+              "level": 6,
+              "coreCritRatePct": 22.6,
+              "edgeCritDmgPerStackPct": 11
+            },
+            {
+              "level": 7,
+              "coreCritRatePct": 25,
+              "edgeCritDmgPerStackPct": 12
+            }
+          ]
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1201",
+          "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1201.json"
+        ]
+      },
+      "potentialVision": {
+        "name": {
+          "zhCN": "例无虚发"
+        },
+        "defaultLevel": 6,
+        "maxLevel": 6,
+        "mechanicUnlockLevel": 1,
+        "scaling": {
+          "name": {
+            "zhCN": "潜能觉醒：贯注"
+          },
+          "levels": [
+            {
+              "level": 0,
+              "potentialAtkPct": 0,
+              "dashElectricResIgnorePct": 0
+            },
+            {
+              "level": 1,
+              "potentialAtkPct": 0,
+              "dashElectricResIgnorePct": 0
+            },
+            {
+              "level": 2,
+              "potentialAtkPct": 4,
+              "dashElectricResIgnorePct": 5
+            },
+            {
+              "level": 3,
+              "potentialAtkPct": 6,
+              "dashElectricResIgnorePct": 7.5
+            },
+            {
+              "level": 4,
+              "potentialAtkPct": 8,
+              "dashElectricResIgnorePct": 10
+            },
+            {
+              "level": 5,
+              "potentialAtkPct": 10,
+              "dashElectricResIgnorePct": 12.5
+            },
+            {
+              "level": 6,
+              "potentialAtkPct": 12,
+              "dashElectricResIgnorePct": 15
+            }
+          ]
+        },
+        "mechanics": {
+          "potentialOneExtendsCoreToUltimate": true,
+          "bloomIsAutomaticUltimateDamage": true,
+          "dashMovesExcludedByUser": true
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1201",
+          "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1201.json"
+        ]
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "name": {
+            "zhCN": "核心被动：破晓／潜能觉醒：贯注"
+          },
+          "scope": "inCombat",
+          "defaultChecked": true,
+          "description": {
+            "zhCN": "原版核心仅提升飞弦·斩的暴击率和锋芒暴伤，不作用于此处大招/强化技。潜能1后范围扩展至逐雷和终结技：核心初始/A–F暴击率提升10.6%/13%/15.4%/17.8%/20.2%/22.6%/25%，每层锋芒暴伤6%/7%/8%/9%/10%/11%/12%，最多6层。用户确认默认已铺垫6层锋芒，不自动模拟本次大招内部叠层。潜能2–6发动强化技/连携/大招后攻击提升4%/6%/8%/10%/12%，持续12秒。潜能电抗无视仅用于飞弦·斩/逐雷，不用于大招/强化技，故当前录入范围不施加该效果。"
+          },
+          "effects": [
+            {
+              "id": "harumasa-core-ultimate-crit",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 10.6,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "coreCritRatePct"
+              },
+              "requirement": {
+                "minPotentialLevel": 1
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "harumasa-edge-ultimate-crit-dmg",
+              "type": "stacked",
+              "stat": "critDmg",
+              "value": 6,
+              "valuePerStack": 6,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "edgeCritDmgPerStackPct"
+              },
+              "requirement": {
+                "minPotentialLevel": 1
+              },
+              "maxStacks": 6,
+              "defaultStacks": 6,
+              "stackGroup": "harumasa_edge",
+              "stackLabel": {
+                "zhCN": "锋芒层数"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "harumasa-potential-atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "value": 0,
+              "mode": "pct",
+              "basis": "baseAtk",
+              "target": {
+                "kind": "default"
+              },
+              "valueSource": {
+                "kind": "potentialVisionScaling",
+                "field": "potentialAtkPct"
+              },
+              "requirement": {
+                "minPotentialLevel": 2
+              },
+              "durationSeconds": 12,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "name": {
+            "zhCN": "额外能力：超频"
+          },
+          "scope": "inCombat",
+          "defaultChecked": false,
+          "description": {
+            "zhCN": "队伍有击破或异常角色时，攻击命中失衡或属性异常敌人，自身伤害提升40%。落羽也会增加电囚层数。未确认队友，默认关闭；启用时需确认队伍条件和覆盖率。"
+          },
+          "effects": [
+            {
+              "id": "harumasa-overclock-damage",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 40,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "condition": "队伍有击破或异常角色，目标处于失衡或属性异常状态"
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "「意气风发」"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[普通攻击：甲乙矢]中，[电囚]效果的叠加层数上限提升至14层；[电壶]被激活时，将会向目标连续发射2支[甲乙矢]。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "挥霍"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "发动[连携技]或[终结技]时，悠真获得7层[电掣]，最多叠加7层；拥有[电掣]时，[冲刺攻击：飞弦·斩]造成的伤害提升50%；[冲刺攻击：飞弦·斩]结束后，消耗1层[电掣]。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 3,
+            "cinemaName": {
+              "zhCN": "白色谎言"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能使用最终等级，不在计算中重复加级。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "偶有充盈"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[电囚]效果的持续时间提升至20秒；[冲刺攻击：飞弦·斩]命中敌人时，悠真获得30点喧响值，同一招式内最多触发一次；发动[终结技]时，将为场上所有敌人施加满层[电囚]效果。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 5,
+            "cinemaName": {
+              "zhCN": "无人知晓"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能使用最终等级，不在计算中重复加级。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "会心"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[甲乙矢]命中处于失衡状态或属性异常状态下的敌人后，悠真将无视其15%电属性伤害抗性，持续12秒；[甲乙矢]每命中同一名敌人12次，将额外触发1次电磁爆炸，对目标造成悠真1500%攻击力的电属性伤害。"
+            },
+            "effects": [
+              {
+                "id": "harumasa-c6-electric-res-ignore",
+                "type": "fixed",
+                "stat": "electricResIgnore",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "durationSeconds": 12,
+                "condition": "甲乙矢命中失衡或异常敌人后；默认未假定该铺垫完成"
+              }
+            ],
+            "buffModifiers": []
+          }
+        ]
+      },
+      "skillGroups": [
+        {
+          "id": "ultimate_full",
+          "name": {
+            "zhCN": "单次完整大招（残心＋散华，仅潜能参考）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "body",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "asaba_harumasa",
+                "categoryId": "chain",
+                "moveId": "ultimate_zanshin",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "bloom",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "asaba_harumasa",
+                "categoryId": "chain",
+                "moveId": "ultimate_bloom",
+                "rowId": "damage"
+              }
+            }
+          ]
+        }
+      ],
+      "defaultCalculationConfig": {
+        "mode": "single",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "单次大招：残心"
+        },
+        "events": [
+          {
+            "id": "ultimate_1",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "asaba_harumasa",
+              "categoryId": "chain",
+              "moveId": "ultimate_zanshin",
+              "rowId": "damage"
+            }
+          }
+        ],
+        "selectedEventId": "ultimate_1",
+        "potentialVariants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 0,
+            "minPotentialLevel": 1,
+            "maxPotentialLevel": 6,
+            "name": {
+              "zhCN": "单次完整大招：残心＋散华"
+            },
+            "events": [
+              {
+                "id": "ultimate_full_1",
+                "kind": "skillGroup",
+                "skillGroupId": "ultimate_full",
+                "count": 1,
+                "stunned": true
+              }
+            ],
+            "selectedEventId": "ultimate_full_1"
+          }
+        ]
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "shadow_harmony"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "atkPct",
+            "critRate",
+            "critDmg"
+          ],
+          "5": [
+            "electricDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "atkPct"
+          ]
+        }
+      },
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg",
+        "penFlat"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg"
+      ],
+      "hidden": false,
+      "sources": [
+        "https://zzz.nanoka.cc/character/1201",
+        "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1201.json"
+      ],
+      "verification": {
+        "dataVersion": "3.3.12+19520738",
+        "acquiredAt": "2026-10-13",
+        "reference": "User confirmed level60, C0, P6, coreF, final skills12, R1 Zanshin Herb Case, 4 Shadow Harmony and pre-stacked 6 Edge stacks.",
+        "scope": "Only Ultimate and EX Special moves are imported. One default Ultimate includes automatically derived Bloom at P1+. No Basic/dash/chain rotation is authored.",
+        "potentialBoundaries": "P0 gets no Ultimate core bonus or Bloom default event. Potential resistance ignore only affects omitted dash/Thunder Pursuit; never Ultimate or EX.",
+        "resources": "No action time, energy/Decibel, Electro Quiver/Feather, arrow count or stacking simulation. Electro arrows and C6 explosions are omitted by the requested skill scope.",
+        "conditions": "No default teammates; Overclock and C6 resistance ignore are disabled. Signature triggered CR is evaluated as an already-stunned snapshot and can adjust coverage.",
+        "level60Stats": "Published initial + growth * 59/10000 + promotion6, floored; core nodes use deltas of the cumulative extra_level source."
+      }
+    },
+    {
+      "id": "evelyn_chevalier",
+      "name": {
+        "zhCN": "伊芙琳"
+      },
+      "rarity": "S",
+      "attribute": "fire",
+      "damageElement": "fire",
+      "specialty": "attack",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "天琴座",
+      "level60": {
+        "hpBase": 7788,
+        "atkBase": 854,
+        "defBase": 612,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 93,
+        "anomalyProficiency": 90,
+        "anomalyMastery": 92,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "images": {
+        "portrait": "/assets/agents/evelyn_chevalier.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/IconRole37.webp"
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "缠丝"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：缠丝"
+          },
+          "defaultLevelAtCoreSkill": "F",
+          "levels": [
+            {
+              "level": 1,
+              "tetherCritRatePct": 12.5
+            },
+            {
+              "level": 2,
+              "tetherCritRatePct": 14.6
+            },
+            {
+              "level": 3,
+              "tetherCritRatePct": 16.7
+            },
+            {
+              "level": 4,
+              "tetherCritRatePct": 18.8
+            },
+            {
+              "level": 5,
+              "tetherCritRatePct": 20.8
+            },
+            {
+              "level": 6,
+              "tetherCritRatePct": 23
+            },
+            {
+              "level": 7,
+              "tetherCritRatePct": 25
+            }
+          ]
+        },
+        "sources": [
+          "https://zzz.nanoka.cc/character/1321",
+          "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1321.json"
+        ]
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "name": {
+            "zhCN": "核心被动：缠丝"
+          },
+          "scope": "inCombat",
+          "defaultChecked": true,
+          "description": {
+            "zhCN": "进入牵缠禁制时，暴击率提升12.5%/14.6%/16.7%/18.8%/20.8%/23%/25%；退出后仍保有10秒。默认按已触发状态快照，覆盖率可调，不模拟绑定和换人。"
+          },
+          "effects": [
+            {
+              "id": "evelyn-tether-crit",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 12.5,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "tetherCritRatePct"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "name": {
+            "zhCN": "额外能力：潜袭支点"
+          },
+          "scope": "inCombat",
+          "defaultChecked": true,
+          "description": {
+            "zhCN": "队伍有击破或支援角色时，连携技/终结技增伤30%；局内暴击率达到80%时，指定连携和两种终结技原倍率变为125%。用户确认默认队伍条件满足；80%阈值由当前候选局内面板自动判定，不固定开启，不作用于强化技。当前目录仅录入终结技目标。"
+          },
+          "effects": [
+            {
+              "id": "evelyn-ultimate-damage",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 30,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "evelyn-crit-threshold-multiplier",
+              "type": "formula",
+              "stat": "skillMultiplierScaleBonus",
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "source": {
+                "kind": "inCombatStat",
+                "stat": "critRate",
+                "unit": "storedPercent",
+                "label": {
+                  "zhCN": "局内暴击率"
+                }
+              },
+              "formula": {
+                "expression": "clamp(floor(x / threshold), 0, 1) * rate",
+                "parameters": {
+                  "threshold": 80,
+                  "rate": 25
+                },
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "织梦"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "进入战场时，伊芙琳立刻获得1500点喧响值，在勘域模式中此效果180秒内最多触发一次；敌人进入[牵缠禁制]后，将被施加[禁锢]效果，伊芙琳攻击带有[禁锢]效果的敌人时，无视目标12%防御力；伊芙琳发动[特殊技：束裂式·I型]或[强化特殊技：束裂式·终型]时，会将[禁锢]效果扩散给所有被招式命中的敌人，被扩散的[禁锢]效果持续10秒。"
+            },
+            "effects": [
+              {
+                "id": "evelyn-c1-def-ignore",
+                "type": "fixed",
+                "stat": "fireDefIgnore",
+                "value": 12,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "skillType",
+                      "skillType": "ultimate"
+                    },
+                    {
+                      "kind": "skillTag",
+                      "skillTag": "exSpecial"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "目标已进入禁锢，当前录入招式均为火属性"
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "赴火之舞"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "伊芙琳的攻击力提升15%；伊芙琳发动[普通攻击：绞勒式·I型]或[普通攻击：绞勒式·II型]时，将返还所消耗的[燎火]，25秒内最多触发一次；伊芙琳消耗[燎索点]发动[连携技：月辉丝·绊]时，招式的打断等级提升。"
+            },
+            "effects": [
+              {
+                "id": "evelyn-c2-atk",
+                "type": "fixed",
+                "stat": "atkPct",
+                "value": 15,
+                "mode": "pct",
+                "basis": "baseAtk",
+                "target": {
+                  "kind": "default"
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 3,
+            "cinemaName": {
+              "zhCN": "破茧"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n使用最终技能等级，不重复加级。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "命运的弦音"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "description": {
+              "zhCN": "发动[连携技]或[终结技]时，伊芙琳立刻获得等同于自身10%生命值上限的护盾，持有该护盾时，伊芙琳的暴击伤害提升40%。"
+            },
+            "effects": [
+              {
+                "id": "evelyn-c4-shield-crit-dmg",
+                "type": "fixed",
+                "stat": "critDmg",
+                "value": 40,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "持有连携/终结技生成的护盾"
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 5,
+            "cinemaName": {
+              "zhCN": "丹缕如霞"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n使用最终技能等级，不重复加级。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "光与影的牵绊"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "description": {
+              "zhCN": "发动[连携技]或[终结技]时，伊芙琳将获得[弦影绝锋]，持续20秒；[弦影绝锋]期间，伊芙琳发动[普通攻击]、[冲刺攻击]、[特殊技]或[强化特殊技]命中主要攻击目标时，将额外释放一段[月辉丝·弦]进行追击，对范围内敌人造成等同于伊芙琳375%攻击力的火属性伤害，该伤害会被视为[连携技]伤害，最多触发16次，再次获得[弦影绝锋]时刷新可触发次数。\n当前只录大招/强化技；此375%连携追击不自动加入伤害。"
+            },
+            "effects": [],
+            "buffModifiers": []
+          }
+        ]
+      },
+      "defaultCalculationConfig": {
+        "mode": "single",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "单次大招：月辉丝·弦音"
+        },
+        "events": [
+          {
+            "id": "ultimate_1",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "evelyn_chevalier",
+              "categoryId": "chain",
+              "moveId": "ultimate_nocturne",
+              "rowId": "damage"
+            }
+          }
+        ],
+        "selectedEventId": "ultimate_1"
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "puffer_electro",
+          "hormone_punk"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "atkPct",
+            "critRate",
+            "critDmg"
+          ],
+          "5": [
+            "fireDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "atkPct"
+          ]
+        }
+      },
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg",
+        "penFlat"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg"
+      ],
+      "hidden": false,
+      "sources": [
+        "https://zzz.nanoka.cc/character/1321",
+        "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1321.json"
+      ],
+      "verification": {
+        "dataVersion": "3.3.12+19520738",
+        "acquiredAt": "2026-10-14",
+        "reference": "User confirmed level60, C0, coreF, final skills12, R1 signature. Signature identity corrected to Heartstring Nocturne; Elegant Vanity is a Support weapon.",
+        "scope": "Only two Ultimates and one EX Special with its wrapping/explosion rows. No other move or C6 chain follow-up is automatically added.",
+        "additionalAbility": "User explicitly confirmed the Stun/Support team condition. >=80% final in-combat crit rate yields a 25% base skill multiplier scale bonus only on the imported Ultimate moves.",
+        "buffs": "Core tether CR and signature 2 Heartstring stacks are condition snapshots; coverage and stacks remain adjustable. No named teammates or unconfirmed team buffs are preloaded.",
+        "statBasis": "Level60 stats exclude core nodes; cumulative source core entries are converted to deltas."
       }
     }
   ]

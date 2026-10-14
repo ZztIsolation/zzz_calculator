@@ -26,6 +26,7 @@ export const SKILL_TYPE_VALUES = new Set(SKILL_TYPES)
 
 export const SKILL_TAGS = Object.freeze([
     "dashAttack",
+    "followUp",
     "exSpecial",
     "assistAttack",
     "fireSuppression",
@@ -41,6 +42,7 @@ export function skillMultiplierTargetId({ agentSkillId = "", categoryId = "", mo
 
 export const SKILL_TAG_LABELS = Object.freeze({
     dashAttack: "冲刺攻击",
+    followUp: "追加攻击",
     exSpecial: "强化特殊技",
     assistAttack: "支援攻击",
     fireSuppression: "火力镇压",

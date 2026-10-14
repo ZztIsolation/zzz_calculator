@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NInput, NInputNumber, NSelect } from "naive-ui"
+import { NButton, NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import { Plus, Trash2 } from "lucide-vue-next"
 import { option } from "./maintenance-options"
 
@@ -20,6 +20,7 @@ const releaseModifierOptions = [option("releaseProficiencyYieldBonus", "异放�
 const coreFieldLabels: Record<string, string> = {
   anomalyProficiencyFlat: "核心被动异常精通",
   releaseCoefficientPctByElement: "异放属性系数",
+  cinema6ReleaseCoefficientPctByElement: "六影颤音改异放属性系数",
 }
 const coreFieldOptions = () => {
   const fields = new Set<string>()
@@ -69,6 +70,7 @@ function addArgument() {
 
     <div v-if="node.kind && !node.op" class="maintenance-inline-row release-expression-leaf">
       <label v-if="node.kind === 'constant'" class="maintenance-field"><span>数值</span><NInputNumber v-model:value="node.value" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
+      <label v-if="node.kind === 'constant'" class="maintenance-switch-field"><span>按影画读取数值</span><NSwitch :value="Array.isArray(node.cinemaValues)" :disabled="disabled" @update:value="node.cinemaValues = $event ? Array(7).fill(node.value ?? 0) : undefined; emit('change')" /></label>
       <label v-if="node.kind === 'triggerStat'" class="maintenance-field"><span>面板</span><NSelect v-model:value="node.panel" :options="panelOptions" :disabled="disabled" @update:value="emit('change')" /></label>
       <label v-if="node.kind === 'triggerStat'" class="maintenance-field"><span>属性</span><NSelect v-model:value="node.stat" :options="statOptions" :disabled="disabled" @update:value="emit('change')" /></label>
       <label v-if="node.kind === 'coreSkillScaling'" class="maintenance-field"><span>倍率字段</span><NSelect filterable v-model:value="node.field" :options="coreFieldOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
@@ -79,6 +81,9 @@ function addArgument() {
       <label v-if="node.kind === 'condition'" class="maintenance-field"><span>不满足时</span><NInputNumber v-model:value="node.whenFalse" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>数值单位</span><NSelect v-model:value="node.unit" :options="unitOptions" :disabled="disabled" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>白盒展示</span><NSelect :value="node.whiteBoxRole ?? ''" :options="whiteBoxRoleOptions" :disabled="disabled" @update:value="node.whiteBoxRole = $event || undefined; emit('change')" /></label>
+    </div>
+    <div v-if="node.kind === 'constant' && Array.isArray(node.cinemaValues)" class="maintenance-grid">
+      <label v-for="(_, index) in node.cinemaValues" :key="index" class="maintenance-field"><span>{{ index }} 影数值</span><NInputNumber v-model:value="node.cinemaValues[index]" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
     </div>
 
     <div v-if="node.op" class="release-expression-args">

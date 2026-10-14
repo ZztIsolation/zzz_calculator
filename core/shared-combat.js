@@ -105,6 +105,7 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     etherDefIgnore: "以太伤害无视防御",
     windDefIgnore: "风属性伤害无视防御",
     skillMultiplierBonus: "技能倍率加算",
+    skillMultiplierScaleBonus: "直伤技能倍率乘算",
 }
 export const ANOMALY_EFFECT_LABELS = {
     assault: "强击",
@@ -200,6 +201,7 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["windSharpDmg", "风锐化伤害加成%", "skill", null],
     ["lacerationDmg", "锐暴伤害加成%", "skill", null],
     ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
+    ["skillMultiplierScaleBonus", "直伤技能倍率乘算%", "skill", null],
     ["enemyDefReduction", "敌方减防率%", "skill", null],
     ["enemyDefIgnore", "无视防御率%", "skill", null],
     ["enemyResReduction", "当前属性减抗%", "skill", null],
@@ -314,6 +316,7 @@ export const FALLBACK_LABELS = {
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
     stunDmgMultiplierBonusCapAlways: "捕获的失衡易伤加成上限",
     skillMultiplierBonus: "技能倍率加算",
+    skillMultiplierScaleBonus: "直伤技能倍率乘算",
 }
 
 export const ENUM_LABELS = {
@@ -419,6 +422,7 @@ export const PERCENT_KEYS = new Set([
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
 ])
 export const PERCENT_MODE_KEY = {
     hp: "hpPct",
@@ -491,6 +495,7 @@ export const STORED_PERCENT_STATS = new Set([
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
 ])
 export const STORED_STAT_LABELS = {
     hpPct: "百分比生命值%",
@@ -572,6 +577,7 @@ export const STORED_STAT_LABELS = {
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）%",
     stunDmgMultiplierBonusCapAlways: "捕获的失衡易伤加成上限%",
     skillMultiplierBonus: "技能倍率加算%",
+    skillMultiplierScaleBonus: "直伤技能倍率乘算%",
 }
 
 export function nameOf(item) {

@@ -9,6 +9,10 @@
       "id": "anby_demara",
       "name": "安比"
     },
+    "1021": {
+      "id": "nekomata",
+      "name": "猫又"
+    },
     "1041": {
       "id": "soldier_11",
       "name": "11号"
@@ -20,6 +24,22 @@
     "1191": {
       "id": "ellen_joe",
       "name": "艾莲"
+    },
+    "1201": {
+      "id": "asaba_harumasa",
+      "name": "浅羽悠真"
+    },
+    "1261": {
+      "id": "jane_doe",
+      "name": "简"
+    },
+    "1321": {
+      "id": "evelyn_chevalier",
+      "name": "伊芙琳"
+    },
+    "1331": {
+      "id": "vivian",
+      "name": "薇薇安·班希"
     },
     "1371": {
       "id": "yixuan",
@@ -37,13 +57,17 @@
       "id": "aria",
       "name": "爱芮"
     },
-    "1261": {
-      "id": "jane_doe",
-      "name": "简"
+    "1511": {
+      "id": "nangongyu",
+      "name": "南宫羽"
     },
-    "1331": {
-      "id": "vivian",
-      "name": "薇薇安·班希"
+    "1551": {
+      "id": "pyrois",
+      "name": "佩洛伊斯"
+    },
+    "1561": {
+      "id": "velina",
+      "name": "维琳娜·艾嘉德"
     },
     "1581": {
       "id": "remielle_dan",
@@ -56,14 +80,6 @@
     "1611": {
       "id": "claret",
       "name": "克拉蕾·弗林特"
-    },
-    "1551": {
-      "id": "pyrois",
-      "name": "佩洛伊斯"
-    },
-    "1561": {
-      "id": "velina",
-      "name": "维琳娜·艾嘉德"
     }
   },
   "wEngines": {

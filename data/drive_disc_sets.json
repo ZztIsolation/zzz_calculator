@@ -883,7 +883,8 @@
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
-        "https://zenless-zone-zero.fandom.com/wiki/Shadow_Harmony"
+        "https://zenless-zone-zero.fandom.com/wiki/Shadow_Harmony",
+        "https://static.nanoka.cc/zzz/3.3.12+19520738/equipment.json"
       ],
       "fourPiece": {
         "effectText": {
@@ -940,6 +941,34 @@
           "buffModifiers": []
         },
         "teamBuff": null
+      },
+      "twoPiece": {
+        "effectText": {
+          "zhCN": "[追加攻击]和[冲刺攻击]造成的伤害提升15%。"
+        },
+        "effects": [
+          {
+            "id": "effect_shadow_harmony_2pc_followup_dash_dmg",
+            "type": "fixed",
+            "stat": "dmgBonus",
+            "value": 15,
+            "mode": "flat",
+            "target": {
+              "kind": "skill",
+              "skillTargets": [
+                {
+                  "kind": "skillTag",
+                  "skillTag": "followUp"
+                },
+                {
+                  "kind": "skillTag",
+                  "skillTag": "dashAttack"
+                }
+              ]
+            }
+          }
+        ],
+        "buffModifiers": []
       }
     },
     {

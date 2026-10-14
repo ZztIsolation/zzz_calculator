@@ -132,6 +132,10 @@ const sharpCritModeOptions = [
   { label: "二次锐暴", value: "lacerationCrit" },
 ]
 const releaseProfiles = computed(() => anomalyReleaseProfiles(props.agent))
+const releaseProfileOptions = computed(() => releaseProfiles.value.map((profile: any) => ({
+  label: labelOf(profile), value: profile.id,
+  disabled: Number(props.cinemaLevel ?? 0) < Number(profile.minCinemaLevel ?? 0),
+})))
 const supportsRelease = computed(() => releaseProfiles.value.length > 0)
 const supportsLuminescence = computed(() => props.agent?.id === "remielle_dan" || props.agent?.luminescenceModel?.status === "implemented")
 const releaseSourceLocked = computed(() => isAriaReleaseSourceLocked(props.agent))
@@ -365,7 +369,7 @@ function releaseBreakdown(event: any) {
   const profileId = isVelinaReleaseAgent(props.agent)
     ? event?.releaseSource
     : event?.triggerActorRef?.profileId
-  const profile = anomalyReleaseProfile(props.agent, profileId, effect?.element)
+  const profile = anomalyReleaseProfile(props.agent, profileId, effect?.element, { cinemaLevel: props.cinemaLevel ?? 0 })
   if (!effect || !profile) return null
   try {
     const releaseModifiers = releaseModifierValues(event, effect)
@@ -1841,6 +1845,13 @@ function save() {
               <div v-if="isReleaseSettlement(selectedEvent) && !isVelinaRelease" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field="release-trigger">
                 <span class="metric-title">异放触发者</span>
                 <div class="metric-value"><span class="calculation-readonly-value">{{ labelOf(agent) }}</span></div>
+              </div>
+              <div v-if="isReleaseSettlement(selectedEvent) && !isVelinaRelease && releaseProfiles.length > 1" class="metric calculation-editor-field calculation-editor-field-wide ui-field" data-layout-field="release-profile">
+                <span class="metric-title">异放倍率方案</span>
+                <div class="metric-value">
+                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(releaseProfileOptions, selectedEvent?.triggerActorRef?.profileId) }}</span>
+                  <NSelect v-else :value="selectedEvent?.triggerActorRef?.profileId" :options="releaseProfileOptions" aria-label="异放倍率方案" @update:value="updateSelectedEvent({ triggerActorRef: { agentId: agent?.id, profileId: String($event) } }, { clearLabel: true })" />
+                </div>
               </div>
               <div v-if="isReleaseSettlement(selectedEvent) && isVelinaRelease" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="velina-release-source">
                 <span class="metric-title">异放来源</span>

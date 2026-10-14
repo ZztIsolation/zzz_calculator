@@ -301,7 +301,7 @@ export function defaultAnomalyReleaseProfile(agent = {}, damageElement = "") {
         ?? null
 }
 
-export function anomalyReleaseProfile(agent = {}, profileId = "", damageElement = "") {
+export function anomalyReleaseProfile(agent = {}, profileId = "", damageElement = "", options = {}) {
     const id = String(profileId ?? "").trim()
     const profile = id
         ? anomalyReleaseProfiles(agent).find(item => item?.id === id)
@@ -313,7 +313,19 @@ export function anomalyReleaseProfile(agent = {}, profileId = "", damageElement 
         && !profile.supportedElements.includes(damageElement)) {
         return null
     }
-    return profile
+    const cinemaLevel = Math.max(0, Math.min(6, Math.trunc(Number(options.cinemaLevel ?? 0))))
+    if (options.cinemaLevel !== undefined && cinemaLevel < Number(profile.minCinemaLevel ?? 0)) return null
+    // Cinema is fixed for a build. Resolve its coefficients before compiling the
+    // event, so ordinary calculation and every optimizer path share the same tree.
+    const materialize = node => {
+        if (!node || typeof node !== "object") return node
+        return {
+            ...node,
+            ...(Array.isArray(node.cinemaValues) ? { value: node.cinemaValues[cinemaLevel] } : {}),
+            ...(Array.isArray(node.args) ? { args: node.args.map(materialize) } : {}),
+        }
+    }
+    return { ...profile, expression: materialize(profile.expression) }
 }
 
 export function isAriaReleaseSourceLocked(agent = {}) {
@@ -545,6 +557,10 @@ export function validateAnomalyReleaseProfile(profile = {}) {
     if (!Array.isArray(profile.supportedElements) || !profile.supportedElements.length) {
         errors.push("异放倍率方案必须至少支持一个伤害属性。")
     }
+    if (profile.minCinemaLevel !== undefined && (!Number.isInteger(profile.minCinemaLevel)
+        || profile.minCinemaLevel < 0 || profile.minCinemaLevel > 6)) {
+        errors.push("异放方案最低影画必须是 0 至 6 的整数。")
+    }
     const validateNode = (node, path, allowWhiteBoxRole = true) => {
         if (!node || typeof node !== "object" || Array.isArray(node)) {
             errors.push(`${path} 必须是结构化公式节点。`)
@@ -567,6 +583,11 @@ export function validateAnomalyReleaseProfile(profile = {}) {
             return
         }
         if (!RELEASE_LEAF_KINDS.has(node.kind)) errors.push(`${path} 使用了不支持的节点。`)
+        if (node.cinemaValues !== undefined && (node.kind !== "constant"
+            || !Array.isArray(node.cinemaValues) || node.cinemaValues.length !== 7
+            || !node.cinemaValues.every(value => typeof value === "number" && Number.isFinite(value)))) {
+            errors.push(`${path}.cinemaValues 必须是常量节点的 0 至 6 影共七个有限数值。`)
+        }
         if (!RELEASE_UNITS.has(node.unit)) errors.push(`${path}.unit 必须显式使用 raw、percent 或 decimal。`)
         if (node.kind === "triggerStat") {
             if (!RELEASE_TRIGGER_STATS.has(node.stat)) errors.push(`${path}.stat 不是允许的触发者属性。`)
