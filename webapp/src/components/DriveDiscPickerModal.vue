@@ -2,6 +2,8 @@
 import { computed, h, ref, watch } from "vue"
 import { NButton, NInput, NModal, NSelect, NTag } from "naive-ui"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
+import DriveDiscPagination from "@/components/DriveDiscPagination.vue"
+import { useDriveDiscPagination } from "@/utils/driveDiscPagination"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import {
@@ -104,6 +106,8 @@ const filteredDiscs = computed(() => {
         || scannerSequenceSortValue(left) - scannerSequenceSortValue(right)
     })
 })
+
+const { page, pageSize, pagedItems: pagedDiscs } = useDriveDiscPagination(filteredDiscs)
 
 watch(setFilterOptions, options => {
   const validIds = new Set(options.map(option => option.value))
@@ -267,7 +271,7 @@ function clearSlot() {
 
       <div v-if="filteredDiscs.length" class="manual-disc-option-list">
         <button
-          v-for="disc in filteredDiscs"
+          v-for="disc in pagedDiscs"
           :key="disc.id"
           type="button"
           class="manual-disc-option"
@@ -298,6 +302,7 @@ function clearSlot() {
         <strong>暂无驱动盘</strong>
         <span>暂无符合筛选条件的驱动盘</span>
       </div>
+      <DriveDiscPagination v-model:page="page" :total="filteredDiscs.length" :page-size="pageSize" />
     </div>
     <template #footer>
       <div class="drawer-footer">

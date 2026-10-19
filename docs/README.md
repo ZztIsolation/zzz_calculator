@@ -19,6 +19,7 @@
 | 风属性异常与维琳娜 | [风属性专题](wind-anomaly-modeling.md) | 风化、乱流、异放、来源、公式和默认配置 |
 | 蕾米埃尔·丹评分 | [评分专题](luminescence-modeling.md) | 恒定权重近似、正式输入、兼容和评分边界 |
 | 表单和弹窗布局 | [前端布局契约](frontend-layout-contract.md) | 尺寸、滚动、可见性；保存行为引用回归契约 |
+| 驱动盘仓库性能 | [分页与缓存说明](drive-disc-performance.md) | 分页、代理人预设筛选、缓存边界与验证入口 |
 | 发布候选版本 | [生产发布手册](production-deployment-runbook.md) | 内容核对、冻结SHA、Promote、证据和恢复入口 |
 | 安装或升级部署控制面 | [管理器说明](../deploy/production/README.md) | 安装、接口、隔离、审计及保留的迁移兼容 |
 | 发布失败或超时 | [恢复手册](../deploy/production/RECOVERY.md) | 按状态诊断、期限、控制面升级、Resume/回滚 |

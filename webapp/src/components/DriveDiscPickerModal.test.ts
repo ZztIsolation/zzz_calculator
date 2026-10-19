@@ -54,6 +54,18 @@ const mixedDisc = {
 }
 
 describe("DriveDiscPickerModal provenance", () => {
+  it("pages the visible rows but searches the complete inventory and resets the page", async () => {
+    const discs = Array.from({ length: 123 }, (_, index) => ({ ...mixedDisc, id: `disc-${String(index).padStart(3, '0')}`, source: null, provenance: null }))
+    const wrapper = mount(DriveDiscPickerModal, { props: { show: true, slot: 1, discs, driveDiscSets } })
+    expect(wrapper.findAll('.manual-disc-option')).toHaveLength(10)
+    await wrapper.findAll('button').find(button => button.text() === '下一页')!.trigger('click')
+    expect(wrapper.text()).toContain('第 2 / 13 页')
+    await wrapper.get('input[aria-label="搜索驱动盘"]').setValue('disc-122')
+    expect(wrapper.findAll('.manual-disc-option')).toHaveLength(1)
+    expect(wrapper.text()).toContain('第 1 / 1 页')
+    await wrapper.get('.manual-disc-option').trigger('click')
+    expect(wrapper.emitted('select')?.[0]?.[0]).toMatchObject({ id: 'disc-122' })
+  })
   it("shows all sources and uses provenance Scanner sequence for display, search, and aria", async () => {
     const wrapper = mount(DriveDiscPickerModal, {
       props: {

@@ -8,6 +8,8 @@ import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
 import DamageWhiteBox from "@/components/DamageWhiteBox.vue"
 import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
+import DriveDiscPagination from "@/components/DriveDiscPagination.vue"
+import { useDriveDiscPagination } from "@/utils/driveDiscPagination"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
 import AgentSelect from "@/components/AgentSelect.vue"
@@ -473,6 +475,7 @@ const filteredManualDiscOptions = computed(() => {
         || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
     })
 })
+const { page: manualDiscPage, pageSize: manualDiscPageSize, pagedItems: pagedManualDiscOptions } = useDriveDiscPagination(filteredManualDiscOptions)
 const saveLoadoutIdsBySlot = computed(() => saveLoadoutDraft.value?.driveDiscIdsBySlot ?? {})
 const saveLoadoutDiscCount = computed(() => Object.keys(saveLoadoutIdsBySlot.value).length)
 const saveLoadoutMissingSlots = computed(() => OPTIMIZER_RESULT_SLOTS.filter(slot => !saveLoadoutIdsBySlot.value[String(slot)]))
@@ -1940,7 +1943,7 @@ function formatPercentValue(value: any) {
 
       <div v-if="filteredManualDiscOptions.length" class="manual-disc-option-list">
         <button
-          v-for="disc in filteredManualDiscOptions"
+          v-for="disc in pagedManualDiscOptions"
           :key="disc.id"
           type="button"
           class="manual-disc-option"
@@ -1963,6 +1966,7 @@ function formatPercentValue(value: any) {
         <strong>暂无驱动盘</strong>
         <span>暂无符合筛选条件的驱动盘</span>
       </div>
+      <DriveDiscPagination v-model:page="manualDiscPage" :total="filteredManualDiscOptions.length" :page-size="manualDiscPageSize" />
     </div>
     <template #footer>
       <div class="drawer-footer">

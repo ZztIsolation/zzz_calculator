@@ -483,7 +483,8 @@ export function normalizeDriveDiscSetAlias(disc, options = {}) {
     if (!setMatch?.id) return disc
 
     const currentSetId = String(disc.setId ?? "").trim()
-    const replaceSetId = !currentSetId || currentSetId.startsWith("scanner-set-")
+    const replaceSetId = currentSetId !== setMatch.id
+        && (!currentSetId || currentSetId.startsWith("scanner-set-"))
     const fillCanonicalSetName = (replaceSetId || currentSetId === setMatch.id)
         && isMissingCanonicalSetName(disc.canonicalSetName)
     if (!replaceSetId && !fillCanonicalSetName) return disc

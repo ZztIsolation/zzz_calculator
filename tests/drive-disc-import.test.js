@@ -111,6 +111,10 @@ assert.equal(migratedAliases.driveDiscs[3], aliasMigrationInput.driveDiscs[3])
 assert.equal(migratedAliases.driveDiscs[4], aliasMigrationInput.driveDiscs[4])
 assert.equal(migrateDriveDiscSetAliases(migratedAliases), migratedAliases, "alias migration must be idempotent")
 
+const canonicalCatalogStore = { driveDiscs: catalogAliases.driveDiscs }
+assert.equal(migrateDriveDiscSetAliases(canonicalCatalogStore), canonicalCatalogStore,
+    "canonical catalog IDs must not trigger migration again, including IDs with a scanner-set prefix")
+
 const nativeAliasImport = normalizeDriveDiscImport({
     format: DRIVE_DISC_EXPORT_FORMAT,
     version: DRIVE_DISC_EXPORT_VERSION,

@@ -4,7 +4,8 @@ import {
   deleteDriveDiscLoadout,
   deleteUserDriveDisc,
   exportCurrentUserDriveDiscs,
-  loadCurrentUserDriveDiscStore,
+  loadCurrentUserDriveDiscStoreFresh,
+  currentInventoryWriteRevision,
   loadUserDriveDiscStore,
   loadUserDriveDiscStoreFresh,
   planScannerExportImport,
@@ -263,6 +264,9 @@ export function helperVersionAtLeast(actual = "", required = REQUIRED_HELPER_VER
   }
   return true
 }
+
+const inventoryViews = new WeakMap<object, { revision: number, store: any }>()
+const inventoryLoads = new WeakMap<object, number>()
 
 export const useInventoryStore = defineStore("inventory", {
   state: () => ({
@@ -539,15 +543,33 @@ export const useInventoryStore = defineStore("inventory", {
       this.clearAdminRequest()
     },
     async load() {
+      const request = (inventoryLoads.get(this) ?? 0) + 1
+      inventoryLoads.set(this, request)
+      const revision = currentInventoryWriteRevision()
+      inventoryViews.delete(this)
       this.loading = true
       this.error = ""
       try {
-        this.store = await loadCurrentUserDriveDiscStore()
+        const store = await loadCurrentUserDriveDiscStoreFresh()
+        if (inventoryLoads.get(this) !== request) return
+        this.store = store
+        if (revision === currentInventoryWriteRevision()) {
+          inventoryViews.set(this, { revision, store: this.store })
+        }
       } catch (error) {
+        if (inventoryLoads.get(this) !== request) return
         this.error = error instanceof Error ? error.message : String(error)
       } finally {
-        this.loading = false
+        if (inventoryLoads.get(this) === request) this.loading = false
       }
+    },
+    async ensureLoaded(ownerId: string | null) {
+      const cached = inventoryViews.get(this)
+      if (!this.loading && !this.error && cached?.store === this.store
+        && cached?.revision === currentInventoryWriteRevision()
+        && this.store?.currentOwnerId === ownerId) return
+      if (this.store?.currentOwnerId !== ownerId) this.store = null
+      await this.load()
     },
     // Full (all-owners) store + current owner id, for building an Enka drive-disc plan.
     async fullStoreWithOwner() {

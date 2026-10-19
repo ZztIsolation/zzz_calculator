@@ -403,6 +403,7 @@ declare module "@runtime/local-store.js" {
     signal?: AbortSignal
   }
   export function clearAllBrowserData(): Promise<void>
+  export function currentInventoryWriteRevision(): number
   export function driveDiscContentFingerprint(disc: any): string
   export function driveDiscIdentityFingerprint(disc: any): string
   export function ownerScopedStore(store: any, ownerId?: string): any

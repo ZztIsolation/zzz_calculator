@@ -248,6 +248,62 @@ describe("DiscsView", () => {
     vi.restoreAllMocks()
   })
 
+  it("paginates warehouse rows by five while searching the full inventory", async () => {
+    seedInventory(Array.from({ length: 12 }, (_, i) => driveDisc(1, {
+      id: `page-disc-${i}`, setName: i === 11 ? "末页测试盘" : "啄木鸟电音",
+    })))
+    const wrapper = await mountView()
+    expect(wrapper.findAll(".inventory-table tbody tr")).toHaveLength(5)
+    expect(wrapper.get('[aria-label="驱动盘分页"]').text()).toContain("匹配 12 件")
+    await button(wrapper, "下一页").trigger("click")
+    expect(wrapper.get('[aria-label="驱动盘分页"]').text()).toContain("第 2 / 3 页")
+    useInventoryStore().search = "末页测试盘"
+    await flushPromises()
+    expect(wrapper.findAll(".inventory-table tbody tr")).toHaveLength(1)
+    expect(wrapper.get('[aria-label="驱动盘分页"]').text()).toContain("第 1 / 1 页")
+    expect(useInventoryStore().driveDiscs).toHaveLength(12)
+    wrapper.unmount()
+  })
+
+  it.each([true, false])("filters presets by agent, including unknown and public presets (visual=%s)", async visual => {
+    seedInventory([driveDisc(1)], ["agent-a", "agent-a", "agent-b", "retired-agent", ""].map((agentId, i) => ({
+      id: `filter-${i}`, ownerId: "default", name: `预设${i}`, agentId,
+      driveDiscIdsBySlot: { 1: "preset-disc-1" },
+    })))
+    const wrapper = await mountView(visual)
+    const titles = () => wrapper.findAll("h3").map(title => title.text())
+    expect(titles()).toEqual(["预设0", "预设1"])
+    const picker = wrapper.get('[aria-label="预设代理人"]')
+    expect(picker.text()).toContain("角色甲（2 套）")
+    await picker.setValue("retired-agent")
+    expect(titles()).toEqual(["预设3"])
+    await picker.setValue("")
+    expect(titles()).toEqual(["预设4"])
+    await picker.setValue("agent-b")
+    await useInventoryStore().removeLoadout("filter-2")
+    await flushPromises()
+    expect(titles()).toEqual(["预设0", "预设1"])
+    expect(useInventoryStore().driveDiscs[0].reservedForAgentId).toBeFalsy()
+    wrapper.unmount()
+  })
+
+  it("shows the saved agent after creating or reassigning a preset", async () => {
+    seedInventory([driveDisc(1)], [{ id: "existing", name: "原预设", agentId: "agent-a", driveDiscIdsBySlot: {} }])
+    const wrapper = await mountView(true)
+    await button(wrapper, "新增预设").trigger("click")
+    await wrapper.get('[aria-label="套装预设名称"]').setValue("乙的新预设")
+    await wrapper.get('[aria-label="套装预设角色"]').setValue("agent-b")
+    await button(wrapper, "保存").trigger("click")
+    await flushPromises()
+    expect(wrapper.findAll("h3").map(title => title.text())).toEqual(["乙的新预设"])
+    await button(wrapper, "编辑").trigger("click")
+    await wrapper.get('[aria-label="套装预设角色"]').setValue("agent-a")
+    await button(wrapper, "保存").trigger("click")
+    await flushPromises()
+    expect(wrapper.findAll("h3")).toHaveLength(2)
+    wrapper.unmount()
+  })
+
   it("renders drive disc set icons from the catalog in the inventory table", async () => {
     seedInventory([{
       id: "disc-a",

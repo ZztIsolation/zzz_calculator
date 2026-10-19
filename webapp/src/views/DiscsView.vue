@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
-import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
+import { computed, inject, onMounted, onActivated, onDeactivated, ref, watch } from "vue"
+import { routeLocationKey } from "vue-router"
+import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTag, useMessage } from "naive-ui"
 import { Ban, Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import DriveDiscConflictResolver from "@/components/DriveDiscConflictResolver.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
+import DriveDiscPagination from "@/components/DriveDiscPagination.vue"
+import { useDriveDiscPagination } from "@/utils/driveDiscPagination"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
@@ -16,6 +19,7 @@ import { driveDiscScannerSequence } from "@/utils/driveDiscProvenance"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
+import { useAccountStore } from "@/stores/account"
 import { driveDiscReservationStateForLoadout, driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { DRIVE_DISC_STORE_BUSY } from "@runtime/drive-disc-import-lock"
 import { DRIVE_DISC_STORAGE_TIMEOUT } from "@runtime/local-store.js"
@@ -24,7 +28,30 @@ import { scanTelemetryPreferenceEnabled } from "@runtime/scan-telemetry"
 const catalogStore = useCatalogStore()
 const appConfigStore = useAppConfigStore()
 const inventoryStore = useInventoryStore()
+const accountStore = useAccountStore()
+defineOptions({ name: "DiscsView" })
+const pageActive = ref(true)
+const route = inject(routeLocationKey, null)
 const message = useMessage()
+const { page: discPage, pageSize: discPageSize, pagedItems: pagedDiscs } = useDriveDiscPagination(computed(() => inventoryStore.filteredDriveDiscs), 5)
+const presetAgentId = ref<string | null>(null)
+const presetAgentOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const loadout of inventoryStore.loadouts) {
+    const id = String(loadout.agentId ?? "")
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  // Include unknown and unassigned agents so existing presets remain accessible.
+  return Array.from(counts, ([value, count]) => ({ value, label: `${agentName(value)}（${count} 套）` }))
+})
+watch(presetAgentOptions, options => {
+  if (!options.some(option => option.value === presetAgentId.value)) {
+    presetAgentId.value = options[0]?.value ?? null
+  }
+}, { immediate: true, flush: "sync" })
+const visibleLoadouts = computed(() => inventoryStore.loadouts.filter(
+  (loadout: any) => String(loadout.agentId ?? "") === presetAgentId.value,
+))
 const reservationUiEnabled = computed(() => appConfigStore.driveDiscReservationsUiEnabled)
 const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfigStore.driveDiscExclusionsUiEnabled)
 
@@ -83,8 +110,29 @@ const pendingDangerImport = ref<"paste" | "">("")
 
 const showScan = ref(false)
 
-onMounted(async () => {
-  await Promise.all([catalogStore.load(), inventoryStore.load()])
+async function loadWarehouse() {
+  await Promise.all([catalogStore.load(), inventoryStore.ensureLoaded(accountStore.currentOwnerId)])
+}
+onMounted(loadWarehouse)
+let activatedOnce = false
+onActivated(() => {
+  pageActive.value = true
+  if (activatedOnce) void loadWarehouse()
+  activatedOnce = true
+})
+watch(() => route?.name, name => {
+  // Unmount teleported dialogs and their polling just as leaving an uncached
+  // page did, but only after navigation succeeds (a guard may cancel it).
+  if (name && name !== "discs") pageActive.value = false
+}, { flush: "sync" })
+onDeactivated(() => {
+  pageActive.value = false
+  for (const visible of [showDiscEditor, confirmDelete, showDiscReservation,
+    showReservationConflict, showDiscExclusions, showLoadoutEditor,
+    showLoadoutDiscPicker, showImport, confirmRemoveMissingImport, showScan]) {
+    visible.value = false
+  }
+  deleteLoadoutId.value = ""
 })
 
 watch(showScan, visible => {
@@ -798,7 +846,7 @@ function openNewLoadout() {
   loadoutDraft.value = {
     id: `loadout-${Date.now()}`,
     name: "未命名套装",
-    agentId: catalogStore.agents[0]?.id || "",
+    agentId: presetAgentId.value ?? catalogStore.agents[0]?.id ?? "",
     driveDiscIdsBySlot: {},
   }
   activeLoadoutDiscSlot.value = 0
@@ -872,6 +920,7 @@ async function saveLoadout() {
       storageTimeoutMs: LOADOUT_SAVE_STORAGE_TIMEOUT_MS,
       purpose: "保存套装预设",
     })
+    presetAgentId.value = String(loadoutDraft.value.agentId ?? "")
     loadoutIsNew.value = false
     showLoadoutDiscPicker.value = false
     showLoadoutEditor.value = false
@@ -1082,7 +1131,7 @@ function confirmDangerImport() {
             <template #icon><Plus :size="16" /></template>
             新增单个
           </NButton>
-          <NButton @click="inventoryStore.load">
+          <NButton title="重新读取库存；其他标签页的改动请点击刷新" @click="inventoryStore.load">
             <template #icon><RefreshCw :size="16" /></template>
             刷新
           </NButton>
@@ -1134,11 +1183,13 @@ function confirmDangerImport() {
           <NTag round>{{ inventoryStore.loadouts.length }} 个套装预设</NTag>
         </div>
         <div class="slot-filter-scroll">
-          <NTabs v-model:value="inventoryStore.slotFilter" type="segment">
-            <NTab v-for="slot in slotTabs" :key="slot.value" :name="slot.value">
+          <div class="slot-filter-buttons" role="group" aria-label="驱动盘槽位筛选">
+            <button v-for="slot in slotTabs" :key="slot.value" type="button"
+              :aria-pressed="inventoryStore.slotFilter === slot.value"
+              @click="inventoryStore.slotFilter = slot.value">
               {{ slot.name }} {{ slot.count }}
-            </NTab>
-          </NTabs>
+            </button>
+          </div>
         </div>
         <div v-if="!inventoryStore.hasDriveDiscs" class="scan-empty-state">
           <div class="scan-empty-icon">
@@ -1171,7 +1222,7 @@ function confirmDangerImport() {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="disc in inventoryStore.filteredDriveDiscs" :key="disc.id" @click="openEditDisc(disc)">
+              <tr v-for="disc in pagedDiscs" :key="disc.id" @click="openEditDisc(disc)">
                 <td>
                   <div class="disc-row-identity">
                     <ImageAvatar :src="driveDiscSetIcon(disc)" :name="driveDiscSetName(disc)" :size="44" />
@@ -1237,6 +1288,7 @@ function confirmDangerImport() {
           </table>
           <div v-if="!inventoryStore.filteredDriveDiscs.length" class="empty-state">暂无数据</div>
         </div>
+        <DriveDiscPagination v-model:page="discPage" :total="inventoryStore.filteredDriveDiscs.length" :page-size="discPageSize" />
       </div>
     </div>
 
@@ -1247,8 +1299,13 @@ function confirmDangerImport() {
       </div>
       <div class="panel-body">
         <template v-if="inventoryStore.loadouts.length">
+          <div class="preset-agent-filter">
+            <span id="preset-agent-label">代理人</span>
+            <NSelect v-model:value="presetAgentId" :options="presetAgentOptions" filterable aria-labelledby="preset-agent-label" aria-label="预设代理人" />
+            <span>显示 {{ visibleLoadouts.length }} / {{ inventoryStore.loadouts.length }} 套预设</span>
+          </div>
           <div v-if="reservationUiEnabled" class="loadout-visual-grid" data-layout-surface="loadout-presets">
-            <article v-for="loadout in inventoryStore.loadouts" :key="loadout.id" class="loadout-visual-card">
+            <article v-for="loadout in visibleLoadouts" :key="loadout.id" class="loadout-visual-card">
               <div class="panel-header">
                 <div class="loadout-heading-copy">
                   <h3 class="panel-title">{{ loadout.name || loadout.id }}</h3>
@@ -1298,7 +1355,7 @@ function confirmDangerImport() {
             </article>
           </div>
           <div v-else class="entity-grid">
-            <article v-for="loadout in inventoryStore.loadouts" :key="loadout.id" class="panel">
+            <article v-for="loadout in visibleLoadouts" :key="loadout.id" class="panel">
               <div class="panel-header">
                 <h3 class="panel-title">{{ loadout.name || loadout.id }}</h3>
                 <NTag :type="loadout.status === 'complete' ? 'success' : 'warning'" round>{{ Object.keys(loadout.driveDiscIdsBySlot ?? loadout.idsBySlot ?? {}).length }} / 6</NTag>
@@ -1317,6 +1374,7 @@ function confirmDangerImport() {
     </div>
   </section>
 
+  <template v-if="pageActive">
   <NModal v-model:show="showDiscEditor" preset="card" :title="selectedDisc ? '编辑驱动盘' : '新增驱动盘'" style="width: min(920px, calc(100vw - 16px)); max-width: 920px">
     <div class="section-band ui-layout-scope" data-layout-surface="drive-disc-editor">
       <div class="metric-grid ui-field-grid">
@@ -1541,7 +1599,7 @@ function confirmDangerImport() {
           @select="openLoadoutDiscPicker"
         />
       </div>
-      <div v-else class="metric-grid ui-field-grid">
+      <div class="metric-grid ui-field-grid">
         <div class="metric" data-layout-field>
           <span class="metric-title">名称</span>
           <div class="metric-value"><NInput v-model:value="loadoutDraft.name" aria-label="套装预设名称" :disabled="loadoutSaving" /></div>
@@ -1894,6 +1952,7 @@ function confirmDangerImport() {
     @update:show="visible => { if (!visible) inventoryStore.cancelScanStartConfirmation() }"
     @confirm="inventoryStore.confirmScanStart"
   />
+  </template>
 </template>
 
 <style scoped>
@@ -2073,6 +2132,35 @@ function confirmDangerImport() {
   overscroll-behavior-inline: contain;
 }
 
+.slot-filter-buttons {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  min-width: max-content;
+  border-radius: 6px;
+  background: var(--app-panel-muted);
+}
+.slot-filter-buttons button {
+  flex: 1;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.slot-filter-buttons button[aria-pressed="true"] {
+  background: var(--app-panel);
+  color: var(--app-blue);
+  box-shadow: 0 1px 3px #00000014;
+}
+.slot-filter-buttons button:focus-visible {
+  outline: 2px solid var(--app-blue);
+  outline-offset: -2px;
+}
+
 @media (max-width: 680px) {
   .inventory-filter-toolbar {
     display: grid;
@@ -2193,6 +2281,20 @@ function confirmDangerImport() {
   .restriction-actions {
     justify-content: start;
   }
+}
+
+.preset-agent-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.preset-agent-filter :deep(.n-select) {
+  width: 260px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .loadout-agent {

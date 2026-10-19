@@ -24,6 +24,52 @@ describe("local-store IndexedDB compatibility", () => {
     vi.resetModules()
   })
 
+  it("does not rewrite canonical scanner-prefixed set IDs on repeated inventory reads", async () => {
+    const persisted = {
+      version: 1, currentOwnerId: "default", owners: [{ id: "default", label: "默认用户" }],
+      imports: [], driveDiscLoadouts: [],
+      driveDiscs: [{ id: "already-canonical", ownerId: "default", setId: "scanner-set-48ee0a14625f",
+        setName: "折枝剑歌", canonicalSetName: { zhCN: "折枝剑歌" }, partition: 1, rarity: "S", level: 15,
+        mainStat: { stat: "hpFlat", mode: "flat", value: 2200 }, subStats: [], statUnitVersion: 2 }],
+    }
+    const put = vi.fn()
+    const database = {
+      objectStoreNames: { contains: () => true },
+      transaction() {
+        return asyncTransaction(scheduleComplete => ({
+          get() { scheduleComplete(); return asyncRequest(persisted) },
+          put(value: any, key: string) { put(value, key); scheduleComplete(); return asyncRequest(key) },
+        }))
+      },
+    }
+    vi.stubGlobal("indexedDB", { open: () => asyncRequest(database) })
+    const localStore = await import("@runtime/local-store.js?canonical-read-only")
+    const first = await localStore.loadCurrentUserDriveDiscStore()
+    const second = await localStore.loadCurrentUserDriveDiscStoreFresh()
+    expect(first.driveDiscs[0].contentFingerprint).toBeTruthy()
+    expect(second).toEqual(first)
+    expect(put).not.toHaveBeenCalled()
+
+    // A later read must see external writes and scope every collection to the
+    // newly selected owner, without renormalizing or returning a cached view.
+    persisted.owners.push({ id: "alt", label: "另一个账号" })
+    persisted.currentOwnerId = "alt"
+    persisted.driveDiscs.push({ ...persisted.driveDiscs[0], id: "alt-disc", ownerId: "alt" })
+    Object.assign(persisted, {
+      imports: [{ id: "default-import", ownerId: "default" }, { id: "alt-import", ownerId: "alt" }],
+      driveDiscLoadouts: [{ id: "default-loadout", ownerId: "default" }, { id: "alt-loadout", ownerId: "alt" }],
+    })
+    for (const read of [localStore.loadCurrentUserDriveDiscStore, localStore.loadCurrentUserDriveDiscStoreFresh]) {
+      const latest = await read()
+      expect(latest.currentOwnerId).toBe("alt")
+      expect(latest.driveDiscs.map((disc: any) => disc.id)).toEqual(["alt-disc"])
+      expect(latest.driveDiscs[0].contentFingerprint).toBeTruthy()
+      expect(latest.imports.map((item: any) => item.id)).toEqual(["alt-import"])
+      expect(latest.driveDiscLoadouts.map((item: any) => item.id)).toEqual(["alt-loadout"])
+    }
+    expect(put).not.toHaveBeenCalled()
+  })
+
   it("keeps the existing database, object store, and record key", async () => {
     const records = new Map<string, any>([["userDriveDiscStore", {
       version: 1,

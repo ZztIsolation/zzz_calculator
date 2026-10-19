@@ -33,6 +33,12 @@ const STATE_STORE = "state"
 const STORE_KEY = "userDriveDiscStore"
 const FALLBACK_STORAGE_KEY = "zzz-calculator.userStore.v1"
 
+// In-tab invalidation only. Other tabs are refreshed explicitly by the user.
+let inventoryWriteRevision = 0
+export function currentInventoryWriteRevision() {
+    return inventoryWriteRevision
+}
+
 function normalizedTimeout(value, fallback = DEFAULT_STORAGE_TIMEOUT_MS) {
     if (value === undefined || value === null || value === "") return fallback
     const timeout = Number(value)
@@ -400,6 +406,7 @@ export function loadUserDriveDiscStoreFresh(options = {}) {
 }
 
 export async function clearAllBrowserData() {
+    inventoryWriteRevision += 1
     if (dbPromise) {
         try {
             const db = await dbPromise
@@ -422,14 +429,28 @@ export async function clearAllBrowserData() {
         }
     } catch {
     }
+    inventoryWriteRevision += 1
+}
+
+function currentOwnerView(normalizedStore) {
+    // Both readers already normalize the fresh document. Scoping must not hash
+    // every disc a second time; keep reads fresh without a long-lived cache.
+    const ownerId = normalizedStore.currentOwnerId
+    const belongsToOwner = item => (item.ownerId ?? "default") === ownerId
+    return {
+        ...normalizedStore,
+        imports: normalizedStore.imports.filter(belongsToOwner),
+        driveDiscs: normalizedStore.driveDiscs.filter(belongsToOwner),
+        driveDiscLoadouts: normalizedStore.driveDiscLoadouts.filter(belongsToOwner),
+    }
 }
 
 export async function loadCurrentUserDriveDiscStore(options = {}) {
-    return ownerScopedStore(await loadUserDriveDiscStore(options))
+    return currentOwnerView(await loadUserDriveDiscStore(options))
 }
 
 export async function loadCurrentUserDriveDiscStoreFresh(options = {}) {
-    return ownerScopedStore(await loadUserDriveDiscStoreFresh(options))
+    return currentOwnerView(await loadUserDriveDiscStoreFresh(options))
 }
 
 export async function exportCurrentUserDriveDiscs(options = {}) {
@@ -441,7 +462,13 @@ export async function saveUserDriveDiscStoreUnlocked(store, options = {}) {
         ...normalizeInventoryStore(migratePersistedInventoryStore(store)),
         updatedAt: new Date().toISOString(),
     }
-    await writePersistedStore(nextStore, options)
+    inventoryWriteRevision += 1
+    try {
+        await writePersistedStore(nextStore, options)
+    } finally {
+        // Invalidate reads overlapping a write, including failed transactions.
+        inventoryWriteRevision += 1
+    }
     return nextStore
 }
 

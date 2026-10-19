@@ -120,7 +120,11 @@ const themeOverrides: GlobalThemeOverrides = {
         <main class="app-main">
           <NAlert v-if="props.startupError" type="error" :title="props.startupError" />
           <NAlert v-if="enkaImportDisabledNotice" type="warning" title="展柜数据导入当前未启用。" />
-          <RouterView v-if="!props.startupError" />
+          <RouterView v-if="!props.startupError" v-slot="{ Component }">
+            <KeepAlive include="DiscsView" :max="1">
+              <component :is="Component" :key="route.name === 'discs' ? `discs:${accountStore.currentOwnerId}` : route.name" />
+            </KeepAlive>
+          </RouterView>
         </main>
         <footer class="site-footer">
           <a
