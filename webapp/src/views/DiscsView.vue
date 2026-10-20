@@ -34,7 +34,8 @@ const pageActive = ref(true)
 const route = inject(routeLocationKey, null)
 const message = useMessage()
 const { page: discPage, pageSize: discPageSize, pagedItems: pagedDiscs } = useDriveDiscPagination(computed(() => inventoryStore.filteredDriveDiscs), 5)
-const presetAgentId = ref<string | null>(null)
+const ALL_PRESET_AGENTS = "__all__"
+const presetAgentId = ref<string>(ALL_PRESET_AGENTS)
 const presetAgentOptions = computed(() => {
   const counts = new Map<string, number>()
   for (const loadout of inventoryStore.loadouts) {
@@ -42,15 +43,19 @@ const presetAgentOptions = computed(() => {
     counts.set(id, (counts.get(id) ?? 0) + 1)
   }
   // Include unknown and unassigned agents so existing presets remain accessible.
-  return Array.from(counts, ([value, count]) => ({ value, label: `${agentName(value)}（${count} 套）` }))
+  return [
+    { value: ALL_PRESET_AGENTS, label: `全部角色（${inventoryStore.loadouts.length} 套）` },
+    ...Array.from(counts, ([value, count]) => ({ value, label: `${agentName(value)}（${count} 套）` })),
+  ]
 })
 watch(presetAgentOptions, options => {
   if (!options.some(option => option.value === presetAgentId.value)) {
-    presetAgentId.value = options[0]?.value ?? null
+    presetAgentId.value = ALL_PRESET_AGENTS
   }
 }, { immediate: true, flush: "sync" })
 const visibleLoadouts = computed(() => inventoryStore.loadouts.filter(
-  (loadout: any) => String(loadout.agentId ?? "") === presetAgentId.value,
+  (loadout: any) => presetAgentId.value === ALL_PRESET_AGENTS
+    || String(loadout.agentId ?? "") === presetAgentId.value,
 ))
 const reservationUiEnabled = computed(() => appConfigStore.driveDiscReservationsUiEnabled)
 const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfigStore.driveDiscExclusionsUiEnabled)
@@ -842,11 +847,12 @@ async function deleteSelectedDisc() {
 }
 
 function openNewLoadout() {
+  const selectedAgentId = presetAgentId.value === ALL_PRESET_AGENTS ? "" : presetAgentId.value
   loadoutIsNew.value = true
   loadoutDraft.value = {
     id: `loadout-${Date.now()}`,
     name: "未命名套装",
-    agentId: presetAgentId.value ?? catalogStore.agents[0]?.id ?? "",
+    agentId: selectedAgentId || catalogStore.agents[0]?.id || "",
     driveDiscIdsBySlot: {},
   }
   activeLoadoutDiscSlot.value = 0
