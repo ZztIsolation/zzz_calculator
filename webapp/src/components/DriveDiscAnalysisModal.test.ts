@@ -147,6 +147,30 @@ describe("DriveDiscAnalysisModal", () => {
     expect(wrapper.text()).toContain("第1条边际收益")
   })
 
+  it("ranks substat gains as bars with only the best value labelled", async () => {
+    vi.mocked(analyzeDriveDiscStatDiffs).mockReturnValueOnce({
+      ...vi.mocked(analyzeDriveDiscStatDiffs).getMockImplementation()!(),
+      substatDiffs: [
+        { stat: "atkPct", mode: "pct", currentValue: 3, addedValue: 3, absoluteDiff: 30, relativeDiff: 0.03 },
+        { stat: "critDmg", mode: "pct", currentValue: 4.8, addedValue: 4.8, absoluteDiff: 150, relativeDiff: 0.15 },
+        { stat: "critRate", mode: "pct", currentValue: 4.8, addedValue: 2.4, absoluteDiff: -5, relativeDiff: -0.005 },
+        { stat: "atkFlat", mode: "flat", currentValue: 19, addedValue: 19, absoluteDiff: 10, relativeDiff: 0.01 },
+      ],
+    } as any)
+    const wrapper = mountModal()
+    await flushPromises()
+
+    const rows = wrapper.findAll("[data-testid='substat-gain-bars'] .gain-bar-row")
+    // 攻击力百分比与固定值同名时补上区分
+    expect(rows.map(row => row.get(".gain-bar-name").text())).toEqual(["暴击伤害", "攻击力%", "攻击力（固定）", "暴击率"])
+    expect(rows.map(row => row.classes().includes("is-best"))).toEqual([true, false, false, false])
+    expect(rows.map(row => (row.get(".gain-bar-fill").element as HTMLElement).style.width)).toEqual(["100%", "20%", "6.666666666666667%", "0%"])
+    expect(rows[0]!.attributes("aria-label")).toBe("暴击伤害：伤害 +150（+15%）")
+    expect(rows[0]!.attributes("tabindex")).toBe("0")
+    // 精确数值仍保留在下方表格
+    expect(wrapper.find(".analysis-table").exists()).toBe(true)
+  })
+
   it("keeps automatic analysis refresh when the input changes", async () => {
     const wrapper = mountModal()
     await flushPromises()

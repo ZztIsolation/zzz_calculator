@@ -58,6 +58,26 @@ const gainModeTabs: Array<{ label: string, value: GainDisplayMode }> = [
 const driveDiscCount = computed(() => Array.isArray(props.input?.driveDiscs) ? props.input.driveDiscs.length : 0)
 const substatRows = computed(() => analysisData.value?.substats?.stats ?? [])
 const substatDiffRows = computed(() => analysisData.value?.diffs?.substatDiffs ?? [])
+// 条形图：按“新增一条”的伤害提升排序；没有提升的词条条长为 0
+const substatGainBars = computed(() => {
+  const rows = [...substatDiffRows.value]
+    .map((item: any) => ({ ...item, gain: Math.max(0, Number(item.relativeDiff) || 0) }))
+    .sort((left: any, right: any) => right.gain - left.gain || String(left.stat).localeCompare(String(right.stat), "zh-CN"))
+  const max = Math.max(0, ...rows.map((item: any) => item.gain))
+  // 百分比与固定值同名（如攻击力）时补上区分，条形图没有“当前值”列可供辨认
+  const nameCounts = new Map<string, number>()
+  for (const item of rows) nameCounts.set(statName(item.stat), (nameCounts.get(statName(item.stat)) ?? 0) + 1)
+  return rows.map((item: any, index: number) => {
+    const name = statName(item.stat)
+    const label = (nameCounts.get(name) ?? 0) > 1 ? `${name}${item.mode === "pct" ? "%" : "（固定）"}` : name
+    return {
+      ...item,
+      label,
+      best: index === 0 && item.gain > 0,
+      width: max > 0 ? `${(item.gain / max) * 100}%` : "0%",
+    }
+  })
+})
 const mainStatSlots = computed<any[]>(() => (Object.values(analysisData.value?.diffs?.mainStatDiffsBySlot ?? {}) as any[])
   .sort((left: any, right: any) => Number(left.slot) - Number(right.slot)))
 const replacementRows = computed(() => (analysisData.value?.diffs?.substatReplacements ?? [])
@@ -442,7 +462,26 @@ function lastPoint(item: any) {
         <section class="analysis-section">
           <h3>副词条差异计算</h3>
           <div v-if="!substatDiffRows.length" class="empty-state compact">当前伤害目标下没有可见的副词条边际收益。</div>
-          <div v-else class="analysis-table-wrap">
+          <figure v-if="substatGainBars.length" class="gain-bars" data-testid="substat-gain-bars">
+            <figcaption>每加一条副词条带来的伤害提升（悬停或聚焦查看数值，精确数值见下表）</figcaption>
+            <ol aria-label="每加一条副词条的伤害提升排名">
+              <li
+                v-for="item in substatGainBars"
+                :key="item.stat"
+                class="gain-bar-row"
+                :class="{ 'is-best': item.best }"
+                tabindex="0"
+                :aria-label="`${item.label}：伤害 ${signedNumberText(item.absoluteDiff)}（${signedPercentText(item.relativeDiff, 3)}）`"
+              >
+                <span class="gain-bar-name">{{ item.label }}</span>
+                <span class="gain-bar-track">
+                  <span class="gain-bar-fill" :style="{ width: item.width }"></span>
+                  <span class="gain-bar-value num">{{ signedPercentText(item.relativeDiff, 3) }}</span>
+                </span>
+              </li>
+            </ol>
+          </figure>
+          <div v-if="substatDiffRows.length" class="analysis-table-wrap">
             <table class="data-table analysis-table">
               <thead>
                 <tr>
@@ -549,6 +588,94 @@ function lastPoint(item: any) {
   gap: 10px 14px;
   color: var(--app-muted);
   font-size: 13px;
+}
+
+.gain-bars {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.gain-bars figcaption {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.gain-bars ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gain-bar-row {
+  display: grid;
+  grid-template-columns: minmax(64px, 120px) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  outline: none;
+}
+
+.gain-bar-row:hover,
+.gain-bar-row:focus-visible {
+  background: var(--app-panel-muted);
+}
+
+.gain-bar-row:focus-visible {
+  box-shadow: 0 0 0 3px rgba(47, 125, 246, 0.35);
+}
+
+.gain-bar-name {
+  min-width: 0;
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+/* 条从左侧基线长出：基线端方角、末端 4px 圆角，粗细 14px */
+.gain-bar-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 22px;
+  border-left: 1px solid var(--app-border-strong);
+}
+
+.gain-bar-fill {
+  flex: 0 0 auto;
+  height: 14px;
+  max-width: calc(100% - 72px);
+  border-radius: 0 4px 4px 0;
+  background: var(--app-blue);
+}
+
+/* 只给最大的一条常驻数值，其余在悬停或聚焦时显示 */
+.gain-bar-value {
+  flex: 0 0 auto;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.gain-bar-row.is-best .gain-bar-value,
+.gain-bar-row:hover .gain-bar-value,
+.gain-bar-row:focus-visible .gain-bar-value {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gain-bar-value {
+    transition: none;
+  }
 }
 
 .analysis-section {
