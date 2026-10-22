@@ -200,9 +200,18 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("workbench-section")
     expect(source).toContain("DamageWhiteBox")
     expect(source).toContain("PanelStatTable")
-    expect(source.match(/:important-stats="selectedAgent\?\.importantPanelStats"/g)).toHaveLength(2)
-    expect(source).toContain("damage-panel-grid")
-    expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));")
+    expect(source.match(/<PanelStatTable/g)).toHaveLength(1)
+    expect(source.match(/:important-stats="selectedAgent\?\.importantPanelStats"/g)).toHaveLength(1)
+    expect(source).toContain(':in-combat-panel="buildStore.result?.inCombat?.panel ?? null"')
+    expect(source).toContain("damage-panel-compare")
+    expect(source).not.toContain("damage-panel-grid")
+  })
+
+  it("offers one-click skill level presets that write all categories at once", () => {
+    expect(source).toContain('data-testid="skill-level-preset-12"')
+    expect(source).toContain('data-testid="skill-level-preset-max"')
+    expect(source).toContain("buildStore.updateSkillLevels(levels)")
+    expect(source).toContain(':aria-pressed="skillLevelPresetActive(12)"')
   })
 
   it("orders the right column as panel, damage summary, then white box", () => {
@@ -263,8 +272,8 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain(".calculation-event-summary-toggle:focus-visible")
   })
 
-  it("passes the rupture sheer-force flag to both panel tables", () => {
-    expect(source.match(/:include-sheer-force=\"selectedAgent\?\.specialty === 'rupture'\"/g)).toHaveLength(2)
+  it("passes the rupture sheer-force flag to the panel comparison table", () => {
+    expect(source.match(/:include-sheer-force=\"selectedAgent\?\.specialty === 'rupture'\"/g)).toHaveLength(1)
   })
 
   it("splits event management from optimizer configuration", () => {

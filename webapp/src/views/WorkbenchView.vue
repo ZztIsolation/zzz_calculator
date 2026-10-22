@@ -554,6 +554,25 @@ const skillLevelControls = computed(() => SKILL_CATEGORIES.map(categoryId => {
     summary: `${labelOf(firstMove)} · ${labelOf(firstRow)} · ${skillLevelLabel(category, value)}`,
   }
 }))
+// 每个类别取可选值中最接近目标的一档；“max”取最高档。
+function skillLevelPresetFor(control: { options: { value: any }[] }, target: number | "max") {
+  const values = control.options.map(option => Number(option.value)).filter(Number.isFinite)
+  if (!values.length) return null
+  if (target === "max") return Math.max(...values)
+  return values.reduce((best, value) => Math.abs(value - target) < Math.abs(best - target) ? value : best, values[0]!)
+}
+function skillLevelPresetActive(target: number | "max") {
+  const controls = skillLevelControls.value
+  return controls.length > 0 && controls.every(control => Number(control.value) === skillLevelPresetFor(control, target))
+}
+function applySkillLevelPreset(target: number | "max") {
+  const levels: Record<string, number> = {}
+  for (const control of skillLevelControls.value) {
+    const level = skillLevelPresetFor(control, target)
+    if (level !== null && Number(control.value) !== level) levels[control.id] = level
+  }
+  buildStore.updateSkillLevels(levels)
+}
 const damageEventSummary = computed(() => (buildStore.damageConfig.events ?? []).map((event: any) => {
   return {
     id: event.id,
@@ -1421,6 +1440,25 @@ function formatPercentValue(value: any) {
               <NSelect v-model:value="buildStore.coreSkillLevel" :options="coreSkillOptions" size="small" />
             </label>
           </div>
+          <div class="skill-level-presets" role="group" aria-label="技能等级快捷设置">
+            <span>技能等级</span>
+            <button
+              type="button"
+              class="skill-level-preset"
+              :class="{ active: skillLevelPresetActive(12) }"
+              :aria-pressed="skillLevelPresetActive(12)"
+              data-testid="skill-level-preset-12"
+              @click="applySkillLevelPreset(12)"
+            >全 Lv12</button>
+            <button
+              type="button"
+              class="skill-level-preset"
+              :class="{ active: skillLevelPresetActive('max') }"
+              :aria-pressed="skillLevelPresetActive('max')"
+              data-testid="skill-level-preset-max"
+              @click="applySkillLevelPreset('max')"
+            >全满级</button>
+          </div>
           <div class="build-skill-grid ui-field-grid" data-layout-surface="skill-level-fields">
             <label v-for="control in skillLevelControls" :key="control.id" class="compact-field ui-field" data-layout-field>
               <span>{{ control.label }}</span>
@@ -1837,25 +1875,14 @@ function formatPercentValue(value: any) {
               <p class="panel-subtitle">局外与局内对照</p>
             </div>
           </div>
-          <div class="workbench-section-body damage-panel-grid">
-            <div>
-              <h3>局外</h3>
-              <PanelStatTable
-                :panel="buildStore.outOfCombat?.panel"
-                :meta="catalogStore.meta"
-                :include-sheer-force="selectedAgent?.specialty === 'rupture'"
-                :important-stats="selectedAgent?.importantPanelStats"
-              />
-            </div>
-            <div>
-              <h3>局内</h3>
-              <PanelStatTable
-                :panel="buildStore.result?.inCombat?.panel"
-                :meta="catalogStore.meta"
-                :include-sheer-force="selectedAgent?.specialty === 'rupture'"
-                :important-stats="selectedAgent?.importantPanelStats"
-              />
-            </div>
+          <div class="workbench-section-body damage-panel-compare">
+            <PanelStatTable
+              :panel="buildStore.outOfCombat?.panel"
+              :in-combat-panel="buildStore.result?.inCombat?.panel ?? null"
+              :meta="catalogStore.meta"
+              :include-sheer-force="selectedAgent?.specialty === 'rupture'"
+              :important-stats="selectedAgent?.importantPanelStats"
+            />
           </div>
         </section>
         <DamageSummaryBar class="workbench-summary-section" :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
@@ -2322,6 +2349,51 @@ function formatPercentValue(value: any) {
 
 .workbench-left .compact-field {
   gap: 4px;
+}
+
+.skill-level-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.skill-level-presets > span {
+  flex: 1 1 auto;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.skill-level-preset {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 999px;
+  background: var(--app-panel);
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.skill-level-preset:hover {
+  border-color: var(--app-blue);
+  color: var(--app-blue-strong);
+}
+
+.skill-level-preset.active {
+  border-color: var(--app-blue-line);
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+}
+
+.skill-level-preset:focus-visible {
+  outline: var(--app-focus-ring);
+  outline-offset: 2px;
 }
 
 .workbench-left .prominent-config-button {
@@ -3134,26 +3206,14 @@ function formatPercentValue(value: any) {
   overflow-wrap: anywhere;
 }
 
-.damage-panel-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+.damage-panel-compare {
+  min-width: 0;
+  overflow-x: auto;
   padding: 10px 12px 12px;
 }
 
 .damage-panel-card > .panel-header {
   padding: 10px 12px;
-}
-
-.damage-panel-grid > div {
-  min-width: 0;
-}
-
-.damage-panel-grid h3 {
-  margin: 0 0 6px;
-  color: var(--app-muted);
-  font-size: 12px;
-  line-height: 1.2;
 }
 
 .damage-panel-card :deep(.data-table) {
@@ -3751,10 +3811,6 @@ function formatPercentValue(value: any) {
   .scheme-reservation-conflict-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
-  }
-
-  .damage-panel-grid {
-    grid-template-columns: 1fr;
   }
 
   .optimizer-result-disc-row {
