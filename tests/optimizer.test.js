@@ -1308,6 +1308,21 @@ const explicitOverridesPreferred = optimizeDriveDiscs(preferredCatalog, store, o
 assert.ok(explicitOverridesPreferred.results.length > 0)
 assert.ok(explicitOverridesPreferred.results.every(result => result.driveDiscs.find(disc => disc.partition === 4).mainStat.stat === "atkPct"))
 
+// Empty is a player choice; only an omitted slot inherits a recommendation.
+for (const algorithm of ["exact-legacy", "exact-super-bound"]) {
+    const input = optimizerInput({ settings: { algorithm, mainStatLimits: { 4: [] } } })
+    const cleared = optimizeDriveDiscs(preferredCatalog, store, input)
+    const unrestricted = optimizeDriveDiscs(catalog, store, input)
+    assert.deepEqual(cleared.settings.mainStatLimits["4"], [])
+    assert.deepEqual(cleared.settings.appliedPreferredMainStatLimits["4"], [])
+    assert.deepEqual(cleared.results.map(row => [row.driveDiscs.map(disc => disc.id), row.score]),
+        unrestricted.results.map(row => [row.driveDiscs.map(disc => disc.id), row.score]))
+    assert.ok(cleared.metrics.candidateCountsBySlot["4"] > preferredLimited.metrics.candidateCountsBySlot["4"])
+    const asyncCleared = await optimizeDriveDiscsAsync(preferredCatalog, store, input)
+    assert.deepEqual(asyncCleared.results.map(row => [row.driveDiscs.map(disc => disc.id), row.score]),
+        cleared.results.map(row => [row.driveDiscs.map(disc => disc.id), row.score]))
+}
+
 const preferredDefaultSetCatalog = {
     ...catalog,
     agents: catalog.agents.map(agent => agent.id === exampleInput.agentId

@@ -111,7 +111,7 @@ describe("optimizer store", () => {
     preferredDriveDiscs: { defaultSetIds: ["woodpecker_electro"], defaultTwoPieceSetIds: ["swing_jazz", "fanged_metal"] },
   }
 
-  it.each([[], ["woodpecker_electro"]])("replaces legacy two-piece settings once: %j", oldIds => {
+  it.each([{ oldIds: [] }, { oldIds: ["woodpecker_electro"] }])("preserves legacy two-piece settings while recording defaults version: $oldIds", ({ oldIds }) => {
     localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
       version: 4, currentAgentId: "agent_a", byAgent: {
         agent_a: { twoPieceSetIds: oldIds, fourPieceSetSource: "manual", fourPieceSetIds: ["fanged_metal"], minimums: { atk: 1234 }, minimumDefaultsVersion: 2 },
@@ -120,8 +120,8 @@ describe("optimizer store", () => {
     }))
     const store = useOptimizerStore()
     store.initialize(preferredCatalog, energyAgent)
-    expect(store.twoPieceSetIds).toEqual(["swing_jazz", "fanged_metal"])
-    expect(store.twoPieceSetSource).toBe("preferred")
+    expect(store.twoPieceSetIds).toEqual(oldIds)
+    expect(store.twoPieceSetSource).toBe("manual")
     expect(store.fourPieceSetIds).toEqual(["fanged_metal"])
     expect(store.minimums.atk).toBe(1234)
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1")!)
@@ -317,7 +317,7 @@ describe("optimizer store", () => {
     expect(store.twoPieceSetIds).toEqual([])
   })
 
-  it("uses the active agent preferred four-piece drive-disc set by default", () => {
+  it("preserves legacy four-piece choices without a source marker", () => {
     localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
       fourPieceSetId: "woodpecker_electro",
     }))
@@ -328,8 +328,8 @@ describe("optimizer store", () => {
       preferredDriveDiscs: { defaultSetId: "fanged_metal" },
     })
 
-    expect(store.fourPieceSetId).toBe("fanged_metal")
-    expect(store.inputWithSettings({ agentId: "agent_a" }).settings.fourPieceSetId).toBe("fanged_metal")
+    expect(store.fourPieceSetId).toBe("woodpecker_electro")
+    expect(store.inputWithSettings({ agentId: "agent_a" }).settings.fourPieceSetId).toBe("woodpecker_electro")
   })
 
   it("loads, persists, and submits multiple preferred four-piece sets", () => {
@@ -701,6 +701,29 @@ describe("optimizer store", () => {
       }],
     }), "default", "agent_a")).toBe(true)
     expect(worker.terminated).toBe(false)
+  })
+
+  it("marks results with an old constraint-semantics fingerprint as stale", async () => {
+    const store = useOptimizerStore()
+    store.initialize(catalog, preferredAgentA)
+    const runPromise = store.run(catalog, inventoryStore(), optimizerInput())
+    const worker = MockWorker.instances[0]
+    worker.emit({
+      type: "complete",
+      runId: worker.messages[0].runId,
+      result: {
+        settings: store.settings,
+        metrics: {},
+        results: [{ rank: 1, score: 200, driveDiscs: [] }],
+      },
+    })
+    await runPromise
+    expect(store.resultsAreStale).toBe(false)
+
+    const legacyFingerprint = JSON.parse(store.completedSettingsFingerprint)
+    delete legacyFingerprint.constraintSemanticsVersion
+    store.completedSettingsFingerprint = JSON.stringify(legacyFingerprint)
+    expect(store.resultsAreStale).toBe(true)
   })
 
   it("tracks calculation input changes from the last successful run", async () => {
