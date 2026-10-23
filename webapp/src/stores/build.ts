@@ -1386,6 +1386,22 @@ export const useBuildStore = defineStore("build", {
       }
       this.persist()
     },
+    /** 一次设置多个技能类别的等级，只持久化一次 */
+    updateSkillLevels(levels: Record<string, any>) {
+      if (!Object.keys(levels).length) return
+      this.skillLevels = {
+        ...this.skillLevels,
+        ...levels,
+      }
+      this.damageConfig = {
+        ...this.damageConfig,
+        skillLevelsByCategory: {
+          ...(this.damageConfig.skillLevelsByCategory ?? {}),
+          ...levels,
+        },
+      }
+      this.persist()
+    },
     setDamageConfig(config: any, agent: any = null) {
       const hasTargetConfig = Object.prototype.hasOwnProperty.call(config ?? {}, "target")
         || Object.prototype.hasOwnProperty.call(config ?? {}, "targetConfig")

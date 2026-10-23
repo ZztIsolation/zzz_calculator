@@ -366,6 +366,7 @@ describe("DiscsView", () => {
     expect(toolbarButtons.map(item => item.text().trim())).toEqual([
       "新增单个",
       "刷新",
+      "撤销上次导入",
       "批量导入",
       "批量导出",
       "扫描",

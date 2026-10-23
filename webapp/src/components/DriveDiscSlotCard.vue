@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { NButton, NTag } from "naive-ui"
-import { Ban, LockKeyhole } from "lucide-vue-next"
+import { Ban, LockKeyhole, Plus } from "lucide-vue-next"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
@@ -161,6 +161,12 @@ function isImportantSubStat(stat: any) {
   return Boolean(key) && importantSubStatKeys.value.has(key)
 }
 
+// 角色配置了重要副词条时，其余副词条弱化显示
+function isMinorSubStat(stat: any) {
+  return importantSubStatKeys.value.size > 0 && !isImportantSubStat(stat)
+}
+
+const showAddPlaceholder = computed(() => !props.disc && !props.missingReference && props.interactive)
 function choose() {
   if (props.interactive) emit("select", props.slot)
 }
@@ -199,7 +205,8 @@ function toggleExclusion() {
     @keydown.space.prevent="choose"
   >
     <span class="disc-slot-card-icon">
-      <img :src="disc ? thumbnailForDriveDiscSet(driveDiscSet) : fallbackIcon" alt="" loading="lazy" decoding="async">
+      <span v-if="showAddPlaceholder" class="disc-slot-card-add" aria-hidden="true"><Plus :size="22" /></span>
+      <img v-else :src="disc ? thumbnailForDriveDiscSet(driveDiscSet) : fallbackIcon" alt="" loading="lazy" decoding="async">
     </span>
     <div class="disc-slot-card-copy">
       <strong>{{ title }}</strong>
@@ -212,7 +219,7 @@ function toggleExclusion() {
           v-for="(stat, index) in verticalSubStats"
           :key="`${String(stat?.stat ?? 'unknown')}-${String(stat?.mode ?? '')}-${index}`"
           class="disc-slot-card-stat-row disc-slot-card-sub-stat"
-          :class="{ 'disc-slot-card-sub-stat-important': isImportantSubStat(stat) }"
+          :class="{ 'disc-slot-card-sub-stat-important': isImportantSubStat(stat), 'disc-slot-card-sub-stat-minor': isMinorSubStat(stat) }"
         >
           <dt>
             {{ statLabel(stat) }}
@@ -296,8 +303,50 @@ function toggleExclusion() {
   background: var(--app-panel);
 }
 
+.disc-slot-card {
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 空槽位用虚线框，与已装备的实线卡片区分 */
 .disc-slot-card-empty {
+  border-style: dashed;
+  border-color: var(--app-border-strong);
   background: var(--app-panel-muted);
+}
+
+.disc-slot-card-empty .disc-slot-card-copy strong {
+  color: var(--app-text-secondary, #334155);
+}
+
+.disc-slot-card-add {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px dashed var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-panel);
+  color: var(--app-muted);
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.disc-slot-card-manual:hover .disc-slot-card-add,
+.disc-slot-card-manual:focus-visible .disc-slot-card-add {
+  border-color: var(--app-blue, #2f7df6);
+  background: var(--app-blue-soft, #edf4ff);
+  color: var(--app-blue-strong, #1d5fd6);
+}
+
+.disc-slot-card-sub-stat-minor dt,
+.disc-slot-card-sub-stat-minor dd {
+  color: var(--app-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disc-slot-card,
+  .disc-slot-card-add {
+    transition: none;
+  }
 }
 
 .disc-slot-card-missing,

@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { NAlert, NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NTag, useMessage } from "naive-ui"
-import { Ban, CheckSquare, ChevronDown, ChevronUp, LineChart, LockKeyhole, UnlockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
+import { NAlert, NButton, NInput, NInputNumber, NModal, NSelect, NTag, useMessage } from "naive-ui"
+import { Ban, CheckSquare, LineChart, LockKeyhole, UnlockKeyhole, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
-import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
-import DamageWhiteBox from "@/components/DamageWhiteBox.vue"
 import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
 import DriveDiscPagination from "@/components/DriveDiscPagination.vue"
+import ExpandToggle from "@/components/ExpandToggle.vue"
 import { useDriveDiscPagination } from "@/utils/driveDiscPagination"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
@@ -17,8 +16,11 @@ import ImageAvatar from "@/components/ImageAvatar.vue"
 import LuminescenceParameterFields from "@/components/LuminescenceParameterFields.vue"
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
-import PanelStatTable from "@/components/PanelStatTable.vue"
+import OptimizerSetChoiceModal from "@/components/workbench/OptimizerSetChoiceModal.vue"
+import WorkbenchSegmentedControl from "@/components/workbench/WorkbenchSegmentedControl.vue"
+import WorkbenchResultColumn from "@/components/workbench/WorkbenchResultColumn.vue"
 import WEngineSelect from "@/components/WEngineSelect.vue"
+import { groupActiveBuffs } from "@/utils/activeBuffGroups"
 import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { buffLabelForId, teammateBuffCandidates } from "@/utils/combatBuffs"
 import { inferBuffPickerState, selectedTeammateOwnerIds } from '@/utils/teammateBuffPicker'
@@ -69,10 +71,32 @@ const openingBuffPicker = ref(false)
 const buffContextReady = ref(false)
 const buffContextError = ref('')
 const buffPickerResetNotice = ref("")
+const BUFF_SECTION_STORAGE_KEY = "zzz-workbench-buff-expanded"
+const buffSectionExpanded = ref(false)
+function restoreBuffSectionState() {
+  try {
+    buffSectionExpanded.value = window.localStorage.getItem(BUFF_SECTION_STORAGE_KEY) === "true"
+  } catch {
+    buffSectionExpanded.value = false
+  }
+}
+watch(buffSectionExpanded, expanded => {
+  try {
+    window.localStorage.setItem(BUFF_SECTION_STORAGE_KEY, String(expanded))
+  } catch {
+    // 隐私模式或禁用存储时保持当前会话状态即可。
+  }
+})
 const teammateSources = ref<TeammateSources>()
 let buffSession: { context: Awaited<ReturnType<typeof readTeammateSources>>, state: string, agentId: string } | null = null
 let disposed = false
-onBeforeUnmount(() => { disposed = true })
+let optimizationRequest = 0
+function invalidateOptimization() {
+  optimizationRequest++
+  optimizerStore.reset()
+}
+watch(() => [accountStore.currentOwnerId, buildStore.agentId], invalidateOptimization, { flush: "sync" })
+onBeforeUnmount(() => { disposed = true; invalidateOptimization() })
 
 function currentBuffPayload() {
   return { selectedBuffIds: buildStore.activeBuffIds(catalogStore.meta), addedBuffs: buildStore.addedBuffs,
@@ -129,8 +153,9 @@ const showSchemeReservationConflict = ref(false)
 const schemeReservationConflicts = ref<any[]>([])
 const pendingSchemeReservation = ref<any | null>(null)
 const schemeReservationBusy = ref(false)
-const draftFourPieceSetIds = ref<string[]>([])
-const draftTwoPieceSetIds = ref<string[]>([])
+// 套装选择弹窗打开时的草稿初始值；草稿本身由弹窗组件管理。
+const fourPieceSetModalInitialIds = ref<string[]>([])
+const twoPieceSetModalInitialIds = ref<string[]>([])
 const activeManualDiscSlot = ref(0)
 const manualDiscSetFilterIds = ref<string[]>([])
 const manualDiscMainStatFilter = ref("")
@@ -176,6 +201,7 @@ async function loadWorkbench(initial = false) {
       optimizerStore.setFourPieceSets([catalogStore.displayDriveDiscSets[0]?.id ?? ""].filter(Boolean))
     }
     recalculate()
+    restoreOptimizerResults()
     await refreshAutomaticTeammates()
     await nextTick()
     if (disposed || sequence !== loadSequence || ownerId !== accountStore.currentOwnerId) return
@@ -186,7 +212,36 @@ async function loadWorkbench(initial = false) {
   }
 }
 onMounted(() => loadWorkbench(true))
+onMounted(restoreBuffSectionState)
 watch(() => accountStore.currentOwnerId, () => loadWorkbench())
+
+// 优化结果只在内存里，刷新或切换角色后会丢失；这里从本地恢复该角色上次的结果。
+// 恢复不到却仍停在“优化结果”时，回到“自选”并提示，避免显示一个空方案。
+const optimizedResultsExpired = ref(false)
+function restoreOptimizerResults() {
+  if (!catalogStore.catalog || !inventoryStore.store || optimizerStore.isBusy) return
+  const ownerId = String(inventoryStore.store?.currentOwnerId ?? accountStore.currentOwnerId ?? "default")
+  const restored = optimizerStore.restoreSavedResults(ownerId, buildStore.agentId, inventoryStore.driveDiscs)
+  if (restored || optimizerStore.resultSchemes.length) {
+    optimizedResultsExpired.value = false
+    return
+  }
+  if (buildStore.discMode === "optimized") {
+    buildStore.setDiscMode("manual")
+    optimizedResultsExpired.value = true
+  }
+}
+watch(() => buildStore.agentId, (agentId, previousAgentId) => {
+  // 加载时角色从空值初始化不算切换，不能清掉刚出现的“已失效”提示
+  if (previousAgentId && previousAgentId !== agentId) optimizedResultsExpired.value = false
+  void nextTick(restoreOptimizerResults)
+})
+const restoredResultsTimeText = computed(() => {
+  const savedAt = optimizerStore.restoredResultsSavedAt
+  const date = savedAt ? new Date(savedAt) : null
+  if (!date || Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date)
+})
 
 const selectedAgent = computed(() => catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId))
 const selectedWEngine = computed(() => catalogStore.displayWEngines.find((item: any) => item.id === buildStore.wEngineId))
@@ -279,11 +334,6 @@ const optimizedResultSetIsUserPinned = computed(() => {
   const id = selectedOptimizedScheme.value?.fourPieceSetId
   return !!id && optimizerStore.fourPieceSetIds.includes(id)
 })
-const draftFourPieceSets = computed(() => draftFourPieceSetIds.value
-  .map(id => catalogStore.displayDriveDiscSets.find((set: any) => set.id === id))
-  .filter(Boolean))
-const fourPieceDraftUnchanged = computed(() => [...draftFourPieceSetIds.value].sort().join("|")
-  === [...optimizerStore.fourPieceSetIds].sort().join("|"))
 const selectedTwoPieceSets = computed(() => optimizerStore.twoPieceSetIds
   .map(id => catalogStore.displayDriveDiscSets.find((set: any) => set.id === id))
   .filter(Boolean))
@@ -318,11 +368,6 @@ const mainStatOptionsBySlot = computed(() => {
     return [String(slot), pool.map((stat: string) => ({ label: statLabel(stat, catalogStore.meta), value: stat }))]
   }))
 })
-const draftTwoPieceSetSummary = computed(() => {
-  const count = draftTwoPieceSetIds.value.length
-  return count ? `已选择 ${count} 个额外 2 件套` : "自动匹配任意 2 件套"
-})
-const twoPieceDraftUnchanged = computed(() => [...draftTwoPieceSetIds.value].sort().join("|") === [...optimizerStore.twoPieceSetIds].sort().join("|"))
 const topOptimizedResultSchemes = computed(() => optimizerStore.resultSchemes.slice(0, OPTIMIZED_RESULT_LIMIT))
 const isLuminescenceScore = computed(() => ["luminescenceTeamScore", "luminescenceScore"]
   .includes(String(buildStore.result?.damage?.objectiveKind ?? "")))
@@ -486,7 +531,7 @@ const canSaveCurrentScheme = computed(() => {
     return selectedDriveDiscs.value.length > 0
   }
   if (buildStore.discMode === "optimized") {
-    return Boolean(selectedOptimizedScheme.value?.driveDiscs?.length)
+    return !optimizerStore.resultsAreProvisional && Boolean(selectedOptimizedScheme.value?.driveDiscs?.length)
   }
   return false
 })
@@ -554,16 +599,37 @@ const skillLevelControls = computed(() => SKILL_CATEGORIES.map(categoryId => {
     summary: `${labelOf(firstMove)} · ${labelOf(firstRow)} · ${skillLevelLabel(category, value)}`,
   }
 }))
+// 每个类别取可选值中最接近目标的一档；“max”取最高档。
+function skillLevelPresetFor(control: { options: { value: any }[] }, target: number | "max") {
+  const values = control.options.map(option => Number(option.value)).filter(Number.isFinite)
+  if (!values.length) return null
+  if (target === "max") return Math.max(...values)
+  return values.reduce((best, value) => Math.abs(value - target) < Math.abs(best - target) ? value : best, values[0]!)
+}
+function skillLevelPresetActive(target: number | "max") {
+  const controls = skillLevelControls.value
+  return controls.length > 0 && controls.every(control => Number(control.value) === skillLevelPresetFor(control, target))
+}
+function applySkillLevelPreset(target: number | "max") {
+  const levels: Record<string, number> = {}
+  for (const control of skillLevelControls.value) {
+    const level = skillLevelPresetFor(control, target)
+    if (level !== null && Number(control.value) !== level) levels[control.id] = level
+  }
+  buildStore.updateSkillLevels(levels)
+}
+// 事件摘要拆成“名称 + 次数”两列显示；标题文字末尾的“×N”就是次数。默认全部收起，只显示总数。
 const damageEventSummary = computed(() => (buildStore.damageConfig.events ?? []).map((event: any) => {
+  const label = damageEventSummaryTitle(event, catalogStore.meta, selectedSkillCatalog.value)
+  const match = /^(.*?)\s*×\s*([\d.]+)$/.exec(label)
   return {
     id: event.id,
-    label: damageEventSummaryTitle(event, catalogStore.meta, selectedSkillCatalog.value),
+    label,
+    name: match ? match[1] : label,
+    count: match ? match[2] : "",
   }
 }))
-const visibleDamageEventSummary = computed(() => showAllDamageEvents.value
-  ? damageEventSummary.value
-  : damageEventSummary.value.slice(0, 2))
-const hiddenDamageEventCount = computed(() => Math.max(0, damageEventSummary.value.length - 2))
+const visibleDamageEventSummary = computed(() => showAllDamageEvents.value ? damageEventSummary.value : [])
 const damageEventSummarySignature = computed(() => [
   buildStore.agentId,
   buildStore.damageConfig.mode,
@@ -618,6 +684,7 @@ const activeBuffBadges = computed(() => activeBuffIdsForPanel.value.map(id => ({
     addedBuffs: buildStore.addedBuffs,
   }),
 })))
+const activeBuffGroups = computed(() => groupActiveBuffs(activeBuffBadges.value))
 const customAddedBuffCount = computed(() => buildStore.addedBuffs
   .filter((buff: any) => buff?.sourceKind === "custom").length)
 const optimizerProgress = computed(() => optimizerStore.progress ?? null)
@@ -656,7 +723,9 @@ const optimizerStatusSummary = computed(() => {
     return optimizerPrepareStageLabel.value || "正在准备候选数据"
   }
   if (["preview", "running"].includes(optimizerUiStatus.value)) {
-    return "正在优化"
+    return optimizerStore.resultsAreProvisional
+      ? `正在优化 · 已找到 ${optimizerStore.resultSchemes.length} 套临时方案`
+      : "正在优化"
   }
   if (optimizerUiStatus.value === "cancelling") {
     return "正在取消优化"
@@ -768,6 +837,17 @@ const buildSignature = computed(() => JSON.stringify({
 
 watch(buildSignature, () => recalculate())
 
+// 结果条的涨跌只比较同一角色、同一驱动盘方案下的参数调整；
+// 切换角色、方案来源、已有套装、优化结果第几套，或优化过程中结果刷新时只重置基准。
+// 自选模式下手动换盘属于参数调整，仍显示涨跌。
+const summaryContextKey = computed(() => {
+  const mode = buildStore.discMode
+  const scheme = mode === "manual"
+    ? ""
+    : selectedDriveDiscs.value.map((disc: any) => disc.id).join(",")
+  return `${buildStore.agentId}|${mode}|${scheme}`
+})
+
 function recalculate() {
   buildStore.calculate(catalogStore.catalog, catalogStore.meta, selectedDriveDiscs.value, selectedBuildOptions.value)
 }
@@ -875,7 +955,18 @@ function optimizerInput(ownerId = inventoryStore.store?.currentOwnerId ?? accoun
 }
 
 async function runOptimization() {
-  await inventoryStore.load()
+  const request = ++optimizationRequest
+  const requestedOwnerId = accountStore.currentOwnerId
+  const requestedAgentId = buildStore.agentId
+  const isCurrent = () => !disposed && request === optimizationRequest
+    && requestedOwnerId === accountStore.currentOwnerId && requestedAgentId === buildStore.agentId
+  try {
+    await inventoryStore.load()
+  } catch (error) {
+    if (isCurrent()) optimizerStore.failBeforeRun(error instanceof Error ? error.message : String(error), optimizerStore.settings)
+    return
+  }
+  if (!isCurrent()) return
   const ownerId = inventoryStore.store?.currentOwnerId ?? accountStore.currentOwnerId ?? "default"
   const owner = (inventoryStore.store?.owners ?? accountStore.owners ?? []).find((item: any) => item.id === ownerId)
   if (!luminescenceParametersValid.value) {
@@ -903,7 +994,7 @@ async function runOptimization() {
     return
   }
   await optimizerStore.run(catalogStore.catalog, inventoryStore.store, input)
-  if (optimizerStore.resultSchemes[0]) {
+  if (isCurrent() && optimizerStore.status === "done" && optimizerStore.resultSchemes[0]) {
     buildStore.selectOptimizedRank(Number(optimizerStore.resultSchemes[0].rank))
   }
 }
@@ -1296,49 +1387,24 @@ function twoPieceSetEffectText(set: any) {
 }
 
 function openFourPieceSetModal() {
-  draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length
+  fourPieceSetModalInitialIds.value = optimizerStore.fourPieceSetIds.length
     ? [...optimizerStore.fourPieceSetIds]
     : [optimizerSetChoices.value[0]?.id].filter(Boolean)
   showFourPieceSetModal.value = true
 }
 
-function applyFourPieceSetModalSelection() {
-  optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)
+function applyFourPieceSetModalSelection(ids: string[]) {
+  optimizerStore.setFourPieceSets(ids)
   showFourPieceSetModal.value = false
 }
 
-function draftHasFourPieceSet(id: string) {
-  return draftFourPieceSetIds.value.includes(id)
-}
-
-function toggleDraftFourPieceSet(id: string) {
-  const selected = new Set(draftFourPieceSetIds.value)
-  if (selected.has(id)) selected.delete(id)
-  else selected.add(id)
-  draftFourPieceSetIds.value = [...selected]
-}
-
 function openTwoPieceSetModal() {
-  draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]
+  twoPieceSetModalInitialIds.value = [...optimizerStore.twoPieceSetIds]
   showTwoPieceSetModal.value = true
 }
 
-function draftHasTwoPieceSet(id: string) {
-  return draftTwoPieceSetIds.value.includes(id)
-}
-
-function toggleDraftTwoPieceSet(id: string) {
-  const selected = new Set(draftTwoPieceSetIds.value)
-  if (selected.has(id)) {
-    selected.delete(id)
-  } else {
-    selected.add(id)
-  }
-  draftTwoPieceSetIds.value = [...selected]
-}
-
-function applyTwoPieceSetModalSelection() {
-  optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)
+function applyTwoPieceSetModalSelection(ids: string[]) {
+  optimizerStore.setTwoPieceSetIds(ids)
   showTwoPieceSetModal.value = false
 }
 
@@ -1421,6 +1487,25 @@ function formatPercentValue(value: any) {
               <NSelect v-model:value="buildStore.coreSkillLevel" :options="coreSkillOptions" size="small" />
             </label>
           </div>
+          <div class="skill-level-presets" role="group" aria-label="技能等级快捷设置">
+            <span>技能等级</span>
+            <button
+              type="button"
+              class="skill-level-preset"
+              :class="{ active: skillLevelPresetActive(12) }"
+              :aria-pressed="skillLevelPresetActive(12)"
+              data-testid="skill-level-preset-12"
+              @click="applySkillLevelPreset(12)"
+            >全 Lv12</button>
+            <button
+              type="button"
+              class="skill-level-preset"
+              :class="{ active: skillLevelPresetActive('max') }"
+              :aria-pressed="skillLevelPresetActive('max')"
+              data-testid="skill-level-preset-max"
+              @click="applySkillLevelPreset('max')"
+            >全满级</button>
+          </div>
           <div class="build-skill-grid ui-field-grid" data-layout-surface="skill-level-fields">
             <label v-for="control in skillLevelControls" :key="control.id" class="compact-field ui-field" data-layout-field>
               <span>{{ control.label }}</span>
@@ -1463,22 +1548,40 @@ function formatPercentValue(value: any) {
 
       <section class="workbench-section workbench-buff-section">
         <div class="panel-header workbench-section-header">
-          <h2 class="panel-title">局内 Buff</h2>
+          <div class="workbench-buff-title">
+            <h2 class="panel-title">局内 Buff</h2>
+            <!-- 已启用数量用小徽标显示，窄栏里不会被截断 -->
+            <span class="workbench-count-badge" :class="{ 'is-empty': !activeBuffIdsForPanel.length }" data-testid="workbench-buff-count" :title="`已启用 ${activeBuffIdsForPanel.length} 个 Buff`">{{ activeBuffIdsForPanel.length }}</span>
+            <ExpandToggle
+              class="workbench-collapse-button"
+              data-testid="toggle-workbench-buff"
+              :expanded="buffSectionExpanded"
+              aria-controls="workbench-buff-content"
+              :aria-label="buffSectionExpanded ? '收起局内 Buff' : '展开局内 Buff'"
+              @toggle="buffSectionExpanded = !buffSectionExpanded"
+            />
+          </div>
           <NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker" :loading="openingBuffPicker" :disabled="openingBuffPicker || !buffContextReady" @click="openBuffPicker">
             <template #icon><SlidersHorizontal :size="16" /></template>
             选择 Buff
           </NButton>
         </div>
-        <div class="workbench-section-body section-band">
+        <div id="workbench-buff-content" class="workbench-section-body section-band" :hidden="!buffSectionExpanded && !buffContextError">
           <p v-if="buffContextError" role="alert">
             {{ buffContextError }}
             <NButton size="small" @click="loadWorkbench()">重新加载队友资料</NButton>
           </p>
-          <div class="chip-row workbench-buff-tags">
-            <NTag v-for="item in activeBuffBadges" :key="item.id" size="small" round>{{ item.label }}</NTag>
-            <NTag v-if="!activeBuffIdsForPanel.length" size="small" round>未启用 Buff</NTag>
+          <!-- 按来源分组：同一位代理人的 Buff 放一组，组内只写“核心被动 / 影画一…” -->
+          <div v-if="buffSectionExpanded" class="workbench-buff-groups workbench-buff-tags">
+            <div v-for="group in activeBuffGroups" :key="group.key" class="workbench-buff-group">
+              <span class="workbench-buff-group-title">{{ group.title }}</span>
+              <div class="workbench-buff-group-items">
+                <span v-for="item in group.items" :key="item.id" class="workbench-buff-chip" :title="item.title">{{ item.label }}</span>
+              </div>
+            </div>
+            <p v-if="!activeBuffIdsForPanel.length" class="workbench-buff-empty">未启用 Buff</p>
           </div>
-          <NTag v-if="customAddedBuffCount" type="info" size="small" round>自定义 {{ customAddedBuffCount }} 条</NTag>
+          <NTag v-if="buffSectionExpanded && customAddedBuffCount" type="info" size="small" round>自定义 {{ customAddedBuffCount }} 条</NTag>
         </div>
       </section>
 
@@ -1509,57 +1612,40 @@ function formatPercentValue(value: any) {
           </section>
           <div v-if="activeLuminescenceEvent" id="calculation-event-summary-list" class="calculation-luminescence-summary" data-layout-field>
             <strong>事件 {{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
-            <span aria-hidden="true">·</span>
+            <ExpandToggle
+              v-if="damageEventSummary.length"
+              class="calculation-event-summary-toggle"
+              data-testid="calculation-event-summary-toggle"
+              :expanded="showAllDamageEvents"
+              aria-controls="calculation-event-summary-list"
+              label="展开"
+              expanded-label="收起"
+              @toggle="showAllDamageEvents = !showAllDamageEvents"
+            />
             <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
-            <div
-              v-if="hiddenDamageEventCount > 0"
-              class="calculation-event-summary-toggle-row"
-            >
-              <NButton
-                class="calculation-event-summary-toggle"
-                text
-                size="small"
-                data-testid="calculation-event-summary-toggle"
-                :aria-expanded="showAllDamageEvents"
-                aria-controls="calculation-event-summary-list"
-                @click="showAllDamageEvents = !showAllDamageEvents"
-              >
-                <template #icon>
-                  <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
-                  <ChevronDown v-else :size="16" aria-hidden="true" />
-                </template>
-                {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
-              </NButton>
-            </div>
           </div>
           <div v-if="!activeLuminescenceEvent" class="metric calculation-event-summary" data-layout-field>
             <div class="calculation-event-summary-heading">
               <span class="metric-title">事件摘要</span>
               <strong class="calculation-event-count">{{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
+              <!-- 默认全部收起；开关在这一行，展开后位置不变 -->
+              <ExpandToggle
+                v-if="damageEventSummary.length"
+                class="calculation-event-summary-toggle"
+                data-testid="calculation-event-summary-toggle"
+                :expanded="showAllDamageEvents"
+                aria-controls="calculation-event-summary-list"
+                label="展开"
+                expanded-label="收起"
+                @toggle="showAllDamageEvents = !showAllDamageEvents"
+              />
             </div>
-            <div id="calculation-event-summary-list" class="chip-row calculation-event-summary-tags">
-              <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
-              <div
-                v-if="hiddenDamageEventCount > 0"
-                class="calculation-event-summary-toggle-row"
-              >
-                <NButton
-                  class="calculation-event-summary-toggle"
-                  text
-                  size="small"
-                  data-testid="calculation-event-summary-toggle"
-                  :aria-expanded="showAllDamageEvents"
-                  aria-controls="calculation-event-summary-list"
-                  @click="showAllDamageEvents = !showAllDamageEvents"
-                >
-                  <template #icon>
-                    <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
-                    <ChevronDown v-else :size="16" aria-hidden="true" />
-                  </template>
-                  {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
-                </NButton>
-              </div>
-            </div>
+            <ol v-show="showAllDamageEvents" id="calculation-event-summary-list" class="workbench-inset-list calculation-event-summary-tags">
+              <li v-for="event in visibleDamageEventSummary" :key="event.id" class="workbench-inset-row calculation-event-row">
+                <span class="workbench-inset-name" :title="event.label">{{ event.name }}</span>
+                <span v-if="event.count" class="workbench-inset-value num">×{{ event.count }}</span>
+              </li>
+            </ol>
           </div>
         </div>
       </section>
@@ -1685,21 +1771,13 @@ function formatPercentValue(value: any) {
         <div class="workbench-section-body section-band">
           <div class="drive-disc-source-row" role="group" aria-label="驱动盘方案来源">
             <span class="drive-disc-source-label">方案来源</span>
-            <NRadioGroup
+            <WorkbenchSegmentedControl
               class="drive-disc-source-options"
-              :value="buildStore.discMode"
+              :model-value="buildStore.discMode"
+              :options="driveDiscModeOptions.map(option => ({ ...option, disabled: option.value === 'optimized' && !optimizerStore.resultSchemes.length }))"
               aria-label="驱动盘方案来源"
-              @update:value="buildStore.setDiscMode(String($event) as any)"
-            >
-              <NRadioButton
-                v-for="option in driveDiscModeOptions"
-                :key="option.value"
-                :value="option.value"
-                :disabled="option.value === 'optimized' && !optimizerStore.resultSchemes.length"
-              >
-                {{ option.label }}
-              </NRadioButton>
-            </NRadioGroup>
+              @update:model-value="value => buildStore.setDiscMode(value as any)"
+            />
           </div>
           <div class="toolbar drive-disc-action-toolbar">
             <NButton size="small" :disabled="!canSaveCurrentScheme" @click="openSaveCurrentLoadout">
@@ -1717,6 +1795,31 @@ function formatPercentValue(value: any) {
               <span>{{ selectedDriveDiscs.length ? `${selectedDriveDiscs.length} 件驱动盘参与当前${isLuminescenceScore ? "评分" : "伤害"}计算` : "选择驱动盘后可查看词条分析" }}</span>
             </div>
           </div>
+
+          <NAlert
+            v-if="optimizedResultsExpired"
+            type="info"
+            :show-icon="false"
+            closable
+            data-testid="optimizer-results-expired-notice"
+            @close="optimizedResultsExpired = false"
+          >
+            上次的优化结果已失效（驱动盘有变化或尚未保存），已切换到“自选”。重新优化即可得到新方案。
+          </NAlert>
+          <p
+            v-if="buildStore.discMode === 'optimized' && restoredResultsTimeText"
+            class="restored-results-note"
+            data-testid="optimizer-restored-results-note"
+          >
+            正在查看 {{ restoredResultsTimeText }} 的上次优化结果，可直接使用，也可重新优化。
+          </p>
+
+          <NAlert v-if="optimizerStore.resultsAreProvisional" type="info" :show-icon="false" data-testid="optimizer-provisional-notice">
+            {{ optimizerStore.isBusy ? '搜索仍在进行' : '搜索未完成' }}，以下为当前已找到的方案，尚未确认最终最优。完整结果出来后可保存或锁定。
+            <NButton v-if="buildStore.discMode !== 'optimized'" text type="primary" @click="buildStore.selectOptimizedRank(1)">
+              查看当前方案
+            </NButton>
+          </NAlert>
 
           <div v-if="buildStore.discMode === 'loadout'" class="drive-disc-mode-control">
             <NSelect
@@ -1753,7 +1856,7 @@ function formatPercentValue(value: any) {
                 secondary
                 data-testid="lock-optimized-scheme"
                 :loading="schemeReservationBusy"
-                :disabled="!selectedSchemeCanBeLocked || schemeReservationBusy"
+                :disabled="optimizerStore.resultsAreProvisional || !selectedSchemeCanBeLocked || schemeReservationBusy"
                 :title="selectedSchemeIsLocked ? '解除当前方案六张盘对当前角色的专属锁定' : '将当前方案六张盘锁定给当前角色'"
                 @click="toggleSelectedSchemeReservation"
               >
@@ -1828,60 +1931,13 @@ function formatPercentValue(value: any) {
       </section>
     </main>
 
-    <aside class="workbench-right">
-      <div class="workbench-right-sticky workbench-surface">
-        <section class="workbench-section damage-panel-card">
-          <div class="panel-header workbench-section-header">
-            <div>
-              <h2 class="panel-title">面板</h2>
-              <p class="panel-subtitle">局外与局内对照</p>
-            </div>
-          </div>
-          <div class="workbench-section-body damage-panel-grid">
-            <div>
-              <h3>局外</h3>
-              <PanelStatTable
-                :panel="buildStore.outOfCombat?.panel"
-                :meta="catalogStore.meta"
-                :include-sheer-force="selectedAgent?.specialty === 'rupture'"
-                :important-stats="selectedAgent?.importantPanelStats"
-              />
-            </div>
-            <div>
-              <h3>局内</h3>
-              <PanelStatTable
-                :panel="buildStore.result?.inCombat?.panel"
-                :meta="catalogStore.meta"
-                :include-sheer-force="selectedAgent?.specialty === 'rupture'"
-                :important-stats="selectedAgent?.importantPanelStats"
-              />
-            </div>
-          </div>
-        </section>
-        <DamageSummaryBar class="workbench-summary-section" :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
-        <section class="workbench-section workbench-whitebox-section">
-          <div class="panel-header workbench-section-header">
-            <div>
-              <h2 class="panel-title">{{ isLuminescenceScore ? "队伍异常评分白盒" : "伤害白盒" }}</h2>
-              <p class="panel-subtitle">随当前驱动盘方案实时刷新</p>
-            </div>
-            <NButton size="small" @click="recalculate">
-              <template #icon><RefreshCcw :size="16" /></template>
-              刷新
-            </NButton>
-          </div>
-          <div class="workbench-section-body">
-            <div v-if="buildStore.error" class="empty-state">{{ buildStore.error }}</div>
-            <DamageWhiteBox
-              v-else
-              :damage="buildStore.result?.damage"
-              :meta="catalogStore.meta"
-              :skill-catalog="selectedSkillCatalog"
-            />
-          </div>
-        </section>
-      </div>
-    </aside>
+    <WorkbenchResultColumn
+      :summary-context-key="summaryContextKey"
+      :is-luminescence-score="isLuminescenceScore"
+      :selected-agent="selectedAgent"
+      :selected-skill-catalog="selectedSkillCatalog"
+      @refresh="recalculate"
+    />
   </section>
 
   <DriveDiscPickerModal
@@ -2067,66 +2123,29 @@ function formatPercentValue(value: any) {
     </template>
   </NModal>
 
-  <NModal v-model:show="showFourPieceSetModal" preset="card" title="选择限定 4 件套（可多选）" style="max-width: 920px">
-    <div class="set-choice-list">
-      <label
-        v-for="set in optimizerSetChoices"
-        :key="set.id"
-        class="set-choice"
-        :class="{ active: draftHasFourPieceSet(set.id) }"
-      >
-        <input
-          type="checkbox"
-          :checked="draftHasFourPieceSet(set.id)"
-          @change="toggleDraftFourPieceSet(set.id)"
-        >
-        <img :src="thumbnailForDriveDiscSet(set)" alt="" loading="lazy" decoding="async">
-        <span class="set-choice-text">
-          <strong>{{ labelOf(set) }}</strong>
-        </span>
-      </label>
-    </div>
-    <template #footer>
-      <div class="drawer-footer set-modal-footer">
-        <span class="modal-summary">{{ draftFourPieceSets.length ? `已选择 ${draftFourPieceSets.length} 套` : "至少选择一套 4 件套" }}</span>
-        <span class="toolbar">
-          <NButton @click="showFourPieceSetModal = false">取消</NButton>
-          <NButton type="primary" :disabled="!draftFourPieceSetIds.length || fourPieceDraftUnchanged" @click="applyFourPieceSetModalSelection">应用限制</NButton>
-        </span>
-      </div>
-    </template>
-  </NModal>
+  <OptimizerSetChoiceModal
+    v-model:show="showFourPieceSetModal"
+    title="选择限定 4 件套（可多选）"
+    :sets="optimizerSetChoices"
+    :initial-ids="fourPieceSetModalInitialIds"
+    :committed-ids="optimizerStore.fourPieceSetIds"
+    require-selection
+    empty-summary="至少选择一套 4 件套"
+    :selected-summary="count => `已选择 ${count} 套`"
+    @apply="applyFourPieceSetModalSelection"
+  />
 
-  <NModal v-model:show="showTwoPieceSetModal" preset="card" title="选择额外 2 件套" style="max-width: 920px">
-    <div class="set-choice-list">
-      <label
-        v-for="set in optimizerSetChoices"
-        :key="set.id"
-        class="set-choice"
-        :class="{ active: draftHasTwoPieceSet(set.id) }"
-      >
-        <input
-          type="checkbox"
-          :checked="draftHasTwoPieceSet(set.id)"
-          @change="toggleDraftTwoPieceSet(set.id)"
-        >
-        <img :src="thumbnailForDriveDiscSet(set)" alt="" loading="lazy" decoding="async">
-        <span class="set-choice-text">
-          <strong>{{ labelOf(set) }}</strong>
-          <span>{{ twoPieceSetEffectText(set) }}</span>
-        </span>
-      </label>
-    </div>
-    <template #footer>
-      <div class="drawer-footer set-modal-footer">
-        <span class="modal-summary">{{ draftTwoPieceSetSummary }}</span>
-        <span class="toolbar">
-          <NButton @click="showTwoPieceSetModal = false">取消</NButton>
-          <NButton type="primary" :disabled="twoPieceDraftUnchanged" @click="applyTwoPieceSetModalSelection">应用限制</NButton>
-        </span>
-      </div>
-    </template>
-  </NModal>
+  <OptimizerSetChoiceModal
+    v-model:show="showTwoPieceSetModal"
+    title="选择额外 2 件套"
+    :sets="optimizerSetChoices"
+    :initial-ids="twoPieceSetModalInitialIds"
+    :committed-ids="optimizerStore.twoPieceSetIds"
+    :describe="twoPieceSetEffectText"
+    empty-summary="自动匹配任意 2 件套"
+    :selected-summary="count => `已选择 ${count} 个额外 2 件套`"
+    @apply="applyTwoPieceSetModalSelection"
+  />
 
   <BuffPickerModal
     v-model:show="showBuffPicker"
@@ -2186,74 +2205,18 @@ function formatPercentValue(value: any) {
 
 <style scoped>
 .workbench-merged-grid {
+  /* 宽屏三栏共用同一可视高度，避免整页滚动。 */
+  --app-bottom-clearance: 88px;
+  --workbench-sticky-top: calc(var(--app-topbar-height) + var(--app-sticky-gap));
+  --workbench-sticky-height: calc(100vh - var(--app-topbar-height) - var(--app-sticky-gap) - var(--app-bottom-clearance));
   grid-template-columns: minmax(250px, 300px) minmax(480px, 1fr) minmax(340px, 430px);
   gap: 14px;
 }
 
-.workbench-surface {
-  display: grid;
-  align-self: start;
-  min-width: 0;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  background: var(--app-panel);
-  box-shadow: none;
-}
-
-.workbench-section {
-  min-width: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.workbench-section + .workbench-section,
-.workbench-section + .workbench-summary-section,
-.workbench-summary-section + .workbench-section {
-  border-top: 1px solid var(--app-border);
-}
-
-.workbench-section-header {
-  min-height: 0;
-  padding: 10px 12px;
-  border-bottom: 0;
-}
-
-.workbench-section-body {
-  min-width: 0;
-  padding: 8px 12px 12px;
-}
-
-.workbench-surface :deep(.metric:not(.layer-metric)) {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.workbench-surface :deep(.metric dt) {
-  margin-bottom: 4px;
-}
-
-.workbench-surface .selected-set-summary {
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.workbench-summary-section {
-  position: static;
-  top: auto;
-  margin: 0;
-  padding: 12px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+@supports (height: 100dvh) {
+  .workbench-merged-grid {
+    --workbench-sticky-height: calc(100dvh - var(--app-topbar-height) - var(--app-sticky-gap) - var(--app-bottom-clearance));
+  }
 }
 
 .workbench-left,
@@ -2324,6 +2287,51 @@ function formatPercentValue(value: any) {
   gap: 4px;
 }
 
+.skill-level-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.skill-level-presets > span {
+  flex: 1 1 auto;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.skill-level-preset {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 999px;
+  background: var(--app-panel);
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.skill-level-preset:hover {
+  border-color: var(--app-blue);
+  color: var(--app-blue-strong);
+}
+
+.skill-level-preset.active {
+  border-color: var(--app-blue-line);
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+}
+
+.skill-level-preset:focus-visible {
+  outline: var(--app-focus-ring);
+  outline-offset: 2px;
+}
+
 .workbench-left .prominent-config-button {
   min-width: 112px;
   height: 40px;
@@ -2371,17 +2379,44 @@ function formatPercentValue(value: any) {
   margin: 0;
 }
 
+/* 计算设置：左列标签、右列内容对齐，像一张小表。 */
+.calculation-summary-grid {
+  --calculation-summary-label-width: 60px;
+  gap: 8px;
+}
+
+.calculation-summary-grid > dl.metric:not(.calculation-mode-summary--luminescence) {
+  display: grid;
+  grid-template-columns: var(--calculation-summary-label-width) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+}
+
+.calculation-summary-grid > dl.metric:not(.calculation-mode-summary--luminescence) dt {
+  margin: 0;
+}
+
+.calculation-summary-grid > dl.metric:not(.calculation-mode-summary--luminescence) dd {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .calculation-event-summary {
   grid-column: 1 / -1;
 }
 
 .calculation-event-summary-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px 10px;
+  display: grid;
+  grid-template-columns: var(--calculation-summary-label-width) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  margin-bottom: 4px;
+  min-height: 28px;
+}
+
+.calculation-event-summary-tags {
+  margin-top: 6px;
 }
 
 .calculation-event-summary-heading .metric-title {
@@ -2393,10 +2428,15 @@ function formatPercentValue(value: any) {
   line-height: 1.6;
 }
 
+/* 展开开关靠右，与“N 项”同一行。 */
+.calculation-event-summary-heading .calculation-event-summary-toggle {
+  justify-self: end;
+}
+
 .calculation-event-count {
-  flex: 0 0 auto;
   color: var(--app-text);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .calculation-mode-summary--luminescence,
@@ -2491,18 +2531,6 @@ function formatPercentValue(value: any) {
 .calculation-event-summary-toggle :deep(.n-button__content) {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.workbench-right-sticky {
-  position: sticky;
-  top: 74px;
-}
-
-.panel-subtitle {
-  margin: 4px 0 0;
-  color: var(--app-muted);
-  font-size: 12px;
-  line-height: 1.35;
 }
 
 .prominent-config-button {
@@ -2756,8 +2784,8 @@ function formatPercentValue(value: any) {
 
 .drive-disc-source-row {
   display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
   align-items: center;
   padding: 8px 10px;
   border-left: 3px solid var(--app-blue);
@@ -2765,28 +2793,14 @@ function formatPercentValue(value: any) {
 }
 
 .drive-disc-source-label {
-  color: var(--app-text);
-  font-size: 13px;
+  color: var(--app-muted);
+  font-size: var(--font-xs);
   font-weight: 700;
 }
 
 .drive-disc-source-options {
-  display: flex;
   width: 100%;
   min-width: 0;
-}
-
-.drive-disc-source-options :deep(.n-radio-button) {
-  flex: 1 1 0;
-  min-width: 0;
-  text-align: center;
-}
-
-.drive-disc-source-options :deep(.n-radio-button__label) {
-  width: 100%;
-  min-width: 0;
-  text-align: center;
-  white-space: normal;
 }
 
 .drive-disc-action-toolbar {
@@ -2901,6 +2915,13 @@ function formatPercentValue(value: any) {
 
 .optimizer-stale-alert {
   margin-top: 2px;
+}
+
+.restored-results-note {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: var(--font-xs);
+  line-height: 1.5;
 }
 
 .disc-slot-card {
@@ -3131,49 +3152,6 @@ function formatPercentValue(value: any) {
 .scheme-reservation-conflict-row span {
   color: var(--app-muted);
   font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.damage-panel-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 10px 12px 12px;
-}
-
-.damage-panel-card > .panel-header {
-  padding: 10px 12px;
-}
-
-.damage-panel-grid > div {
-  min-width: 0;
-}
-
-.damage-panel-grid h3 {
-  margin: 0 0 6px;
-  color: var(--app-muted);
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.damage-panel-card :deep(.data-table) {
-  table-layout: fixed;
-}
-
-.damage-panel-card :deep(.data-table th),
-.damage-panel-card :deep(.data-table td) {
-  padding: 6px 8px;
-  line-height: 1.25;
-}
-
-.damage-panel-card :deep(.data-table th) {
-  width: 54%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.damage-panel-card :deep(.data-table td) {
-  white-space: normal;
   overflow-wrap: anywhere;
 }
 
@@ -3432,73 +3410,6 @@ function formatPercentValue(value: any) {
   overflow-wrap: anywhere;
 }
 
-.set-choice-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 10px;
-}
-
-.set-choice {
-  display: grid;
-  grid-template-columns: 18px 46px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: 64px;
-  padding: 10px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
-  background: var(--app-panel);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.set-choice:hover,
-.set-choice.active {
-  border-color: var(--app-blue);
-  background: var(--app-blue-soft);
-}
-
-.set-choice input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--app-blue);
-}
-
-.set-choice img {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-  border-radius: var(--app-radius-sm);
-  background: var(--app-panel-muted);
-}
-
-.set-choice-text {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.set-choice-text strong {
-  color: var(--app-text);
-  font-size: 13px;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.set-choice-text span {
-  color: var(--app-muted);
-  font-size: 12px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.set-modal-footer {
-  align-items: center;
-  justify-content: space-between;
-}
-
 .optimizer-result-detail-shell {
   gap: 10px;
 }
@@ -3697,10 +3608,6 @@ function formatPercentValue(value: any) {
     grid-column: 1 / -1;
   }
 
-  .workbench-right-sticky {
-    position: static;
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 980px) {
@@ -3753,10 +3660,6 @@ function formatPercentValue(value: any) {
     gap: 6px;
   }
 
-  .damage-panel-grid {
-    grid-template-columns: 1fr;
-  }
-
   .optimizer-result-disc-row {
     grid-template-columns: 42px minmax(0, 1fr);
     align-items: start;
@@ -3780,10 +3683,6 @@ function formatPercentValue(value: any) {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .set-choice-list {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .manual-disc-option {
     grid-template-columns: 48px minmax(0, 1fr);
   }
@@ -3797,10 +3696,6 @@ function formatPercentValue(value: any) {
     height: 42px;
   }
 
-  .set-modal-footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
 }
 
 </style>
