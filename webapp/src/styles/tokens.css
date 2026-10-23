@@ -229,27 +229,90 @@ textarea {
 }
 
 .nav {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--app-panel-sunken);
+}
+
+/* 当前页的滑块由 App.vue 量出位置；切换页面时滑过去。 */
+.nav-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  z-index: 0;
+  border-radius: 999px;
+  background: var(--app-panel);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.03);
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  will-change: transform;
+}
+
+.nav-indicator.is-visible {
+  opacity: 1;
+}
+
+/* 只过渡 transform，由合成线程播放，减少新页面渲染造成的停顿。 */
+.nav-indicator.is-animated {
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .nav a {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 7px;
-  height: 34px;
-  padding: 0 10px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
   color: var(--app-muted);
+  font-weight: 600;
   text-decoration: none;
-  border-radius: var(--app-radius-sm);
+  border-radius: 999px;
   white-space: nowrap;
+  transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nav a:hover {
+  color: var(--app-text);
+}
+
+.nav a:focus-visible {
+  outline: var(--app-focus-ring);
+  outline-offset: 1px;
 }
 
 .nav a.router-link-active {
-  color: var(--app-text);
-  background: var(--app-panel-muted);
+  color: var(--app-blue-strong);
+}
+
+/* 滑块尚未就绪（首帧、测试环境）时由链接自身画出白底。 */
+.nav:not(.nav--has-indicator) a.router-link-active {
+  background: var(--app-panel);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.nav a svg {
+  transition: transform 0.2s ease;
+}
+
+.nav a.router-link-active svg {
+  transform: scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-indicator.is-animated,
+  .nav a,
+  .nav a svg {
+    transition: none;
+  }
 }
 
 .topbar-actions {
@@ -804,11 +867,23 @@ textarea {
   .nav a {
     flex: 1 1 0;
     justify-content: center;
-    min-width: 0;
+    min-width: max-content;
     gap: 3px;
     padding: 0 2px;
     font-size: 12px;
   }
 
   .nav a svg { width: 14px; height: 14px; flex-shrink: 0; }
+}
+
+@media (max-width: 360px) {
+  .nav a {
+    gap: 0;
+    padding: 0 1px;
+    font-size: 11px;
+  }
+
+  .nav a svg {
+    display: none;
+  }
 }

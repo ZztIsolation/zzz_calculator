@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NConfigProvider, NMessageProvider } from "naive-ui"
 import { storageIssues, exportUnreadableData } from "@runtime/storage-guard.js"
 import { Calculator, Database, Download, HardDrive, Settings2, UserRound, Monitor, Sun, Moon } from "lucide-vue-next"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useTheme } from "@/runtime/theme"
@@ -11,6 +11,7 @@ import { useTheme } from "@/runtime/theme"
 const accountStore = useAccountStore()
 const appConfigStore = useAppConfigStore()
 const route = useRoute()
+const router = useRouter()
 const props = defineProps<{ startupError?: string }>()
 const maintenanceEnabled = computed(() => appConfigStore.config.maintenanceEnabled)
 const enkaImportEnabled = computed(() => appConfigStore.config.enkaImportEnabled)
@@ -30,7 +31,86 @@ const themeButtonLabel = computed(() => ({
   dark: "主题：深色（点击切换为跟随系统）",
 })[preference.value])
 
+// 主导航的滑块：一个绝对定位的白色块滑到当前链接下面。
+// 链接位置只在导航尺寸变化时量一次并缓存，切页时直接取缓存，避免新页面渲染时强制排版。
+// 滑动只用 transform（平移 + 横向缩放），交给合成线程播放。
+const navRef = ref<HTMLElement | null>(null)
+const navIndicator = ref({ left: 0, width: 0, baseWidth: 0, visible: false, animated: false })
+const navIndicatorStyle = computed(() => {
+  const { left, width, baseWidth } = navIndicator.value
+  return {
+    width: `${baseWidth}px`,
+    transform: `translateX(${left}px) scaleX(${baseWidth > 0 ? width / baseWidth : 1})`,
+  }
+})
+let navResizeObserver: ResizeObserver | null = null
+let navLinkBoxes = new Map<string, { left: number; width: number }>()
 
+function cacheNavLinkBoxes() {
+  const links = [...(navRef.value?.querySelectorAll<HTMLAnchorElement>("a[href]") ?? [])]
+  navLinkBoxes = new Map(links.map(link => [link.getAttribute("href") ?? "", { left: link.offsetLeft, width: link.offsetWidth }]))
+}
+
+function moveNavIndicator(path: string, animate: boolean) {
+  const box = navLinkBoxes.get(path)
+  if (!box) {
+    navIndicator.value = { ...navIndicator.value, visible: false, animated: false }
+    return
+  }
+  const current = navIndicator.value
+  const animated = animate && current.visible
+  if (animated && current.left === box.left && current.width === box.width) return
+  navIndicator.value = {
+    left: box.left,
+    width: box.width,
+    // 动画期间保持原宽度、用缩放过渡；结束后再换成真实宽度。
+    baseWidth: animated && current.baseWidth > 0 ? current.baseWidth : box.width,
+    visible: true,
+    animated,
+  }
+}
+
+function settleNavIndicator() {
+  const current = navIndicator.value
+  if (current.baseWidth !== current.width) navIndicator.value = { ...current, baseWidth: current.width, animated: false }
+}
+
+function measureNavIndicator(animate: boolean) {
+  cacheNavLinkBoxes()
+  moveNavIndicator(route.path, animate)
+}
+
+// 点击后先让滑块开始滑动，再挂载新页面；后台标签页没有动画帧时，最多等 50ms。
+const removeNavGuard = router.beforeEach(async to => {
+  if (to.path === route.path || !navLinkBoxes.has(to.path)) return
+  moveNavIndicator(to.path, true)
+  await Promise.race([
+    new Promise(resolve => requestAnimationFrame(() => resolve(null))),
+    new Promise(resolve => setTimeout(resolve, 50)),
+  ])
+})
+
+// 被重定向或取消的导航以最终路由为准。
+watch(() => route.path, path => {
+  void nextTick(() => moveNavIndicator(path, true))
+})
+
+watch(() => [maintenanceEnabled.value, enkaImportEnabled.value], () => {
+  void nextTick(() => measureNavIndicator(false))
+})
+
+onMounted(() => {
+  void nextTick(() => measureNavIndicator(false))
+  if (typeof ResizeObserver !== "undefined" && navRef.value) {
+    navResizeObserver = new ResizeObserver(() => measureNavIndicator(false))
+    navResizeObserver.observe(navRef.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  navResizeObserver?.disconnect()
+  removeNavGuard()
+})
 </script>
 
 <template>
@@ -42,7 +122,14 @@ const themeButtonLabel = computed(() => ({
             <img class="brand-mark" src="/zzz-mark.svg" alt="">
             <span>ZZZ Calculator</span>
           </div>
-          <nav class="nav" aria-label="主导航">
+          <nav ref="navRef" class="nav" :class="{ 'nav--has-indicator': navIndicator.visible }" aria-label="主导航">
+            <span
+              class="nav-indicator"
+              :class="{ 'is-visible': navIndicator.visible, 'is-animated': navIndicator.animated }"
+              :style="navIndicatorStyle"
+              aria-hidden="true"
+              @transitionend="settleNavIndicator"
+            ></span>
             <RouterLink to="/">
               <Calculator :size="16" />
               <span>计算</span>

@@ -1,6 +1,27 @@
+import { expectNavigationFits, expectNavigationReachable } from "./navigation-assertions"
 import { expect, test, type Locator } from "@playwright/test"
 
 const THEME_KEY = "zzz-calculator.webapp.theme.v1"
+
+for (const width of [320, 360, 390]) {
+  test(`all six navigation entries remain reachable and aligned at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 })
+    await page.route("**/api/app-config", async route => {
+      const response = await route.fetch()
+      await route.fulfill({ response, json: { ...await response.json(), maintenanceEnabled: true, enkaImportEnabled: true } })
+    })
+    await page.goto("/")
+    await expectNavigationReachable(page)
+    await page.screenshot({ path: testInfo.outputPath(`navigation-${width}.png`) })
+    // A narrower local container exercises scrolling even when the viewport's links all fit.
+    const nav = page.getByRole("navigation", { name: "主导航" })
+    await nav.evaluate(element => { element.style.width = "140px" })
+    await expect.poll(() => nav.evaluate(element => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0)
+    await expectNavigationReachable(page)
+    await expect.poll(() => nav.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    await page.screenshot({ path: testInfo.outputPath(`navigation-scrolled-${width}.png`) })
+  })
+}
 
 // Composite transparent surfaces, including the score bar's separate fill layer.
 async function expectReadable(locator: Locator, overlay?: string) {
@@ -57,12 +78,11 @@ for (const width of [1440, 390, 320]) {
     const overflow = await page.locator(".app-topbar").evaluate(el => ({
       page: document.documentElement.scrollWidth - innerWidth,
       bar: el.scrollWidth - el.clientWidth,
-      nav: el.querySelector("nav")!.scrollWidth - el.querySelector("nav")!.clientWidth,
       buttonRight: el.querySelector(".theme-toggle")!.getBoundingClientRect().right,
     }))
     expect(overflow.page).toBeLessThanOrEqual(2)
     expect(overflow.bar).toBeLessThanOrEqual(2)
-    expect(overflow.nav).toBeLessThanOrEqual(2)
+    await expectNavigationFits(page)
     expect(overflow.buttonRight).toBeLessThanOrEqual(width)
     await page.reload()
     await expect(button).toHaveAccessibleName("主题：深色（点击切换为跟随系统）")

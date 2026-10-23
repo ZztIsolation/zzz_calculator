@@ -12,7 +12,11 @@ vi.mock("naive-ui", () => ({
   darkTheme: { name: "dark" },
 }))
 
-const routeFixture = vi.hoisted(() => ({ query: {} as Record<string, string> }))
+const routeFixture = vi.hoisted(() => ({ path: "/", query: {} as Record<string, string> }))
+const routerFixture = vi.hoisted(() => ({
+  guards: [] as Array<(to: { path: string }) => unknown>,
+  beforeEach: vi.fn(),
+}))
 const accountFixture = vi.hoisted(() => ({
   currentOwnerLabel: "myself" as string | null,
   currentOwnerId: "internal-owner-id",
@@ -22,6 +26,7 @@ const accountFixture = vi.hoisted(() => ({
 
 vi.mock("vue-router", () => ({
   useRoute: () => routeFixture,
+  useRouter: () => routerFixture,
 }))
 
 vi.mock("@/stores/account", () => ({
@@ -48,7 +53,7 @@ function mountApp(props: Record<string, unknown> = {}) {
     props,
     global: {
       stubs: {
-        RouterLink: { template: "<a><slot /></a>" },
+        RouterLink: { props: ["to"], template: '<a :href="to"><slot /></a>' },
         RouterView: { template: '<div data-testid="router-view" />' },
       },
     },
@@ -58,6 +63,7 @@ function mountApp(props: Record<string, unknown> = {}) {
 beforeEach(() => {
   appConfigFixture.config.maintenanceEnabled = false
   appConfigFixture.config.enkaImportEnabled = false
+  routeFixture.path = "/"
   routeFixture.query = {}
   accountFixture.currentOwnerLabel = "myself"
   accountFixture.currentOwnerId = "internal-owner-id"
@@ -65,6 +71,12 @@ beforeEach(() => {
   accountFixture.error = ""
   storageIssues.value = []
   useTheme().setPreference("system")
+  routerFixture.guards = []
+  routerFixture.beforeEach.mockReset()
+  routerFixture.beforeEach.mockImplementation((guard: (to: { path: string }) => unknown) => {
+    routerFixture.guards.push(guard)
+    return () => {}
+  })
 })
 
 describe("App maintenance navigation", () => {
@@ -138,7 +150,6 @@ describe("App filing information", () => {
   })
 })
 
-
 it("cycles the visible theme button and announces current and next modes", async () => {
   const wrapper = mountApp()
   const button = wrapper.get('[data-testid="theme-toggle"]')
@@ -150,4 +161,51 @@ it("cycles the visible theme button and announces current and next modes", async
   }
   expect(localStorage.getItem("zzz-calculator.webapp.theme.v1")).toBe("system")
   wrapper.unmount()
+})
+
+describe("App navigation indicator", () => {
+  it("slides from cached link boxes with a transform-only animation and settles to the real width", async () => {
+    const boxes: Record<string, { left: number, width: number }> = { "/": { left: 3, width: 80 }, "/discs": { left: 85, width: 96 } }
+    const left = vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockImplementation(function (this: HTMLElement) { return boxes[this.getAttribute("href") ?? ""]?.left ?? 0 })
+    const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) { return boxes[this.getAttribute("href") ?? ""]?.width ?? 0 })
+    try {
+      const wrapper = mountApp()
+      const indicator = wrapper.get(".nav-indicator")
+      await vi.waitFor(() => expect(indicator.attributes("style")).toContain("translateX(3px) scaleX(1)"))
+
+      // 切页时不再读取布局：此后的位置都来自缓存。
+      left.mockClear()
+      width.mockClear()
+      await routerFixture.guards[0]!({ path: "/discs" })
+      await wrapper.vm.$nextTick()
+      expect(left).not.toHaveBeenCalled()
+      expect(width).not.toHaveBeenCalled()
+      expect(indicator.classes()).toContain("is-animated")
+      expect(indicator.attributes("style")).toContain("width: 80px")
+      expect(indicator.attributes("style")).toContain("translateX(85px) scaleX(1.2)")
+
+      await indicator.trigger("transitionend")
+      expect(indicator.attributes("style")).toContain("width: 96px")
+      expect(indicator.attributes("style")).toContain("translateX(85px) scaleX(1)")
+      expect(indicator.classes()).not.toContain("is-animated")
+    } finally {
+      left.mockRestore()
+      width.mockRestore()
+    }
+  })
+
+  it("does not delay navigation to routes without a nav link", async () => {
+    mountApp()
+    await vi.waitFor(() => expect(routerFixture.guards).toHaveLength(1))
+    vi.useFakeTimers()
+    try {
+      let settled = false
+      void Promise.resolve(routerFixture.guards[0]!({ path: "/internal/scans" })).then(() => { settled = true })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(settled).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
