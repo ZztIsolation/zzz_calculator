@@ -5,6 +5,7 @@ import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumb
 import { Ban, Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import DriveDiscConflictResolver from "@/components/DriveDiscConflictResolver.vue"
+import DriveDiscImportUndo from "@/components/DriveDiscImportUndo.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
 import DriveDiscPagination from "@/components/DriveDiscPagination.vue"
 import { useDriveDiscPagination } from "@/utils/driveDiscPagination"
@@ -1141,6 +1142,7 @@ function confirmDangerImport() {
             <template #icon><RefreshCw :size="16" /></template>
             刷新
           </NButton>
+          <DriveDiscImportUndo v-if="pageActive" />
           <NButton @click="showImport = true">
             <template #icon><Upload :size="16" /></template>
             批量导入

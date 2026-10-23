@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 
-const categories = ["自身 Buff", "自身音擎 Buff", "队友 Buff", "队友音擎buff", "队友驱动盘buff", "场地 Buff", "Boss Buff", "自定义 Buff"]
+const categories = ["自身 Buff", "自身音擎 Buff", "队友 Buff", "队友音擎 Buff", "队友驱动盘 Buff", "场地 Buff", "Boss Buff", "自定义 Buff"]
 
 async function expectPinnedActions(page: Page) {
   const modal = page.getByRole("dialog")
@@ -51,13 +51,13 @@ async function exerciseBuffCategories(page: Page) {
   const toolbar = modal.locator(".toolbar")
 
   for (const category of categories) {
-    await modal.locator(".n-tabs-tab").filter({ hasText: new RegExp(`^${category}$`) }).click()
+    await modal.locator(".n-tabs-tab").filter({ hasText: new RegExp(`^${category}(?: \\(\\d+\\))?$`) }).click()
     await expectPinnedActions(page)
     const list = modal.locator(".buff-list-scrollbar .n-scrollbar-container").first()
     const listBox = await list.boundingBox()
     expect(listBox!.height, `${category}: readable content area`).toBeGreaterThan(60)
 
-    if (category === "队友音擎buff") {
+    if (category === "队友音擎 Buff") {
       const headerBefore = await header.boundingBox()
       const toolbarBefore = await toolbar.boundingBox()
       await scrollWithoutMovingActions(page, list)
@@ -127,15 +127,19 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1024, height: 576
 
 test("Buff scrolling preserves the draft until apply and restores it on cancel", async ({ page }) => {
   await page.goto("/")
-  const selectedOnPage = page.locator(".workbench-left .chip-row").first()
+  // 弹窗里改动未应用前，计算页上的已启用数量不变
+  const selectedOnPage = page.getByTestId("workbench-buff-count")
   await expect(page.getByTestId("open-buff-picker")).toBeVisible()
   const openList = async () => {
     await page.getByTestId("open-buff-picker").click()
-    await page.locator(".n-tabs-tab").filter({ hasText: /^队友音擎buff$/ }).click()
+    await page.locator(".n-tabs-tab").filter({ hasText: /^队友音擎 Buff(?: \(\d+\))?$/ }).click()
   }
   await openList()
   const original = await selectedOnPage.innerText()
-  const row = page.getByRole("dialog").locator(".buff-row").last()
+  // 已选会在重新打开时置顶，按 Buff id 跟踪同一条，而不是按位置
+  const buffId = await page.getByRole("dialog").locator(".buff-row").last().getAttribute("data-buff-id")
+  expect(buffId).toBeTruthy()
+  const row = page.getByRole("dialog").locator(`.buff-row[data-buff-id="${buffId}"]`)
   await row.locator(".buff-check").click()
   await expect(row).toHaveClass(/is-selected/)
   expect(await selectedOnPage.innerText()).toBe(original)
@@ -145,6 +149,8 @@ test("Buff scrolling preserves the draft until apply and restores it on cancel",
   await row.locator(".buff-check").click()
   await expectPinnedActions(page)
   await page.getByRole("button", { name: "应用选择", exact: true }).click()
+  // 应用后计算页上的已启用数量多一个
+  await expect(selectedOnPage).toHaveText(String(Number(original) + 1))
   await openList()
   await expect(row).toHaveClass(/is-selected/)
   await page.keyboard.press("Escape")

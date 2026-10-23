@@ -298,6 +298,9 @@ async function writePersistedStore(store, options = {}) {
         purpose: options.purpose ?? "写入驱动盘库存",
     })
     if (!pendingDb) {
+        if (typeof options.unreadableFallback !== "string" || localStorage.getItem(FALLBACK_STORAGE_KEY) !== options.unreadableFallback) {
+            readFallbackStore()
+        }
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(store))
         return store
     }
@@ -467,6 +470,15 @@ export async function saveUserDriveDiscStoreUnlocked(store, options = {}) {
         inventoryWriteRevision += 1
     }
     return nextStore
+}
+
+// Only the full-backup recovery transaction uses this to restore an original
+// unreadable fallback after a failed replacement. Normal writes remain guarded.
+export function restoreUnreadableInventoryFallback(raw, transactionId) {
+    inventoryWriteRevision += 1
+    const current = readFallbackStore()
+    if (current?.personalDataRestore?.id !== transactionId) throw new Error("数据恢复事务已变化，保留恢复记录，请刷新后重试。")
+    localStorage.setItem(FALLBACK_STORAGE_KEY, raw)
 }
 
 export async function saveUserDriveDiscStore(store, options = {}) {

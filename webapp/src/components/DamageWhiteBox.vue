@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { NSelect } from "naive-ui"
+import { ChevronDown } from "lucide-vue-next"
 import {
   damageEventTitle,
   formatNumber,
@@ -133,6 +134,31 @@ function selectedVariantKey(event: any): string {
 function selectEventId(value: string | number | null) {
   selectedEventId.value = value === null || value === undefined ? null : String(value)
 }
+
+// 推导默认折叠，只看乘区名与数值；“最终”公式默认展开
+const expandedRows = ref<Set<number>>(new Set())
+const expandableIndexes = computed(() => selectedRows.value
+  .map((row, index) => (formulaLines(row).length ? index : -1))
+  .filter(index => index >= 0))
+const allExpanded = computed(() => expandableIndexes.value.length > 0
+  && expandableIndexes.value.every(index => expandedRows.value.has(index)))
+
+watch(() => String(selectedEvent.value?.id ?? "") + "|" + selectedRows.value.map(row => row?.label).join("|"), () => {
+  expandedRows.value = new Set(selectedRows.value
+    .map((row, index) => (formulaLines(row).length && String(row?.label ?? "").includes("最终") ? index : -1))
+    .filter(index => index >= 0))
+}, { immediate: true })
+
+function toggleRow(index: number) {
+  const next = new Set(expandedRows.value)
+  if (next.has(index)) next.delete(index)
+  else next.add(index)
+  expandedRows.value = next
+}
+
+function toggleAllRows() {
+  expandedRows.value = allExpanded.value ? new Set() : new Set(expandableIndexes.value)
+}
 </script>
 
 <template>
@@ -163,13 +189,35 @@ function selectEventId(value: string | number | null) {
       />
     </label>
 
+    <div v-if="expandableIndexes.length" class="damage-whitebox-toolbar">
+      <span>点击乘区查看推导</span>
+      <button type="button" class="damage-whitebox-toggle-all" data-testid="whitebox-toggle-all" @click="toggleAllRows">
+        {{ allExpanded ? "全部收起" : "全部展开" }}
+      </button>
+    </div>
     <div v-if="selectedRows.length" class="damage-whitebox-rows">
-      <article v-for="(row, index) in selectedRows" :key="`${row.label}-${index}`" class="damage-whitebox-row">
-        <div class="damage-whitebox-row-main">
-          <strong>{{ row.label }}</strong>
+      <article
+        v-for="(row, index) in selectedRows"
+        :key="`${row.label}-${index}`"
+        class="damage-whitebox-row"
+        :class="{ 'is-expanded': expandedRows.has(index), 'is-expandable': formulaLines(row).length > 0 }"
+      >
+        <component
+          :is="formulaLines(row).length ? 'button' : 'div'"
+          class="damage-whitebox-row-head"
+          :type="formulaLines(row).length ? 'button' : undefined"
+          :aria-expanded="formulaLines(row).length ? expandedRows.has(index) : undefined"
+          @click="formulaLines(row).length && toggleRow(index)"
+        >
+          <strong class="damage-whitebox-row-label">
+            <ChevronDown v-if="formulaLines(row).length" class="damage-whitebox-chevron" :size="14" aria-hidden="true" />
+            {{ row.label }}
+          </strong>
+          <strong class="damage-whitebox-row-value num">{{ rowValue(row) }}</strong>
+        </component>
+        <div v-show="expandedRows.has(index)" class="damage-whitebox-row-main">
           <span v-for="(line, lineIndex) in formulaLines(row)" :key="lineIndex">{{ line }}</span>
         </div>
-        <strong class="damage-whitebox-row-value num">{{ rowValue(row) }}</strong>
       </article>
     </div>
     <div v-else class="empty-state">暂无白盒结果</div>
@@ -267,17 +315,46 @@ function selectEventId(value: string | number | null) {
   font-weight: 650;
 }
 
+.damage-whitebox-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0 2px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.damage-whitebox-toggle-all {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--app-blue-strong, #1d5fd6);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.damage-whitebox-toggle-all:hover {
+  background: var(--app-blue-soft, #edf4ff);
+}
+
+.damage-whitebox-toggle-all:focus-visible,
+.damage-whitebox-row-head:focus-visible {
+  outline: 3px solid rgba(47, 125, 246, 0.35);
+  outline-offset: 2px;
+}
+
 .damage-whitebox-rows {
   display: grid;
 }
 
 .damage-whitebox-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
+  gap: 4px;
   min-width: 0;
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--app-border);
 }
 
@@ -285,15 +362,56 @@ function selectEventId(value: string | number | null) {
   border-bottom: 0;
 }
 
+.damage-whitebox-row-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.damage-whitebox-row-head {
+  cursor: pointer;
+}
+
+button.damage-whitebox-row-head:hover .damage-whitebox-row-label {
+  color: var(--app-blue-strong, #1d5fd6);
+}
+
+.damage-whitebox-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--app-text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* 与全站展开按钮一致：蓝色箭头朝下，展开后翻转朝上 */
+.damage-whitebox-chevron {
+  flex: 0 0 auto;
+  color: var(--app-blue);
+  transition: transform 0.2s ease;
+}
+
+.damage-whitebox-row.is-expanded .damage-whitebox-chevron {
+  transform: rotate(180deg);
+}
+
 .damage-whitebox-row-main {
   display: grid;
   min-width: 0;
   gap: 4px;
-}
-
-.damage-whitebox-row-main strong {
-  color: var(--app-text);
-  font-size: 13px;
+  padding: 4px 0 0 18px;
 }
 
 .damage-whitebox-row-main span {
@@ -308,13 +426,15 @@ function selectEventId(value: string | number | null) {
   font-size: 15px;
 }
 
-@container ui-layout (max-width: 640px) {
-  .damage-whitebox-row {
-    grid-template-columns: 1fr;
+@media (prefers-reduced-motion: reduce) {
+  .damage-whitebox-chevron {
+    transition: none;
   }
+}
 
-  .damage-whitebox-row-value {
-    justify-self: start;
+@container ui-layout (max-width: 640px) {
+  .damage-whitebox-row-head {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 </style>

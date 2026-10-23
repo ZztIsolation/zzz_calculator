@@ -14,7 +14,7 @@ async function selectEllen(page: Page) {
 
 async function openTeammates(page: Page) {
   await page.getByTestId("open-buff-picker").click()
-  await page.locator(".n-tabs-tab").filter({ hasText: /^队友 Buff$/ }).click()
+  await page.locator(".n-tabs-tab").filter({ hasText: /^队友 Buff(?: \(\d+\))?$/ }).click()
 }
 
 async function seedQianxiaEnka(page: Page) {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { NCheckbox, NInputNumber, NRadioButton, NRadioGroup } from "naive-ui"
+import ExpandToggle from "@/components/ExpandToggle.vue"
 import { buffDisplayName, buffSubtitle } from "@/utils/format"
 import {
   localizedText,
@@ -36,27 +37,12 @@ const title = computed(() => {
   return owner && fullName.value.startsWith(prefix) ? fullName.value.slice(prefix.length) : fullName.value
 })
 const description = computed(() => buffSubtitle(props.buff))
-const expanded = ref(false)
-const descriptionElement = ref<HTMLElement | null>(null)
-const canExpand = ref(false)
-let descriptionObserver: ResizeObserver | undefined
-function measureDescription() {
-  const element = descriptionElement.value
-  if (element?.clientWidth) canExpand.value = element.scrollHeight > 41
-}
-watch(description, value => {
-  expanded.value = false
-  canExpand.value = value.length > 60
-  void nextTick(measureDescription)
-}, { immediate: true })
-onMounted(() => {
-  measureDescription()
-  if (typeof ResizeObserver !== "undefined" && descriptionElement.value) {
-    descriptionObserver = new ResizeObserver(measureDescription)
-    descriptionObserver.observe(descriptionElement.value)
-  }
-})
-onBeforeUnmount(() => descriptionObserver?.disconnect())
+// 已选默认展开、未选默认收起；箭头在默认值上取反，勾选状态变化时回到默认。
+const toggledByUser = ref(false)
+const expanded = computed(() => props.selected !== toggledByUser.value)
+const effectSummary = computed(() => [...props.effectRows.map(row => String(row.text).replace(/（[^）]*）/g, "").trim()), ...props.modifierLines].filter(Boolean).join(" · ") || description.value)
+watch(description, () => { toggledByUser.value = false })
+watch(() => props.selected, () => { toggledByUser.value = false })
 
 const parameterDefinitions = computed(() => runtimeParameterDefinitions(props.buff))
 const sources = computed(() => runtimeSourceGroups(props.buff))
@@ -78,10 +64,18 @@ function parameterLabel(definition: any) {
       <button type="button" class="buff-row-toggle" :aria-label="fullName" :aria-pressed="selected" @click="emit('toggle', !selected)">
         {{ title }}
       </button>
+      <span class="buff-effect-summary" :title="`${effectSummary}
+${description}`">{{ effectSummary }}</span>
       <span v-if="sourceLabel" class="buff-source-tag">{{ sourceLabel }}</span>
       <button v-if="canRestore" type="button" class="buff-restore-button" @click="emit('restore')">恢复导入</button>
+      <ExpandToggle
+        class="buff-expand-toggle"
+        :expanded="expanded"
+        :aria-label="`${expanded ? '收起' : '展开'}${fullName}详情`"
+        @toggle="toggledByUser = !toggledByUser"
+      />
     </div>
-    <div v-if="effectRows.length || modifierLines.length" class="buff-effect-lines">
+    <div v-if="expanded && (effectRows.length || modifierLines.length)" class="buff-effect-lines">
       <div v-for="row in effectRows" :key="row.id" class="buff-effect-row">
         <span>{{ row.text }}</span>
         <label v-if="row.coverage" class="rule-coverage-control">
@@ -96,18 +90,10 @@ function parameterLabel(definition: any) {
       </div>
       <div v-for="(line, index) in modifierLines" :key="index" class="buff-modifier-line">{{ line }}</div>
     </div>
-    <div class="teammate-buff-description" :class="{ 'is-expanded': expanded }">
-      <p :id="`buff-description-${buff.id}`" ref="descriptionElement">{{ description }}</p>
-      <button
-        v-if="canExpand"
-        type="button"
-        :aria-expanded="expanded"
-        :aria-controls="`buff-description-${buff.id}`"
-        :aria-label="`${expanded ? '收起' : '展开'}${fullName}说明`"
-        @click="expanded = !expanded"
-      >{{ expanded ? '收起' : '展开' }}</button>
+    <div v-if="expanded" class="teammate-buff-description">
+      <p>{{ description }}</p>
     </div>
-    <div v-if="parameterDefinitions.length" class="buff-runtime-parameters">
+    <div v-if="expanded && parameterDefinitions.length" class="buff-runtime-parameters">
       <label v-for="definition in parameterDefinitions" :key="definition.id" class="buff-runtime-parameter">
         <span>{{ parameterLabel(definition) }}</span>
         <NRadioGroup :value="normalizedRuntimeParameterValue(definition, runtime.parameters?.[definition.id])" size="small" :aria-label="parameterLabel(definition)">
@@ -115,7 +101,7 @@ function parameterLabel(definition: any) {
         </NRadioGroup>
       </label>
     </div>
-    <div v-if="sources.length || stackGroups.length" class="runtime-grid" data-layout-surface="buff-runtime">
+    <div v-if="expanded && (sources.length || stackGroups.length)" class="runtime-grid" data-layout-surface="buff-runtime">
       <label v-for="group in sources" :key="group.key" class="runtime-metric ui-field" data-layout-field>
         <span>{{ group.label || '来源数值' }}</span>
         <NInputNumber
@@ -150,6 +136,7 @@ function parameterLabel(definition: any) {
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--app-border-strong);
+  border-inline-start: 4px solid transparent;
   border-radius: var(--app-radius-sm);
   background: var(--app-panel);
   color: var(--app-text);
@@ -157,6 +144,7 @@ function parameterLabel(definition: any) {
 }
 .teammate-buff-card.is-selected {
   border-color: var(--app-blue);
+  border-inline-start-color: var(--app-blue);
   background: var(--app-blue-soft);
 }
 .buff-row-main {
@@ -188,6 +176,9 @@ function parameterLabel(definition: any) {
   cursor: pointer;
 }
 .buff-row-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-height: 32px;
   min-width: 0;
   padding: 0;
@@ -200,6 +191,15 @@ function parameterLabel(definition: any) {
   text-align: left;
   overflow-wrap: anywhere;
   cursor: pointer;
+}
+.buff-effect-summary {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--app-muted);
+  font-size: 13px;
 }
 button:focus-visible { outline: 2px solid var(--app-blue); outline-offset: 2px; }
 .buff-effect-lines {
@@ -243,22 +243,7 @@ button:focus-visible { outline: 2px solid var(--app-blue); outline-offset: 2px; 
   flex: 1;
   min-width: 0;
   margin: 0;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
   overflow-wrap: anywhere;
-}
-.teammate-buff-description.is-expanded p { display: block; }
-.teammate-buff-description button {
-  flex: 0 0 auto;
-  min-height: 32px;
-  padding: 0 2px;
-  border: 0;
-  background: transparent;
-  color: var(--app-blue);
-  font: inherit;
-  cursor: pointer;
 }
 .buff-runtime-parameters,
 .runtime-grid {

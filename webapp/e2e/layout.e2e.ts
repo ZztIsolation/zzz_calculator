@@ -164,38 +164,85 @@ async function expectNoBorderOverlay(page: Page, button: Locator, label: string)
   expect(await readVisibleBorderedDescendants(), `${label} on focus`).toEqual([])
 }
 
-test("right workbench column keeps panel, summary, and white box in order", async ({ page }) => {
+test("workbench keeps the result first, then panel and white box", async ({ page }) => {
   await openApp(page)
 
-  const rightColumn = page.locator(".workbench-right-sticky")
-  const panel = rightColumn.locator(".damage-panel-card")
-  const summary = rightColumn.locator(".workbench-summary-section")
-  const whiteBox = rightColumn.locator(".workbench-whitebox-section")
+  const viewport = page.viewportSize()!
+  const panel = page.locator(".damage-panel-card")
+  const summary = page.locator(".workbench-summary-section")
+  const whiteBox = page.locator(".workbench-whitebox-section")
 
   await expect(panel).toBeVisible()
   await expect(summary).toBeVisible()
   await expect(whiteBox).toBeVisible()
 
-  const [columnBox, panelBox, summaryBox, whiteBoxBox] = await Promise.all([
-    rightColumn.boundingBox(),
+  const [panelBox, summaryBox, whiteBoxBox] = await Promise.all([
     panel.boundingBox(),
     summary.boundingBox(),
     whiteBox.boundingBox(),
   ])
-
-  expect(columnBox).not.toBeNull()
   expect(panelBox).not.toBeNull()
   expect(summaryBox).not.toBeNull()
   expect(whiteBoxBox).not.toBeNull()
-  expect(summaryBox!.y).toBeGreaterThanOrEqual(panelBox!.y + panelBox!.height)
-  expect(whiteBoxBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height)
-  await expect(summary).toHaveCSS("border-top-width", "1px")
-  await expect(whiteBox).toHaveCSS("border-top-width", "1px")
 
-  for (const sectionBox of [panelBox!, summaryBox!, whiteBoxBox!]) {
-    expect(sectionBox.x).toBeGreaterThanOrEqual(columnBox!.x - 1)
-    expect(sectionBox.x + sectionBox.width).toBeLessThanOrEqual(columnBox!.x + columnBox!.width + 1)
+  if (viewport.width > 1280) {
+    // 宽屏：三栏等高、各自吸顶并独立滚动，右栏内依次是结果、面板、白盒。
+    const rightColumn = page.locator(".workbench-right-sticky")
+    const columnBox = await rightColumn.boundingBox()
+    expect(columnBox).not.toBeNull()
+    expect(panelBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height - 1)
+    expect(whiteBoxBox!.y).toBeGreaterThanOrEqual(panelBox!.y + panelBox!.height)
+    await expect(whiteBox).toHaveCSS("border-top-width", "1px")
+    for (const sectionBox of [panelBox!, summaryBox!, whiteBoxBox!]) {
+      expect(sectionBox.x).toBeGreaterThanOrEqual(columnBox!.x - 1)
+      expect(sectionBox.x + sectionBox.width).toBeLessThanOrEqual(columnBox!.x + columnBox!.width + 1)
+    }
+    const columnMetrics = await Promise.all([".workbench-left", ".workbench-center", ".workbench-right-sticky"].map(async column => ({
+      column,
+      metrics: await page.locator(column).evaluate(element => ({
+        position: getComputedStyle(element).position,
+        overflowY: getComputedStyle(element).overflowY,
+        height: element.getBoundingClientRect().height,
+        bottom: element.getBoundingClientRect().bottom,
+      })),
+    })))
+    const expectedHeight = columnMetrics[0].metrics.height
+    for (const { column, metrics } of columnMetrics) {
+      expect(metrics.position, column).toBe("sticky")
+      expect(metrics.overflowY, column).toBe("auto")
+      expect(metrics.height, column).toBeCloseTo(expectedHeight, 0)
+      expect(metrics.bottom, column).toBeCloseTo(columnMetrics[0].metrics.bottom, 0)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(viewport.height + 1)
+  } else {
+    // 窄屏：结果条在全部配置之前，面板和白盒在驱动盘之后。
+    const [agentBox, driveDiscBox] = await Promise.all([
+      page.locator(".workbench-agent-section").boundingBox(),
+      page.locator(".drive-disc-workbench-panel").boundingBox(),
+    ])
+    expect(agentBox).not.toBeNull()
+    expect(driveDiscBox).not.toBeNull()
+    expect(agentBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height)
+    expect(panelBox!.y).toBeGreaterThanOrEqual(driveDiscBox!.y + driveDiscBox!.height)
+    if (viewport.width <= 980) {
+      // 单栏：结果条、角色、驱动盘依次排列，面板与白盒在配置之后。
+      expect(agentBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height)
+      expect(driveDiscBox!.y).toBeGreaterThanOrEqual(agentBox!.y + agentBox!.height)
+      expect(panelBox!.y).toBeGreaterThanOrEqual(driveDiscBox!.y + driveDiscBox!.height)
+    }
   }
+
+  // 结果条吸顶时不能压住顶栏。
+  const [topbarBottom, summaryTop] = await Promise.all([
+    page.locator(".app-topbar").evaluate(element => element.getBoundingClientRect().bottom),
+    page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight)
+      return new Promise<number>(resolve => requestAnimationFrame(() =>
+        resolve(document.querySelector(".workbench-summary-section")!.getBoundingClientRect().top)))
+    }),
+  ])
+  expect(summaryTop).toBeGreaterThanOrEqual(topbarBottom - 1)
+  await page.evaluate(() => window.scrollTo(0, 0))
 
   await expectStableLayout(page, "damage-whitebox")
 })
@@ -220,14 +267,14 @@ test("event management keeps disorder labels and controls visible", async ({ pag
   await expectStableLayout(page, "calculation-config")
 })
 
-test("calculation summary keeps extra events behind an inline toggle", async ({ page }) => {
+test("calculation summary keeps all events collapsed behind an inline toggle", async ({ page }) => {
   await openApp(page)
   await chooseWorkbenchAgent(page, "星见雅")
 
   const summary = page.locator('[data-layout-surface="calculation-summary"]')
-  const eventTags = summary.locator(".calculation-event-summary-tags .n-tag")
+  const eventTags = summary.locator(".calculation-event-summary-tags .calculation-event-row")
   const toggle = page.getByTestId("calculation-event-summary-toggle")
-  const toggleRow = summary.locator(".calculation-event-summary-toggle-row")
+  const heading = summary.locator(".calculation-event-summary-heading")
   const modeLabel = summary.locator("dt").first()
   const eventSummaryLabel = summary.locator(".calculation-event-summary-heading .metric-title")
   const sectionHeader = summary.locator("xpath=preceding-sibling::*[1]")
@@ -242,27 +289,31 @@ test("calculation summary keeps extra events behind an inline toggle", async ({ 
       lineHeight: style.lineHeight,
     }
   })
-  const expectToggleBelowLastEvent = async () => {
-    const [lastEventBox, toggleBox, toggleRowBox] = await Promise.all([
-      eventTags.last().boundingBox(),
-      toggle.boundingBox(),
-      toggleRow.boundingBox(),
-    ])
-    expect(lastEventBox).not.toBeNull()
+  // 开关在“事件摘要”这一行、事件列表之前；展开后位置不变，不用滚到底部再收起
+  const expectToggleInHeading = async () => {
+    const [toggleBox, headingBox] = await Promise.all([toggle.boundingBox(), heading.boundingBox()])
     expect(toggleBox).not.toBeNull()
-    expect(toggleRowBox).not.toBeNull()
-    expect(toggleBox!.y).toBeGreaterThanOrEqual(lastEventBox!.y + lastEventBox!.height)
-    expect(Math.abs(toggleBox!.x - toggleRowBox!.x)).toBeLessThanOrEqual(1)
+    expect(headingBox).not.toBeNull()
+    expect(toggleBox!.y).toBeGreaterThanOrEqual(headingBox!.y - 4)
+    expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(headingBox!.y + headingBox!.height + 4)
+    if (await eventTags.count()) {
+      const firstEventBox = await eventTags.first().boundingBox()
+      expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(firstEventBox!.y + 4)
+    }
+    // 返回相对标题行的位置：点击后页面可能滚动，比较绝对坐标没有意义
+    return { x: toggleBox!.x - headingBox!.x, y: toggleBox!.y - headingBox!.y }
   }
 
   await expect(summary).toContainText("事件摘要")
-  await expect(toggle).toHaveText(/其余 \d+ 项/)
+  // 默认全部收起，只显示“N 项”
+  await expect(toggle).toHaveText("展开")
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
   await expect(toggle).toHaveCSS("font-size", "14px")
-  await expect(eventTags).toHaveCount(2)
+  await expect(eventTags).toHaveCount(0)
+  await expect(heading).toContainText("8 项")
   await expect(eventSummaryLabel).toHaveText("事件摘要")
   expect(await labelStyle(eventSummaryLabel)).toEqual(await labelStyle(modeLabel))
-  await expectToggleBelowLastEvent()
+  const collapsedToggleBox = await expectToggleInHeading()
 
   const [headerBox, modeLabelBox] = await Promise.all([
     sectionHeader.boundingBox(),
@@ -276,19 +327,21 @@ test("calculation summary keeps extra events behind an inline toggle", async ({ 
   await expectStableLayout(page, "calculation-summary")
 
   await toggle.click()
-  await expect(toggle).toHaveText("收起其余")
+  await expect(toggle).toHaveText("收起")
   await expect(toggle).toHaveAttribute("aria-expanded", "true")
   await expect(eventTags).toHaveCount(8)
-  await expectToggleBelowLastEvent()
+  const expandedToggleBox = await expectToggleInHeading()
+  expect(Math.abs(expandedToggleBox.y - collapsedToggleBox.y)).toBeLessThanOrEqual(1)
   await expectStableLayout(page, "calculation-summary")
 
   await toggle.click()
-  await expect(toggle).toHaveText(/其余 \d+ 项/)
+  await expect(toggle).toHaveText("展开")
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
-  await expect(eventTags).toHaveCount(2)
+  await expect(eventTags).toHaveCount(0)
 
+  // 耀变角色的事件摘要同样默认收起
   await chooseWorkbenchAgent(page, "蕾米埃尔·丹")
-  await expect(page.getByTestId("calculation-event-summary-toggle")).toHaveCount(0)
+  await expect(page.getByTestId("calculation-event-summary-toggle")).toHaveText("展开")
   await expectStableLayout(page, "calculation-summary")
 })
 
@@ -440,8 +493,11 @@ test("optimizer and buff configuration use protected field layouts", async ({ pa
   await page.locator(".n-tabs-tab").filter({ hasText: "自定义 Buff" }).click()
   await expectStableLayout(page, "custom-buff-effect")
 
-  for (const tab of ["自身 Buff", "自身音擎 Buff", "队友 Buff", "队友音擎buff", "队友驱动盘buff", "场地 Buff", "Boss Buff"]) {
+  for (const tab of ["自身 Buff", "自身音擎 Buff", "队友 Buff", "队友音擎 Buff", "队友驱动盘 Buff", "场地 Buff", "Boss Buff"]) {
     await page.locator(".n-tabs-tab").filter({ hasText: tab }).click()
+    // 未选中的 Buff 默认收起，参数区要展开后才渲染
+    const collapsed = page.locator('.buff-expand-toggle[aria-expanded="false"]')
+    for (let index = await collapsed.count(); index > 0; index -= 1) await collapsed.first().click()
     if (await page.locator('[data-layout-surface="buff-runtime"]').count()) break
   }
   expect(await page.locator('[data-layout-surface="buff-runtime"]').count()).toBeGreaterThan(0)
