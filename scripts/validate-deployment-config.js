@@ -127,7 +127,7 @@ for (const token of [
 ]) {
     requireText(files.promotionWorkflowTest, token, `Executable promotion behavior coverage is missing: ${token}`)
 }
-for (const command of ["npm test", "npm run build:webapp", "npm run test:layout", "npm run build:server", "npm run build:pages"]) {
+for (const command of ["npm test", "npm run build:webapp", "npm run test:layout:ci", "npm run build:server", "npm run build:pages"]) {
     requireText(files.ci, command, `CI is missing required command: ${command}`)
 }
 requireText(
