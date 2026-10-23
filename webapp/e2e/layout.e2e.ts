@@ -164,38 +164,85 @@ async function expectNoBorderOverlay(page: Page, button: Locator, label: string)
   expect(await readVisibleBorderedDescendants(), `${label} on focus`).toEqual([])
 }
 
-test("right workbench column keeps panel, summary, and white box in order", async ({ page }) => {
+test("workbench keeps the result first, then panel and white box", async ({ page }) => {
   await openApp(page)
 
-  const rightColumn = page.locator(".workbench-right-sticky")
-  const panel = rightColumn.locator(".damage-panel-card")
-  const summary = rightColumn.locator(".workbench-summary-section")
-  const whiteBox = rightColumn.locator(".workbench-whitebox-section")
+  const viewport = page.viewportSize()!
+  const panel = page.locator(".damage-panel-card")
+  const summary = page.locator(".workbench-summary-section")
+  const whiteBox = page.locator(".workbench-whitebox-section")
 
   await expect(panel).toBeVisible()
   await expect(summary).toBeVisible()
   await expect(whiteBox).toBeVisible()
 
-  const [columnBox, panelBox, summaryBox, whiteBoxBox] = await Promise.all([
-    rightColumn.boundingBox(),
+  const [panelBox, summaryBox, whiteBoxBox] = await Promise.all([
     panel.boundingBox(),
     summary.boundingBox(),
     whiteBox.boundingBox(),
   ])
-
-  expect(columnBox).not.toBeNull()
   expect(panelBox).not.toBeNull()
   expect(summaryBox).not.toBeNull()
   expect(whiteBoxBox).not.toBeNull()
-  expect(summaryBox!.y).toBeGreaterThanOrEqual(panelBox!.y + panelBox!.height)
-  expect(whiteBoxBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height)
-  await expect(summary).toHaveCSS("border-top-width", "1px")
-  await expect(whiteBox).toHaveCSS("border-top-width", "1px")
 
-  for (const sectionBox of [panelBox!, summaryBox!, whiteBoxBox!]) {
-    expect(sectionBox.x).toBeGreaterThanOrEqual(columnBox!.x - 1)
-    expect(sectionBox.x + sectionBox.width).toBeLessThanOrEqual(columnBox!.x + columnBox!.width + 1)
+  if (viewport.width > 1280) {
+    // 宽屏：三栏等高、各自吸顶并独立滚动，右栏内依次是结果、面板、白盒。
+    const rightColumn = page.locator(".workbench-right-sticky")
+    const columnBox = await rightColumn.boundingBox()
+    expect(columnBox).not.toBeNull()
+    expect(panelBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height - 1)
+    expect(whiteBoxBox!.y).toBeGreaterThanOrEqual(panelBox!.y + panelBox!.height)
+    await expect(whiteBox).toHaveCSS("border-top-width", "1px")
+    for (const sectionBox of [panelBox!, summaryBox!, whiteBoxBox!]) {
+      expect(sectionBox.x).toBeGreaterThanOrEqual(columnBox!.x - 1)
+      expect(sectionBox.x + sectionBox.width).toBeLessThanOrEqual(columnBox!.x + columnBox!.width + 1)
+    }
+    const columnMetrics = await Promise.all([".workbench-left", ".workbench-center", ".workbench-right-sticky"].map(async column => ({
+      column,
+      metrics: await page.locator(column).evaluate(element => ({
+        position: getComputedStyle(element).position,
+        overflowY: getComputedStyle(element).overflowY,
+        height: element.getBoundingClientRect().height,
+        bottom: element.getBoundingClientRect().bottom,
+      })),
+    })))
+    const expectedHeight = columnMetrics[0].metrics.height
+    for (const { column, metrics } of columnMetrics) {
+      expect(metrics.position, column).toBe("sticky")
+      expect(metrics.overflowY, column).toBe("auto")
+      expect(metrics.height, column).toBeCloseTo(expectedHeight, 0)
+      expect(metrics.bottom, column).toBeCloseTo(columnMetrics[0].metrics.bottom, 0)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(viewport.height + 1)
+  } else {
+    // 窄屏：结果条在全部配置之前，面板和白盒在驱动盘之后。
+    const [agentBox, driveDiscBox] = await Promise.all([
+      page.locator(".workbench-agent-section").boundingBox(),
+      page.locator(".drive-disc-workbench-panel").boundingBox(),
+    ])
+    expect(agentBox).not.toBeNull()
+    expect(driveDiscBox).not.toBeNull()
+    expect(agentBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height)
+    expect(panelBox!.y).toBeGreaterThanOrEqual(driveDiscBox!.y + driveDiscBox!.height)
+    if (viewport.width <= 980) {
+      // 单栏：结果条、角色、驱动盘依次排列，面板与白盒在配置之后。
+      expect(agentBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height)
+      expect(driveDiscBox!.y).toBeGreaterThanOrEqual(agentBox!.y + agentBox!.height)
+      expect(panelBox!.y).toBeGreaterThanOrEqual(driveDiscBox!.y + driveDiscBox!.height)
+    }
   }
+
+  // 结果条吸顶时不能压住顶栏。
+  const [topbarBottom, summaryTop] = await Promise.all([
+    page.locator(".app-topbar").evaluate(element => element.getBoundingClientRect().bottom),
+    page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight)
+      return new Promise<number>(resolve => requestAnimationFrame(() =>
+        resolve(document.querySelector(".workbench-summary-section")!.getBoundingClientRect().top)))
+    }),
+  ])
+  expect(summaryTop).toBeGreaterThanOrEqual(topbarBottom - 1)
+  await page.evaluate(() => window.scrollTo(0, 0))
 
   await expectStableLayout(page, "damage-whitebox")
 })

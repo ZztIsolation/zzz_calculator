@@ -1042,4 +1042,89 @@ describe("optimizer store", () => {
     expect(store.error).toBe("没有符合筛选条件的 4 号位驱动盘。")
     expect(store.resultSchemes).toEqual([])
   })
+
+  describe("saved results", () => {
+    const disc = (id: string, partition: number, critRate = 2.4) => ({
+      id, partition, setId: "woodpecker_electro", rarity: "S", level: 15,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [{ stat: "critRate", value: critRate }],
+    })
+
+    async function completeRun(store: ReturnType<typeof useOptimizerStore>, input: any, results: any[]) {
+      const runPromise = store.run(catalog, inventoryStore(), input)
+      const worker = MockWorker.instances.at(-1)!
+      const startMessage = worker.messages.at(-1)
+      worker.emit({
+        type: "complete",
+        runId: startMessage.runId,
+        result: { settings: startMessage.input.settings, metrics: { estimatedCombinationCount: 1, processedCombinationCount: 1 }, results },
+      })
+      await runPromise
+    }
+
+    beforeEach(() => { localStorage.removeItem("zzz-calculator.webapp.optimizer-results.v1") })
+
+    it("restores the last completed results for the same account and agent after a reload", async () => {
+      const store = useOptimizerStore()
+      await completeRun(store, optimizerInput(), [
+        { rank: 1, score: 200, driveDiscs: [disc("a", 1), disc("b", 2)] },
+        { rank: 2, score: 150, driveDiscs: [disc("a", 1), disc("c", 2)] },
+      ])
+      expect(store.restoredResultsSavedAt).toBe("")
+
+      setActivePinia(createPinia())
+      const reloaded = useOptimizerStore()
+      expect(reloaded.restoreSavedResults("default", "agent_a", [disc("a", 1), disc("b", 2), disc("c", 2)])).toBe(true)
+      expect(reloaded.resultSchemes.map((scheme: any) => scheme.rank)).toEqual([1, 2])
+      expect(reloaded.restoredResultsSavedAt).not.toBe("")
+      expect(reloaded.completedSettingsFingerprint).toBe(store.completedSettingsFingerprint)
+
+      // 其他账号或角色互不串用
+      setActivePinia(createPinia())
+      expect(useOptimizerStore().restoreSavedResults("default", "agent_b", [disc("a", 1), disc("b", 2)])).toBe(false)
+      setActivePinia(createPinia())
+      expect(useOptimizerStore().restoreSavedResults("other", "agent_a", [disc("a", 1), disc("b", 2)])).toBe(false)
+    })
+
+    it("drops schemes whose discs were deleted or changed and restores nothing when none remain", async () => {
+      const store = useOptimizerStore()
+      await completeRun(store, optimizerInput(), [
+        { rank: 1, score: 200, driveDiscs: [disc("a", 1), disc("b", 2)] },
+        { rank: 2, score: 150, driveDiscs: [disc("a", 1), disc("c", 2)] },
+      ])
+
+      setActivePinia(createPinia())
+      const reloaded = useOptimizerStore()
+      // b 的词条变了，c 被删除
+      expect(reloaded.restoreSavedResults("default", "agent_a", [disc("a", 1), disc("b", 2, 9.6)])).toBe(false)
+      expect(reloaded.resultSchemes).toEqual([])
+
+      expect(reloaded.restoreSavedResults("default", "agent_a", [disc("a", 1), disc("b", 2, 9.6), disc("c", 2)])).toBe(true)
+      expect(reloaded.resultSchemes.map((scheme: any) => scheme.rank)).toEqual([2])
+    })
+
+    it("never overwrites live results and clears the restored marker on reset", async () => {
+      const store = useOptimizerStore()
+      await completeRun(store, optimizerInput(), [{ rank: 1, score: 200, driveDiscs: [disc("a", 1)] }])
+      expect(store.restoreSavedResults("default", "agent_a", [disc("a", 1)])).toBe(false)
+      expect(store.restoredResultsSavedAt).toBe("")
+
+      store.reset()
+      expect(store.restoreSavedResults("default", "agent_a", [disc("a", 1)])).toBe(true)
+      expect(store.restoredResultsSavedAt).not.toBe("")
+      store.reset()
+      expect(store.restoredResultsSavedAt).toBe("")
+    })
+
+    it("keeps only the most recent saved result sets", async () => {
+      const store = useOptimizerStore()
+      for (let index = 0; index < 8; index++) {
+        vi.setSystemTime(new Date(Date.UTC(2026, 9, 20, 0, index)))
+        await completeRun(store, optimizerInput({ agentId: `agent_${index}` }), [{ rank: 1, score: 100 + index, driveDiscs: [disc("a", 1)] }])
+      }
+      vi.useRealTimers()
+      const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer-results.v1") ?? "{}")
+      expect(Object.keys(saved.entries).sort()).toEqual(["default::agent_2", "default::agent_3", "default::agent_4", "default::agent_5", "default::agent_6", "default::agent_7"])
+    })
+  })
 })

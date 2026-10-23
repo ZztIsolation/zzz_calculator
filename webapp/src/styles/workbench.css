@@ -1,0 +1,115 @@
+/*
+ * 工作台（计算页）各栏共用的区块样式。
+ * 计算页和拆出去的子组件（如右侧结果栏）都使用这些类，因此放在全局。
+ */
+
+.workbench-surface {
+  display: grid;
+  align-self: start;
+  min-width: 0;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-panel);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.workbench-right-sticky {
+  position: sticky;
+  top: var(--workbench-sticky-top);
+  max-height: var(--workbench-sticky-height);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-border-strong) transparent;
+}
+
+.workbench-section {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workbench-section + .workbench-section,
+.workbench-section + .workbench-summary-section,
+.workbench-summary-section + .workbench-section {
+  border-top: 1px solid var(--app-border);
+}
+
+.workbench-section-header {
+  min-height: 0;
+  padding: 12px 14px 8px;
+  border-bottom: 0;
+}
+
+.workbench-section-header .panel-title {
+  font-size: 15px;
+}
+
+.workbench-section-body {
+  min-width: 0;
+  padding: 6px 14px 14px;
+}
+
+.workbench-surface .metric:not(.layer-metric) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workbench-surface .metric dt {
+  margin-bottom: 4px;
+}
+
+.workbench-surface .selected-set-summary {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.workbench-left,
+.workbench-center,
+.workbench-right {
+  min-width: 0;
+}
+
+/* 宽屏三栏共用同一可视高度，各栏内部独立滚动，底边保持对齐。 */
+@media (min-width: 1281px) {
+  .workbench-left,
+  .workbench-center,
+  .workbench-right-sticky {
+    position: sticky;
+    top: var(--workbench-sticky-top);
+    height: var(--workbench-sticky-height);
+    max-height: var(--workbench-sticky-height);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-border-strong) transparent;
+  }
+
+  .workbench-center {
+    align-self: stretch;
+  }
+}
+
+/* 右栏吸顶块的包含块是这个 aside：拉满整行，吸顶块才有滑动空间 */
+.workbench-right {
+  align-self: stretch;
+}
+
+.panel-subtitle {
+  margin: 4px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}

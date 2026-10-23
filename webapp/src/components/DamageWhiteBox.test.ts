@@ -140,6 +140,26 @@ describe("DamageWhiteBox", () => {
     expect(wrapper.findAll(".damage-whitebox-row-value").map(row => row.text())).toEqual(["520%", "0.5101"])
   })
 
+  it("collapses derivations behind each multiplier row and expands them on demand", async () => {
+    const wrapper = mountWhiteBox()
+    const rows = () => wrapper.findAll(".damage-whitebox-row")
+    const derivationVisible = (index: number) => (rows()[index]!.get(".damage-whitebox-row-main").element as HTMLElement).style.display !== "none"
+
+    expect(rows().map(row => row.get(".damage-whitebox-row-head").attributes("aria-expanded"))).toEqual(["false", "false"])
+    expect(derivationVisible(1)).toBe(false)
+
+    await rows()[1]!.get(".damage-whitebox-row-head").trigger("click")
+    expect(derivationVisible(1)).toBe(true)
+    expect(rows()[1]!.get(".damage-whitebox-row-head").attributes("aria-expanded")).toBe("true")
+
+    await wrapper.get("[data-testid='whitebox-toggle-all']").trigger("click")
+    expect([derivationVisible(0), derivationVisible(1)]).toEqual([true, true])
+    expect(wrapper.get("[data-testid='whitebox-toggle-all']").text()).toBe("全部收起")
+
+    await wrapper.get("[data-testid='whitebox-toggle-all']").trigger("click")
+    expect([derivationVisible(0), derivationVisible(1)]).toEqual([false, false])
+  })
+
   it("switches the visible white-box rows from the event select", async () => {
     const wrapper = mountWhiteBox()
 
