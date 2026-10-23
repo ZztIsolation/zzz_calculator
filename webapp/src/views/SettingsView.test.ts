@@ -108,6 +108,17 @@ describe("SettingsView", () => {
     expect(success).toHaveBeenCalledWith("已释放 70.00 MiB。")
   })
 
+  it("keeps the destructive clear action in a danger zone at the end of the page", async () => {
+    const wrapper = mount(SettingsView)
+    await vi.waitFor(() => expect(wrapper.text()).toContain("Helper 1.3.1"))
+    const bands = wrapper.findAll(".settings-band")
+    const dangerZone = bands.at(-1)!
+    expect(dangerZone.classes()).toContain("settings-danger-zone")
+    expect(dangerZone.text()).toContain("危险操作")
+    expect(dangerZone.findAll("button").map(button => button.text().trim())).toEqual(["清除网页数据"])
+    expect(bands.slice(0, -1).some(band => band.text().includes("清除网页数据"))).toBe(false)
+  })
+
   it("offers the takeover installer instead of unsupported commands for Helper 1.1", async () => {
     scanner.helperVersion = "1.1.0"
     scanner.protocolVersion = 2

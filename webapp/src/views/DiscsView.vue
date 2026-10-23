@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, onActivated, onDeactivated, ref, watch } from "vue"
+import { computed, h, inject, onMounted, onActivated, onDeactivated, ref, watch } from "vue"
 import { routeLocationKey } from "vue-router"
-import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTag, useMessage } from "naive-ui"
-import { Ban, Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
+import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NDropdown, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTag, useMessage } from "naive-ui"
+import { Ban, ChevronDown, Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload, X } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import DriveDiscConflictResolver from "@/components/DriveDiscConflictResolver.vue"
+import DriveDiscImportUndo from "@/components/DriveDiscImportUndo.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
 import DriveDiscPagination from "@/components/DriveDiscPagination.vue"
-import { useDriveDiscPagination } from "@/utils/driveDiscPagination"
+import { useDriveDiscPagination, usePersistedPageSize } from "@/utils/driveDiscPagination"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
@@ -33,7 +34,9 @@ defineOptions({ name: "DiscsView" })
 const pageActive = ref(true)
 const route = inject(routeLocationKey, null)
 const message = useMessage()
-const { page: discPage, pageSize: discPageSize, pagedItems: pagedDiscs } = useDriveDiscPagination(computed(() => inventoryStore.filteredDriveDiscs), 5)
+// 仓库每页数量可选（5 / 10 / 20 / 50），默认 5，并记住上次的选择
+const { pageSize: discPageSizeSetting, pageSizeOptions: discPageSizeOptions } = usePersistedPageSize("zzz-calculator.webapp.discs.pageSize.v2")
+const { page: discPage, pageSize: discPageSize, pagedItems: pagedDiscs } = useDriveDiscPagination(computed(() => inventoryStore.filteredDriveDiscs), discPageSizeSetting)
 const ALL_PRESET_AGENTS = "__all__"
 const presetAgentId = ref<string>(ALL_PRESET_AGENTS)
 const presetAgentOptions = computed(() => {
@@ -1125,6 +1128,52 @@ function confirmDangerImport() {
   }
   pendingDangerImport.value = ""
 }
+
+// 工具栏“更多”：低频操作收进下拉，常用的新增、导入、扫描保持可见
+const moreToolbarOptions = computed(() => [
+  { key: "refresh", label: "刷新库存", icon: () => h(RefreshCw, { size: 16 }) },
+  {
+    key: "export",
+    label: inventoryStore.hasDriveDiscs ? "批量导出" : "批量导出（当前账号没有驱动盘）",
+    disabled: inventoryStore.loading || !inventoryStore.hasDriveDiscs,
+    icon: () => h(Download, { size: 16 }),
+  },
+])
+
+function selectMoreToolbarAction(key: string | number) {
+  if (key === "refresh") void inventoryStore.load()
+  else if (key === "export") void exportDriveDiscs()
+}
+
+// 当前生效的筛选条件，以可单独清除的标签展示
+const activeFilterChips = computed(() => {
+  const chips: Array<{ key: string, label: string, clear: () => void }> = []
+  const search = String(inventoryStore.search ?? "").trim()
+  if (search) chips.push({ key: "search", label: `搜索：${search}`, clear: () => { inventoryStore.search = "" } })
+  if (inventoryStore.mainStatFilter) {
+    chips.push({ key: "mainStat", label: `主词条：${statLabel(inventoryStore.mainStatFilter, catalogStore.meta)}`, clear: () => { inventoryStore.mainStatFilter = "" } })
+  }
+  if (inventoryStore.slotFilter) {
+    chips.push({ key: "slot", label: `${inventoryStore.slotFilter}号位`, clear: () => { inventoryStore.slotFilter = 0 } })
+  }
+  if (reservationUiEnabled.value && !exclusionUiEnabled.value && inventoryStore.reservationFilter) {
+    const option = reservationFilterOptions.value.find((item: any) => item.value === inventoryStore.reservationFilter)
+    chips.push({ key: "reservation", label: String(option?.label ?? inventoryStore.reservationFilter), clear: () => { inventoryStore.reservationFilter = "" } })
+  }
+  if (exclusionUiEnabled.value && inventoryStore.restrictionStatusFilter) {
+    const option = restrictionStatusOptions.find(item => item.value === inventoryStore.restrictionStatusFilter)
+    chips.push({ key: "restrictionStatus", label: option?.label ?? inventoryStore.restrictionStatusFilter, clear: () => { inventoryStore.restrictionStatusFilter = "" } })
+  }
+  if (exclusionUiEnabled.value && inventoryStore.restrictionAgentFilter) {
+    const option = restrictionAgentOptions.value.find((item: any) => item.value === inventoryStore.restrictionAgentFilter)
+    chips.push({ key: "restrictionAgent", label: String(option?.label ?? inventoryStore.restrictionAgentFilter), clear: () => { inventoryStore.restrictionAgentFilter = "" } })
+  }
+  return chips
+})
+
+function clearAllFilters() {
+  for (const chip of activeFilterChips.value) chip.clear()
+}
 </script>
 
 <template>
@@ -1137,22 +1186,17 @@ function confirmDangerImport() {
             <template #icon><Plus :size="16" /></template>
             新增单个
           </NButton>
-          <NButton title="重新读取库存；其他标签页的改动请点击刷新" @click="inventoryStore.load">
-            <template #icon><RefreshCw :size="16" /></template>
-            刷新
-          </NButton>
+          <DriveDiscImportUndo v-if="pageActive" />
           <NButton @click="showImport = true">
             <template #icon><Upload :size="16" /></template>
             批量导入
           </NButton>
-          <NButton
-            :disabled="inventoryStore.loading || !inventoryStore.hasDriveDiscs"
-            :title="inventoryStore.hasDriveDiscs ? '导出当前账号的全部驱动盘' : '当前账号没有可导出的驱动盘'"
-            @click="exportDriveDiscs"
-          >
-            <template #icon><Download :size="16" /></template>
-            批量导出
-          </NButton>
+          <NDropdown trigger="click" :options="moreToolbarOptions" placement="bottom-end" @select="selectMoreToolbarAction">
+            <NButton data-testid="drive-disc-more-actions" aria-haspopup="menu">
+              更多
+              <ChevronDown :size="14" aria-hidden="true" class="toolbar-more-chevron" />
+            </NButton>
+          </NDropdown>
           <NButton type="primary" @click="showScan = true">
             <template #icon><Radar :size="16" /></template>
             扫描
@@ -1187,6 +1231,21 @@ function confirmDangerImport() {
           />
           <NTag round>{{ inventoryStore.driveDiscs.length }} 件</NTag>
           <NTag round>{{ inventoryStore.loadouts.length }} 个套装预设</NTag>
+        </div>
+        <div v-if="activeFilterChips.length" class="active-filter-chips" role="group" aria-label="当前筛选条件">
+          <span class="active-filter-label">已筛选</span>
+          <button
+            v-for="chip in activeFilterChips"
+            :key="chip.key"
+            type="button"
+            class="active-filter-chip"
+            :aria-label="`清除筛选：${chip.label}`"
+            @click="chip.clear()"
+          >
+            {{ chip.label }}
+            <X :size="12" aria-hidden="true" />
+          </button>
+          <button type="button" class="active-filter-clear" data-testid="clear-drive-disc-filters" @click="clearAllFilters">清除全部</button>
         </div>
         <div class="slot-filter-scroll">
           <div class="slot-filter-buttons" role="group" aria-label="驱动盘槽位筛选">
@@ -1294,7 +1353,7 @@ function confirmDangerImport() {
           </table>
           <div v-if="!inventoryStore.filteredDriveDiscs.length" class="empty-state">暂无数据</div>
         </div>
-        <DriveDiscPagination v-model:page="discPage" :total="inventoryStore.filteredDriveDiscs.length" :page-size="discPageSize" />
+        <DriveDiscPagination v-model:page="discPage" v-model:page-size="discPageSize" :total="inventoryStore.filteredDriveDiscs.length" :page-size-options="discPageSizeOptions" />
       </div>
     </div>
 
@@ -2599,6 +2658,62 @@ function confirmDangerImport() {
   justify-content: center;
   gap: 10px;
   margin-top: 8px;
+}
+
+.toolbar-more-chevron {
+  margin-left: 4px;
+}
+
+.active-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.active-filter-label {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.active-filter-chip,
+.active-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--app-blue-line);
+  border-radius: 999px;
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.active-filter-chip:hover {
+  border-color: var(--app-blue);
+}
+
+.active-filter-clear {
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--app-muted);
+}
+
+.active-filter-clear:hover {
+  color: var(--app-text);
+}
+
+.active-filter-chip:focus-visible,
+.active-filter-clear:focus-visible {
+  outline: var(--app-focus-ring);
+  outline-offset: 1px;
 }
 
 @media (max-width: 720px) {

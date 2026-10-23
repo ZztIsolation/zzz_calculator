@@ -11,7 +11,7 @@ import {
   driveDiscSourceDescriptors,
   driveDiscSourceText,
 } from "@/utils/driveDiscProvenance"
-import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
+import { driveDiscAdditionalRollText, driveDiscEffectiveRolls, importantSubStatsForAgent } from "@/utils/driveDiscSubstats"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 
@@ -49,6 +49,15 @@ const emit = defineEmits<{
 const setFilterIds = ref<string[]>([])
 const mainStatFilter = ref("")
 const search = ref("")
+// 排序：默认把当前角色有效副词条多的盘排在前面；角色没有配置重要副词条时按套装
+const sortMode = ref<"effective" | "set">("effective")
+const importantSubStats = computed(() => importantSubStatsForAgent(props.targetAgentId, props.meta, props.agents))
+const canSortByEffective = computed(() => importantSubStats.value.length > 0)
+const effectiveRollsById = computed(() => new Map<string, number>(slotDiscs.value
+  .map(disc => [String(disc.id), driveDiscEffectiveRolls(disc, importantSubStats.value, props.meta)])))
+function effectiveRolls(disc: any) {
+  return effectiveRollsById.value.get(String(disc?.id)) ?? 0
+}
 const modalVisible = computed({
   get: () => props.show,
   set: value => emit("update:show", value),
@@ -101,13 +110,17 @@ const filteredDiscs = computed(() => {
     .sort((left, right) => {
       const leftSelected = left.id === props.selectedId ? 0 : 1
       const rightSelected = right.id === props.selectedId ? 0 : 1
+      const byEffective = sortMode.value === "effective" && canSortByEffective.value
+        ? effectiveRolls(right) - effectiveRolls(left)
+        : 0
       return leftSelected - rightSelected
+        || byEffective
         || setName(left).localeCompare(setName(right), "zh-CN")
         || scannerSequenceSortValue(left) - scannerSequenceSortValue(right)
     })
 })
 
-const { page, pageSize, pagedItems: pagedDiscs } = useDriveDiscPagination(filteredDiscs)
+const { page, pageSize, pagedItems: pagedDiscs } = useDriveDiscPagination(filteredDiscs, 20)
 
 watch(setFilterOptions, options => {
   const validIds = new Set(options.map(option => option.value))
@@ -229,7 +242,16 @@ function clearSlot() {
     <div class="section-band manual-disc-picker ui-layout-scope" :data-layout-surface="surface">
       <div class="manual-disc-picker-head">
         <span>只显示当前号位的已有驱动盘</span>
-        <NTag round>{{ filteredDiscs.length }} 件可选</NTag>
+        <span class="manual-disc-picker-head-actions">
+          <label v-if="canSortByEffective" class="manual-disc-sort">
+            排序
+            <select v-model="sortMode" aria-label="驱动盘排序方式">
+              <option value="effective">有效词条优先</option>
+              <option value="set">按套装</option>
+            </select>
+          </label>
+          <NTag round>{{ filteredDiscs.length }} 件可选</NTag>
+        </span>
       </div>
       <div class="manual-disc-filter-row ui-field-grid ui-field-grid--comfortable" data-layout-surface="manual-drive-disc-filters">
         <div class="metric" data-layout-field>
@@ -292,7 +314,10 @@ function clearSlot() {
             </NTag>
           </span>
           <span class="manual-disc-option-stat">
-            <strong>{{ statText(disc.mainStat) }}</strong>
+            <strong>
+              {{ statText(disc.mainStat) }}
+              <em v-if="canSortByEffective" class="manual-disc-effective" :title="`当前角色的有效副词条 ${effectiveRolls(disc)} 条（含强化次数）`">有效 {{ effectiveRolls(disc) }}</em>
+            </strong>
             <span>{{ subStatText(disc) }}</span>
           </span>
         </button>
@@ -319,6 +344,44 @@ function clearSlot() {
 <style scoped>
 .manual-disc-picker {
   gap: 12px;
+}
+
+.manual-disc-picker-head-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.manual-disc-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.manual-disc-sort select {
+  height: 26px;
+  padding: 0 4px;
+  border: 1px solid var(--app-border-strong, #cbd5e1);
+  border-radius: 6px;
+  background: var(--app-panel, #fff);
+  color: var(--app-text, inherit);
+  font: inherit;
+}
+
+.manual-disc-effective {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--app-blue-soft, #edf4ff);
+  color: var(--app-blue-strong, #1d5fd6);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  vertical-align: middle;
 }
 
 .manual-disc-picker-head {

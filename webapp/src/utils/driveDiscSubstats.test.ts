@@ -4,6 +4,8 @@ import {
   driveDiscAdditionalRolls,
   driveDiscSubStatRollCount,
   countEffectiveDriveDiscSubstats,
+  importantSubStatsForAgent,
+  driveDiscEffectiveRolls,
 } from "@/utils/driveDiscSubstats"
 
 const meta = {
@@ -79,5 +81,19 @@ describe("driveDiscSubstats", () => {
     expect(countEffectiveDriveDiscSubstats([
       { rarity: "S", subStats: [{ stat: "critRate", value: 7.2 }] },
     ], [], meta)).toEqual({ total: 0, withoutPenFlat: 0, includesPenFlat: false })
+  })
+
+  it("resolves important substats from metadata before the fallback agent list", () => {
+    expect(importantSubStatsForAgent("agent-a", {
+      agents: [{ id: "agent-a", importantSubStats: ["critRate"] }],
+    }, [{ id: "agent-a", importantSubStats: ["hpFlat"] }])).toEqual(["critRate"])
+    expect(importantSubStatsForAgent("agent-b", {}, [{ id: "agent-b", importantSubStats: ["critDmg"] }])).toEqual(["critDmg"])
+  })
+
+  it("counts effective rolls for one disc", () => {
+    expect(driveDiscEffectiveRolls({
+      rarity: "S",
+      subStats: [{ stat: "critRate", value: 7.2 }, { stat: "hpFlat", value: 112 }],
+    }, ["critRate"], { statRules: { driveDisc: { sRankSubStatBaseStep: { critRate: 2.4, hpFlat: 112 } } } })).toBe(3)
   })
 })

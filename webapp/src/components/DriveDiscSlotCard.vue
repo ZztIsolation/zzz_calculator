@@ -6,6 +6,7 @@ import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
+import { contributionLabel, type DriveDiscContribution } from "@/utils/driveDiscContribution"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
 
 const props = withDefaults(defineProps<{
@@ -27,6 +28,8 @@ const props = withDefaults(defineProps<{
   exclusionBusy?: boolean
   currentReservationPrefix?: string
   emptyHint?: string
+  /** 去掉这张盘后目标值的变化，由计算页在后台算出 */
+  contribution?: DriveDiscContribution | null
 }>(), {
   disc: null,
   driveDiscSets: () => [],
@@ -44,6 +47,7 @@ const props = withDefaults(defineProps<{
   exclusionBusy: false,
   currentReservationPrefix: "当前角色",
   emptyHint: "可在自选模式选择已有驱动盘",
+  contribution: null,
 })
 
 const emit = defineEmits<{
@@ -161,6 +165,8 @@ function isImportantSubStat(stat: any) {
   return Boolean(key) && importantSubStatKeys.value.has(key)
 }
 
+const contributionBadge = computed(() => (props.disc ? contributionLabel(props.contribution) : null))
+
 function choose() {
   if (props.interactive) emit("select", props.slot)
 }
@@ -271,6 +277,13 @@ function toggleExclusion() {
           <template #icon><Ban :size="17" /></template>
         </NButton>
       </div>
+      <span
+        v-if="contributionBadge"
+        class="disc-slot-card-contribution"
+        :class="`is-${contributionBadge.tone}`"
+        :title="contributionBadge.title"
+        data-testid="disc-contribution"
+      >{{ contributionBadge.text }}</span>
       <NTag v-if="disc" round>{{ rarityLevel }}</NTag>
       <NTag v-if="showReservation && disc" :type="usageTag.type" size="small" round>
         {{ usageTag.label }}
@@ -294,6 +307,28 @@ function toggleExclusion() {
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
   background: var(--app-panel);
+}
+
+.disc-slot-card-contribution {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.disc-slot-card-contribution.is-positive {
+  background: var(--app-green-soft, #e9f7f1);
+  color: var(--app-green-strong, #087a55);
+}
+
+.disc-slot-card-contribution.is-negative {
+  background: var(--app-red-soft, #fdecec);
+  color: var(--app-red-strong, #b42318);
 }
 
 .disc-slot-card-empty {

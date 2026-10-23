@@ -12,7 +12,7 @@ const labelDraft = ref("")
 const deleteId = ref("")
 
 const deleteTarget = computed(() => accountStore.owners.find((owner: any) => owner.id === deleteId.value))
-const accountUnavailable = computed(() => accountStore.loadState !== "ready")
+const accountUnavailable = computed(() => accountStore.loadState !== "ready" || Boolean(accountStore.operation))
 
 async function retryAccountLoad() {
   try {
@@ -23,30 +23,43 @@ async function retryAccountLoad() {
 }
 
 function createAccount() {
+  accountStore.operationError = ""
   editingId.value = ""
   labelDraft.value = "新账号"
   showEditor.value = true
 }
 
 function renameAccount(owner: any) {
+  accountStore.operationError = ""
   editingId.value = owner.id
   labelDraft.value = owner.label || owner.name || "账号"
   showEditor.value = true
 }
 
 async function saveEditor() {
+  if (accountStore.operation) return
   const label = labelDraft.value.trim() || "新账号"
-  if (editingId.value) {
-    await accountStore.rename(editingId.value, label)
-  } else {
-    await accountStore.create(label)
-  }
-  showEditor.value = false
+  try {
+    if (editingId.value) {
+      await accountStore.rename(editingId.value, label)
+    } else {
+      await accountStore.create(label)
+    }
+    showEditor.value = false
+  } catch { /* Keep the draft and expose the shared operation error. */ }
 }
 
 async function confirmDelete() {
-  await accountStore.remove(deleteId.value)
-  deleteId.value = ""
+  if (accountStore.operation) return
+  try {
+    await accountStore.remove(deleteId.value)
+    deleteId.value = ""
+  } catch { /* Keep the confirmation open on failure. */ }
+}
+
+async function switchAccount(id: string) {
+  if (accountStore.operation) return
+  try { await accountStore.switchTo(id) } catch { /* Render the shared error. */ }
 }
 </script>
 
@@ -60,6 +73,7 @@ async function confirmDelete() {
       </NButton>
     </div>
     <div class="panel-body">
+      <NAlert v-if="accountStore.operationError" type="error" title="账号操作失败">{{ accountStore.operationError }}</NAlert>
       <NAlert v-if="accountStore.loadState === 'error'" type="error" title="账号信息加载失败">
         {{ accountStore.error }}
         <NButton secondary size="small" @click="retryAccountLoad">重试</NButton>
@@ -67,8 +81,13 @@ async function confirmDelete() {
       <div v-else-if="accountStore.loadState === 'loading' || accountStore.loadState === 'idle'" class="empty-state">
         正在加载账号…
       </div>
-      <div v-else-if="accountStore.owners.length" class="entity-grid">
-        <article v-for="owner in accountStore.owners" :key="owner.id" class="panel">
+      <div v-else-if="accountStore.owners.length" class="entity-grid account-grid">
+        <article
+          v-for="owner in accountStore.owners"
+          :key="owner.id"
+          class="panel account-card"
+          :class="{ 'is-current': owner.id === accountStore.currentOwnerId }"
+        >
           <div class="panel-header">
             <h2 class="panel-title">{{ owner.label }}</h2>
             <NTag v-if="owner.id === accountStore.currentOwnerId" type="success" round>
@@ -76,7 +95,7 @@ async function confirmDelete() {
             </NTag>
           </div>
           <div class="panel-body section-band">
-            <dl class="metric-grid">
+            <dl class="metric-grid account-metrics">
               <div class="metric">
                 <dt>驱动盘</dt>
                 <dd class="num">{{ owner.driveDiscCount ?? 0 }}</dd>
@@ -95,7 +114,7 @@ async function confirmDelete() {
               </div>
             </dl>
             <div class="toolbar">
-              <NButton :disabled="accountUnavailable || owner.id === accountStore.currentOwnerId" @click="accountStore.switchTo(owner.id)">
+              <NButton :loading="accountStore.operation === 'switch'" :disabled="accountUnavailable || owner.id === accountStore.currentOwnerId" @click="switchAccount(owner.id)">
                 <template #icon><Check :size="16" /></template>
                 切换
               </NButton>
@@ -115,11 +134,12 @@ async function confirmDelete() {
     </div>
   </section>
 
-  <NModal v-model:show="showEditor" preset="dialog" :title="editingId ? '重命名账号' : '新建账号'">
-    <NInput v-model:value="labelDraft" placeholder="账号名称" />
+  <NModal v-model:show="showEditor" :closable="!accountStore.operation" :mask-closable="!accountStore.operation" :close-on-esc="!accountStore.operation" preset="dialog" :title="editingId ? '重命名账号' : '新建账号'">
+    <NAlert v-if="accountStore.operationError" type="error">{{ accountStore.operationError }}</NAlert>
+    <NInput v-model:value="labelDraft" :disabled="Boolean(accountStore.operation)" placeholder="账号名称" />
     <template #action>
-      <NButton @click="showEditor = false">取消</NButton>
-      <NButton type="primary" @click="saveEditor">保存</NButton>
+      <NButton :disabled="Boolean(accountStore.operation)" @click="showEditor = false">取消</NButton>
+      <NButton type="primary" :loading="Boolean(accountStore.operation)" @click="saveEditor">保存</NButton>
     </template>
   </NModal>
 
@@ -129,7 +149,26 @@ async function confirmDelete() {
     title="删除账号"
     :message="`将删除「${deleteTarget?.label || ''}」下的 ${deleteTarget?.driveDiscCount ?? 0} 个驱动盘、${deleteTarget?.loadoutCount ?? 0} 个套装预设和 ${deleteTarget?.importCount ?? 0} 条导入记录。`"
     confirm-text="删除账号"
-    @update:show="value => { if (!value) deleteId = '' }"
+    :busy="accountStore.operation === 'remove'"
+    :error="accountStore.operationError"
+    @update:show="value => { if (!value && !accountStore.operation) deleteId = '' }"
     @confirm="confirmDelete"
   />
 </template>
+
+<style scoped>
+/* 账号卡片：每张至少 300px 宽，当前账号用主色描边 */
+.account-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+}
+
+.account-card.is-current {
+  border-color: var(--app-blue-line);
+  box-shadow: 0 0 0 1px var(--app-blue-line);
+}
+
+.account-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+</style>

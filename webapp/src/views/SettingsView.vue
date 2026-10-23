@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { NAlert, NButton, NProgress, NSwitch, NTag, useMessage } from "naive-ui"
 import { Download, HardDrive, Play, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
+import PersonalBackupPanel from "@/components/PersonalBackupPanel.vue"
 import { clearAllBrowserData } from "@runtime/local-store.js"
 import { loadAppConfig } from "@/runtime/app-config"
 import {
@@ -175,6 +176,7 @@ onMounted(() => {
 
 <template>
   <div class="settings-view">
+    <PersonalBackupPanel />
     <section class="panel">
       <div class="panel-header">
         <div>
@@ -224,12 +226,6 @@ onMounted(() => {
           <p>账号、驱动盘、计算配置和本地草稿</p>
         </div>
         <strong>{{ formatBytes(browserBytes) }}</strong>
-      </div>
-      <div class="settings-actions">
-        <NButton type="error" @click="showBrowserClear = true">
-          <template #icon><Trash2 :size="16" /></template>
-          清除网页数据
-        </NButton>
       </div>
     </section>
 
@@ -303,6 +299,26 @@ onMounted(() => {
             释放扫描器空间
           </NButton>
         </template>
+      </div>
+    </section>
+
+    <!-- 不可撤销的操作集中放在页面最后 -->
+    <section class="settings-band settings-danger-zone" aria-labelledby="settings-danger-title">
+      <div class="settings-heading">
+        <div>
+          <h2 id="settings-danger-title">危险操作</h2>
+          <p>以下操作无法撤销，执行前请先导出完整备份。</p>
+        </div>
+      </div>
+      <div class="settings-danger-row">
+        <div>
+          <strong>清除网页数据</strong>
+          <p>永久删除所有账号、驱动盘、套装预设、计算配置和本地草稿（{{ formatBytes(browserBytes) }}）。扫描器程序不受影响。</p>
+        </div>
+        <NButton type="error" secondary @click="showBrowserClear = true">
+          <template #icon><Trash2 :size="16" /></template>
+          清除网页数据
+        </NButton>
       </div>
     </section>
   </div>
@@ -409,6 +425,38 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: 16px;
   flex-wrap: wrap;
+}
+
+.settings-danger-zone {
+  border: 1px solid var(--app-red-line);
+  border-radius: var(--app-radius);
+  background: var(--app-red-soft);
+}
+
+.settings-danger-zone h2 {
+  color: var(--app-red-strong);
+}
+
+.settings-danger-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--app-red-line);
+}
+
+.settings-danger-row > div {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.settings-danger-row p {
+  margin: 4px 0 0;
+  color: var(--app-muted);
+  font-size: 13px;
 }
 
 .privacy-note {
