@@ -125,7 +125,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run browser layout regression suite
-        run: npm run test:layout
+        run: npm run test:layout:ci
 
       # Keep the repository's packaging command as a required verification. It
       # binds the artifact to the exact clean checkout SHA.
