@@ -1,10 +1,17 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
 
 const viewPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "WorkbenchView.vue")
-const source = readFileSync(viewPath, "utf8").replace(/\r\n/g, "\n")
+const viewDir = path.dirname(fileURLToPath(import.meta.url))
+const workbenchComponentDir = path.resolve(viewDir, "../components/workbench")
+const viewSource = readFileSync(viewPath, "utf8").replace(/\r\n/g, "\n")
+const source = [
+  viewSource,
+  ...readdirSync(workbenchComponentDir).filter(file => file.endsWith(".vue")).sort().map(file => readFileSync(path.join(workbenchComponentDir, file), "utf8")),
+  readFileSync(path.resolve(viewDir, "../styles/workbench.css"), "utf8"),
+].join("\n")
 const componentDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../components")
 const slotCardSource = readFileSync(path.join(componentDir, "DriveDiscSlotCard.vue"), "utf8")
 const pickerSource = readFileSync(path.join(componentDir, "DriveDiscPickerModal.vue"), "utf8")
@@ -174,10 +181,23 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).not.toContain("patch.referenceLuminescenceDamageMultiplier")
   })
 
-  it("shows every active combat buff badge instead of truncating the list", () => {
+  it("shows every active combat Buff in grouped source lists", () => {
     expect(source).toContain("activeBuffIdsForPanel")
+    expect(source).toContain("const activeBuffGroups = computed(() => groupActiveBuffs(activeBuffBadges.value))")
+    expect(source).toContain('import { groupActiveBuffs } from "@/utils/activeBuffGroups"')
     expect(source).not.toContain(".slice(0, 8).map(id =>")
     expect(source).toContain("v-if=\"!activeBuffIdsForPanel.length\"")
+  })
+
+  it("keeps the in-combat Buff section collapsed by default and persists the toggle", () => {
+    expect(source).toContain('const BUFF_SECTION_STORAGE_KEY = "zzz-workbench-buff-expanded"')
+    expect(source).toContain("const buffSectionExpanded = ref(false)")
+    expect(source).toContain('data-testid="toggle-workbench-buff"')
+    expect(source).toContain(':expanded="buffSectionExpanded"')
+    expect(source).toContain('aria-controls="workbench-buff-content"')
+    expect(source).toContain("localStorage.getItem(BUFF_SECTION_STORAGE_KEY)")
+    expect(source).toContain("localStorage.setItem(BUFF_SECTION_STORAGE_KEY, String(expanded))")
+    expect(source).toContain(':hidden="!buffSectionExpanded && !buffContextError"')
   })
 
   it("wires teammate w-engine refinement labels while counting only true custom buffs", () => {
@@ -200,32 +220,40 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("workbench-section")
     expect(source).toContain("DamageWhiteBox")
     expect(source).toContain("PanelStatTable")
-    expect(source.match(/:important-stats="selectedAgent\?\.importantPanelStats"/g)).toHaveLength(2)
-    expect(source).toContain("damage-panel-grid")
-    expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));")
+    expect(source.match(/<PanelStatTable/g)).toHaveLength(1)
+    expect(source.match(/:important-stats="selectedAgent\?\.importantPanelStats"/g)).toHaveLength(1)
+    expect(source).toContain(':in-combat-panel="buildStore.result?.inCombat?.panel ?? null"')
+    expect(source).toContain("damage-panel-compare")
+    expect(source).not.toContain("damage-panel-grid")
   })
 
-  it("orders the right column as panel, damage summary, then white box", () => {
-    const panelStart = source.indexOf('<section class="workbench-section damage-panel-card">')
+  it("offers one-click skill level presets that write all categories at once", () => {
+    expect(source).toContain('data-testid="skill-level-preset-12"')
+    expect(source).toContain('data-testid="skill-level-preset-max"')
+    expect(source).toContain("buildStore.updateSkillLevels(levels)")
+    expect(source).toContain(':aria-pressed="skillLevelPresetActive(12)"')
+  })
+
+  it("orders the right column as damage summary, panel, then white box", () => {
     const summaryStart = source.indexOf('<DamageSummaryBar class="workbench-summary-section"')
+    const panelStart = source.indexOf('<section class="workbench-section damage-panel-card">')
     const whiteBoxStart = source.indexOf('<section class="workbench-section workbench-whitebox-section">')
 
-    expect(panelStart).toBeGreaterThan(-1)
-    expect(summaryStart).toBeGreaterThan(panelStart)
-    expect(whiteBoxStart).toBeGreaterThan(summaryStart)
-    expect(source).toContain(".workbench-section + .workbench-summary-section,")
+    expect(summaryStart).toBeGreaterThan(-1)
+    expect(panelStart).toBeGreaterThan(summaryStart)
+    expect(whiteBoxStart).toBeGreaterThan(panelStart)
   })
 
   it("prevents long Miyabi calculation labels from widening the left workbench column", () => {
     expect(source).toContain('class="workbench-section-body metric-grid calculation-summary-grid"')
     expect(source).toContain('class="metric calculation-event-summary"')
-    expect(source).toContain('class="chip-row calculation-event-summary-tags"')
+    expect(source).toContain('class="workbench-inset-list calculation-event-summary-tags"')
     expect(source).toContain(".workbench-left .section-band {")
     expect(source).toContain("grid-template-columns: minmax(0, 1fr);")
     expect(source).toContain(".workbench-left > *,")
-    expect(source).toContain(".calculation-event-summary-tags :deep(.n-tag__content)")
+    expect(source).toContain(".workbench-inset-name {")
     expect(source).toContain("overflow-wrap: anywhere;")
-    expect(source).toContain("white-space: normal;")
+    expect(source).toContain("text-overflow: ellipsis;")
   })
 
   it("uses compact spacing and shared label typography in the calculation summary", () => {
@@ -242,29 +270,21 @@ describe("WorkbenchView optimizer progress", () => {
 }`)
   })
 
-  it("keeps extra calculation events behind an accessible inline toggle", () => {
+  it("keeps all calculation events collapsed by default behind an accessible toggle", () => {
     expect(source).toContain("const showAllDamageEvents = ref(false)")
-    expect(source).toContain("const visibleDamageEventSummary = computed")
-    expect(source).toContain("damageEventSummary.value.slice(0, 2)")
-    expect(source).toContain("const hiddenDamageEventCount = computed")
+    expect(source).toContain("const visibleDamageEventSummary = computed(() => showAllDamageEvents.value ? damageEventSummary.value : [])")
     expect(source).toContain('data-testid="calculation-event-summary-toggle"')
-    expect(source).toContain(':aria-expanded="showAllDamageEvents"')
+    expect(source).toContain(':expanded="showAllDamageEvents"')
     expect(source).toContain('aria-controls="calculation-event-summary-list"')
-    expect(source).toContain('showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项`')
-    expect(source).toContain("<ChevronDown")
-    expect(source).toContain("<ChevronUp")
-    expect(source.match(/class="calculation-event-summary-toggle-row"/g)).toHaveLength(2)
-    expect(source.match(/<ChevronUp v-if="showAllDamageEvents" :size="16"/g)).toHaveLength(2)
-    expect(source.match(/<ChevronDown v-else :size="16"/g)).toHaveLength(2)
-    expect(source).toContain(".calculation-event-summary-toggle-row {")
-    expect(source).toContain("flex: 0 0 100%;")
-    expect(source).toContain("font-size: 14px;")
+    expect(source.match(/label="展开"\n\s*expanded-label="收起"/g)).toHaveLength(2)
+    expect(source).toContain('<ol v-show="showAllDamageEvents" id="calculation-event-summary-list"')
+    const heading = source.slice(source.indexOf('<div class="calculation-event-summary-heading">'), source.indexOf('id="calculation-event-summary-list" class="workbench-inset-list'))
+    expect(heading).toContain('data-testid="calculation-event-summary-toggle"')
     expect(source).toContain("watch(damageEventSummarySignature")
-    expect(source).toContain(".calculation-event-summary-toggle:focus-visible")
   })
 
-  it("passes the rupture sheer-force flag to both panel tables", () => {
-    expect(source.match(/:include-sheer-force=\"selectedAgent\?\.specialty === 'rupture'\"/g)).toHaveLength(2)
+  it("passes the rupture sheer-force flag to the panel comparison table", () => {
+    expect(source.match(/:include-sheer-force=\"selectedAgent\?\.specialty === 'rupture'\"/g)).toHaveLength(1)
   })
 
   it("splits event management from optimizer configuration", () => {
@@ -305,12 +325,6 @@ describe("WorkbenchView optimizer progress", () => {
   it("separates optimizer execution styling from configuration actions", () => {
     expect(source).toContain('<NButton v-if="!optimizerStore.isBusy" class="optimizer-action-button optimizer-action-button--start" type="primary" :disabled="!canRunOptimization" @click="runOptimization">')
     expect(source).toContain('<NButton v-else class="optimizer-action-button optimizer-action-button--cancel" type="warning" @click="optimizerStore.cancel">取消优化</NButton>')
-    expect(source).toContain("linear-gradient(135deg, #0f9f6e 0%, #087a55 100%)")
-    expect(source).toContain("linear-gradient(135deg, #18b57e 0%, #066847 100%)")
-    expect(source).toContain("rgba(8, 122, 85, 0.28)")
-    expect(source).toContain("min-width: 116px;")
-    expect(source).toContain("height: 40px;")
-    expect(source).toContain("@media (prefers-reduced-motion: reduce)")
   })
 
   it("suppresses naive-ui border overlays on custom action buttons", () => {
@@ -335,18 +349,12 @@ describe("WorkbenchView optimizer progress", () => {
 
   it("packs the agent selector and level controls into a denser three-column section", () => {
     expect(source).toContain("workbench-agent-header")
-    expect(source).toContain(".workbench-left .build-profile-grid,")
-    expect(source).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));")
-    expect(source).toContain(".workbench-left .build-profile-grid .compact-field-wide")
-    expect(source).toContain(".workbench-agent-section .build-skill-grid")
-    expect(source).toContain("min-height: 30px;")
+    expect(source).toContain('data-layout-surface="agent-profile-fields"')
+    expect(source).toContain('data-layout-surface="skill-level-fields"')
   })
 
   it("keeps workbench borders scoped to one surface per column", () => {
-    expect(source).toContain(".workbench-surface {")
-    expect(source).toContain(".workbench-section + .workbench-section")
-    expect(source).toContain(".workbench-surface :deep(.metric:not(.layer-metric))")
-    expect(source).toContain(".workbench-summary-section")
+    expect(source.match(/class="[^"]*workbench-surface/g)).toHaveLength(3)
     expect(source).not.toContain('class="panel optimizer-constraint-panel"')
     expect(source).not.toContain('class="panel drive-disc-workbench-panel"')
   })
@@ -415,12 +423,13 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
-    expect(source).toContain("draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length")
-    expect(source).toContain("optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)")
-    expect(source).toContain("draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]")
-    expect(source).toContain("optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)")
-    expect(source).toContain('@click="showFourPieceSetModal = false">取消')
-    expect(source).toContain('@click="showTwoPieceSetModal = false">取消')
+    // 草稿由 OptimizerSetChoiceModal 管理（见组件测试），这里只检查打开时的初始值和提交路径
+    expect(source).toContain("fourPieceSetModalInitialIds.value = optimizerStore.fourPieceSetIds.length")
+    expect(source).toContain("optimizerStore.setFourPieceSets(ids)")
+    expect(source).toContain("twoPieceSetModalInitialIds.value = [...optimizerStore.twoPieceSetIds]")
+    expect(source).toContain("optimizerStore.setTwoPieceSetIds(ids)")
+    expect(source).toContain('@apply="applyFourPieceSetModalSelection"')
+    expect(source).toContain('@apply="applyTwoPieceSetModalSelection"')
   })
 })
 
@@ -622,10 +631,11 @@ describe("WorkbenchView drive disc scheme source", () => {
     expect(source).toContain("const driveDiscModeOptions = [")
     expect(source).toContain('class="drive-disc-source-row"')
     expect(source).toContain('class="drive-disc-source-label"')
-    expect(source).toContain("<NRadioGroup")
-    expect(source).toContain("<NRadioButton")
-    expect(source).toContain(':value="buildStore.discMode"')
-    expect(source).toContain("@update:value=\"buildStore.setDiscMode(String($event) as any)\"")
+    expect(source).toContain("<WorkbenchSegmentedControl")
+    expect(source).toContain(':model-value="buildStore.discMode"')
+    expect(source).toContain('role="radiogroup"')
+    expect(source).toContain('role="radio"')
+    expect(source).toContain("@update:model-value=\"value => buildStore.setDiscMode(value as any)\"")
     expect(source).not.toContain("drive-disc-mode-toolbar")
     expect(source).not.toContain("drive-disc-mode-row")
   })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NModal } from "naive-ui"
+import { NAlert, NButton, NModal } from "naive-ui"
 
 defineProps<{
   show: boolean
@@ -7,6 +7,8 @@ defineProps<{
   message: string
   confirmText?: string
   danger?: boolean
+  busy?: boolean
+  error?: string
 }>()
 
 const emit = defineEmits<{
@@ -16,11 +18,12 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <NModal :show="show" preset="dialog" :title="title" @update:show="emit('update:show', $event)">
+  <NModal :show="show" :closable="!busy" :mask-closable="!busy" :close-on-esc="!busy" preset="dialog" :title="title" @update:show="emit('update:show', $event)">
     <p>{{ message }}</p>
+    <NAlert v-if="error" type="error">{{ error }}</NAlert>
     <template #action>
-      <NButton @click="emit('update:show', false)">取消</NButton>
-      <NButton :type="danger ? 'error' : 'primary'" @click="emit('confirm')">
+      <NButton :disabled="busy" @click="emit('update:show', false)">取消</NButton>
+      <NButton :loading="busy" :type="danger ? 'error' : 'primary'" @click="!busy && emit('confirm')">
         {{ confirmText || "确认" }}
       </NButton>
     </template>

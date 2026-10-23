@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { NAlert, NButton, NProgress, NSwitch, NTag, useMessage } from "naive-ui"
 import { Download, HardDrive, Play, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
+import PersonalBackupPanel from "@/components/PersonalBackupPanel.vue"
 import { clearAllBrowserData } from "@runtime/local-store.js"
 import { loadAppConfig } from "@/runtime/app-config"
 import {
@@ -175,6 +176,7 @@ onMounted(() => {
 
 <template>
   <div class="settings-view">
+    <PersonalBackupPanel />
     <section class="panel">
       <div class="panel-header">
         <div>

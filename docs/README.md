@@ -16,6 +16,7 @@
 | 佩洛伊斯 | [角色专题](pyrois-modeling.md) | 资料版本、四分支假设、当前技能组与默认配置 |
 | 艾莲 | [角色专题](ellen-modeling.md) | 潜能增强、风暴潮共享层数、体型霜锋与琉音＋千夏参考轴 |
 | 南宫羽 | [角色专题](nangongyu-modeling.md) | 核心成长、颤音异放与个人默认目标 |
+| 本地个人备份与恢复 | [本地数据工具](local-data-tools.md) | 完整备份、预览、事务回滚及坏库存恢复边界 |
 | 风属性异常与维琳娜 | [风属性专题](wind-anomaly-modeling.md) | 风化、乱流、异放、来源、公式和默认配置 |
 | 蕾米埃尔·丹评分 | [评分专题](luminescence-modeling.md) | 恒定权重近似、正式输入、兼容和评分边界 |
 | 表单和弹窗布局 | [前端布局契约](frontend-layout-contract.md) | 尺寸、滚动、可见性；保存行为引用回归契约 |

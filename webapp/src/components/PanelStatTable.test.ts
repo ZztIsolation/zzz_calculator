@@ -84,6 +84,24 @@ describe("PanelStatTable", () => {
       .not.toContain("panel-stat-important")
   })
 
+  it("compares out-of-combat and in-combat values in one table and marks buff gains", () => {
+    const wrapper = mount(PanelStatTable, {
+      props: {
+        panel,
+        inCombatPanel: { ...panel, atk: 2749, critRate: 0.578, critDmg: 1.616 },
+      },
+    })
+
+    expect(wrapper.findAll("thead th").map(item => item.text())).toEqual(["属性", "局外", "局内"])
+    const row = (label: string) => wrapper.findAll("tbody tr").find(item => item.find("th").text() === label)!
+    expect(row("攻击力").findAll("td").map(cell => cell.find("span").exists() ? cell.find("span").text() : cell.text()))
+      .toEqual(["2,249", "2,749"])
+    expect(row("攻击力").find(".panel-stat-up small").text()).toBe("+500")
+    expect(row("暴击率").find(".panel-stat-up").exists()).toBe(false)
+    expect(row("暴击率").find("small").exists()).toBe(false)
+    expect(row("暴击伤害").find(".panel-stat-down small").text()).toContain("−")
+  })
+
   it("keeps every stat name unhighlighted without a configuration", () => {
     const wrapper = mount(PanelStatTable, { props: { panel } })
 

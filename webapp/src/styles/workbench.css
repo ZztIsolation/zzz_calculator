@@ -1,0 +1,329 @@
+/*
+ * 工作台（计算页）各栏共用的区块样式。
+ * 计算页和拆出去的子组件（如右侧结果栏）都使用这些类，因此放在全局。
+ */
+
+.workbench-surface {
+  display: grid;
+  align-self: start;
+  min-width: 0;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-panel);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.workbench-right-sticky {
+  position: sticky;
+  top: var(--workbench-sticky-top);
+  max-height: var(--workbench-sticky-height);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-border-strong) transparent;
+}
+
+.workbench-section {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workbench-section + .workbench-section,
+.workbench-section + .workbench-summary-section,
+.workbench-summary-section + .workbench-section {
+  border-top: 1px solid var(--app-border);
+}
+
+.workbench-section-header {
+  min-height: 0;
+  padding: 12px 14px 8px;
+  border-bottom: 0;
+}
+
+.workbench-section-header .panel-title {
+  font-size: 15px;
+}
+
+.workbench-section-body {
+  min-width: 0;
+  padding: 6px 14px 14px;
+}
+
+.workbench-surface .metric:not(.layer-metric) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workbench-surface .metric dt {
+  margin-bottom: 4px;
+}
+
+.workbench-surface .selected-set-summary {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.workbench-left,
+.workbench-center,
+.workbench-right {
+  min-width: 0;
+}
+
+/* 宽屏三栏共用同一可视高度，各栏内部独立滚动，底边保持对齐。 */
+@media (min-width: 1281px) {
+  .workbench-left,
+  .workbench-center,
+  .workbench-right-sticky {
+    position: sticky;
+    top: var(--workbench-sticky-top);
+    height: var(--workbench-sticky-height);
+    max-height: var(--workbench-sticky-height);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-border-strong) transparent;
+  }
+
+  .workbench-center {
+    align-self: stretch;
+  }
+}
+
+.workbench-buff-title {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+.workbench-buff-section .workbench-section-header {
+  gap: 8px;
+}
+
+.workbench-buff-title .panel-title {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 左栏标题旁的数量徽标，例如“局内 Buff ②” */
+.workbench-count-badge {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.workbench-count-badge.is-empty {
+  background: var(--app-panel-sunken);
+  color: var(--app-muted);
+}
+
+/*
+ * 左栏的内嵌列表：事件摘要、已启用 Buff 都用它。
+ * 每行左边名称、右边数值，和右栏面板表格的读法一致，替代换行乱排的圆角标签。
+ */
+.workbench-inset-list {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: var(--app-panel-sunken);
+  list-style: none;
+}
+
+.workbench-inset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 30px;
+  font-size: 13px;
+}
+
+.workbench-inset-row + .workbench-inset-row {
+  border-top: 1px solid var(--app-border);
+}
+
+.workbench-inset-row.is-empty {
+  color: var(--app-muted);
+}
+
+.workbench-inset-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--app-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-inset-value {
+  flex: 0 0 auto;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 已启用 Buff 分组：组名一行，组内 Buff 用小标签横排 */
+.workbench-buff-groups {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--app-panel-sunken);
+}
+
+.workbench-buff-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workbench-buff-group + .workbench-buff-group {
+  padding-top: 10px;
+  border-top: 1px solid var(--app-border);
+}
+
+.workbench-buff-group-title {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workbench-buff-group-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workbench-buff-chip {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-panel);
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-buff-empty {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.workbench-collapse-button {
+  margin-left: 2px;
+}
+
+.drive-disc-source-options {
+  min-width: 0;
+}
+
+.workbench-segmented-control {
+  min-width: 0;
+}
+
+.workbench-segmented-control__track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  /* 与顶部主导航同一底槽色，选中块同为面板色 + 轻阴影 */
+  background: var(--app-panel-sunken);
+}
+
+.workbench-segmented-control__indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  z-index: 0;
+  border-radius: 999px;
+  background: var(--app-panel);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.03);
+  transform-origin: left center;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.workbench-segmented-control__option {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-muted);
+  font: inherit;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.workbench-segmented-control__option[aria-checked="true"] {
+  color: var(--app-blue-strong);
+}
+
+.workbench-segmented-control__option:disabled {
+  color: var(--app-faint);
+  cursor: not-allowed;
+}
+
+.workbench-segmented-control__option:focus-visible {
+  outline: var(--app-focus-ring);
+  outline-offset: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workbench-segmented-control__indicator {
+    transition: none;
+  }
+}
+
+/* 右栏吸顶块的包含块是这个 aside：拉满整行，吸顶块才有滑动空间 */
+.workbench-right {
+  align-self: stretch;
+}
+
+.panel-subtitle {
+  margin: 4px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}

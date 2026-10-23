@@ -1,3 +1,4 @@
+import { expectNavigationFits } from "./navigation-assertions"
 import { expect, test, type Page } from "@playwright/test"
 
 const uid = "1302309616"
@@ -82,10 +83,11 @@ async function mockAppConfig(page: Page, enkaImportEnabled: boolean) {
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
-  const metrics = await page.evaluate(() => ({
+  await expectNavigationFits(page)
+  const readMetrics = () => page.evaluate(() => ({
     viewportWidth: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
-    clipped: Array.from(document.querySelectorAll<HTMLElement>(".nav, .nav a, .nav a span"))
+    clipped: Array.from(document.querySelectorAll<HTMLElement>(".nav a, .nav a span"))
       .filter(element => element.scrollWidth > element.clientWidth + 1)
       .map(element => ({
         text: element.textContent?.trim(),
@@ -93,8 +95,14 @@ async function expectNoHorizontalOverflow(page: Page) {
         scrollWidth: element.scrollWidth,
       })),
   }))
-  expect(metrics.scrollWidth - metrics.viewportWidth, JSON.stringify(metrics, null, 2)).toBeLessThanOrEqual(2)
-  expect(metrics.clipped, JSON.stringify(metrics, null, 2)).toEqual([])
+  await expect.poll(async () => {
+    const metrics = await readMetrics()
+    return metrics.scrollWidth - metrics.viewportWidth
+  }).toBeLessThanOrEqual(2)
+  await expect.poll(async () => {
+    const metrics = await readMetrics()
+    return metrics.clipped
+  }).toEqual([])
 }
 
 async function readInventoryStore(page: Page): Promise<any> {
@@ -462,7 +470,7 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   }, showcaseLoadoutId)
 
   await page.goto("/")
-  await page.locator(".drive-disc-source-options .n-radio-button").filter({ hasText: "已有套装" }).click()
+  await page.locator(".drive-disc-source-options").getByRole("radio", { name: "已有套装", exact: true }).click()
   const loadoutSelect = page.locator(".drive-disc-mode-control .n-select")
   await loadoutSelect.click()
   const openLoadoutOptions = page.locator(".n-base-select-option")
@@ -477,7 +485,7 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await agentSelect.locator("input").press("ArrowDown")
   await agentSelect.locator("input").press("Enter")
   await expect(page.locator(".agent-select-display .agent-select-name")).toHaveText("爱芮")
-  await page.locator(".drive-disc-source-options .n-radio-button").filter({ hasText: "已有套装" }).click()
+  await page.locator(".drive-disc-source-options").getByRole("radio", { name: "已有套装", exact: true }).click()
   await expect(page.locator(".loadout-agent-mismatch-alert")).toContainText("当前保存的套装不属于该角色")
   await expect(page.getByTestId("open-drive-disc-analysis")).toBeDisabled()
   await loadoutSelect.click()

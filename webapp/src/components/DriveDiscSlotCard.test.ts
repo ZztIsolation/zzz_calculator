@@ -221,6 +221,18 @@ describe("DriveDiscSlotCard stat layout", () => {
     expect(wrapper.text()).toContain("此预设引用的驱动盘已不在当前库存")
   })
 
+  it("shows an add icon in interactive empty slots and keeps non-interactive empty slots unchanged", async () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: { slot: 1, statLayout: "vertical", interactive: true },
+    })
+    expect(wrapper.find(".disc-slot-card-add").exists()).toBe(true)
+    expect(wrapper.find(".disc-slot-card-icon img").exists()).toBe(false)
+
+    await wrapper.setProps({ interactive: false })
+    expect(wrapper.find(".disc-slot-card-add").exists()).toBe(false)
+    expect(wrapper.find(".disc-slot-card-icon img").exists()).toBe(true)
+  })
+
   it("keeps long labels wrappable and values non-wrapping without changing selection actions", async () => {
     const wrapper = mount(DriveDiscSlotCard, {
       props: {
@@ -282,6 +294,8 @@ describe("DriveDiscSlotCard important substat highlight", () => {
     expect(wrapper.findAll(".disc-slot-card-sub-stat-important .disc-slot-card-sub-stat-rolls")).toHaveLength(2)
     expect(wrapper.findAll(".disc-slot-card-sub-stat-rolls-important").map(node => node.text()))
       .toEqual(["+1", "+1"])
+    expect(wrapper.findAll(".disc-slot-card-sub-stat").map(row => row.classes().includes("disc-slot-card-sub-stat-minor")))
+      .toEqual([false, false, true, true])
     expect(wrapper.findAll(".disc-slot-card-sub-stat")[0].classes()).toContain("disc-slot-card-sub-stat")
   })
 

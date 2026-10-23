@@ -127,7 +127,8 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1024, height: 576
 
 test("Buff scrolling preserves the draft until apply and restores it on cancel", async ({ page }) => {
   await page.goto("/")
-  const selectedOnPage = page.locator(".workbench-left .chip-row").first()
+  // 弹窗里改动未应用前，计算页上的已启用数量不变
+  const selectedOnPage = page.getByTestId("workbench-buff-count")
   await expect(page.getByTestId("open-buff-picker")).toBeVisible()
   const openList = async () => {
     await page.getByTestId("open-buff-picker").click()
@@ -145,6 +146,8 @@ test("Buff scrolling preserves the draft until apply and restores it on cancel",
   await row.locator(".buff-check").click()
   await expectPinnedActions(page)
   await page.getByRole("button", { name: "应用选择", exact: true }).click()
+  // 应用后计算页上的已启用数量多一个
+  await expect(selectedOnPage).toHaveText(String(Number(original) + 1))
   await openList()
   await expect(row).toHaveClass(/is-selected/)
   await page.keyboard.press("Escape")
