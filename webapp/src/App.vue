@@ -7,6 +7,7 @@ import { useRoute } from "vue-router"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useTheme } from "@/runtime/theme"
+import PersonalBackupPanel from "@/components/PersonalBackupPanel.vue"
 
 const accountStore = useAccountStore()
 const appConfigStore = useAppConfigStore()
@@ -86,10 +87,11 @@ const themeButtonLabel = computed(() => ({
         </header>
         <main class="app-main">
           <NAlert v-if="storageIssues.length" type="error" title="本地数据读取失败，原始内容已保留">
-            已阻止相关数据保存。请先下载原始内容；不要清空浏览器数据。
+            已阻止相关数据保存。请先下载原始内容，再使用备份恢复；不要清空浏览器数据。
             <NButton @click="exportUnreadableData">导出原始内容</NButton>
           </NAlert>
           <NAlert v-if="props.startupError" type="error" :title="props.startupError" />
+          <PersonalBackupPanel v-if="props.startupError" />
           <NAlert v-if="enkaImportDisabledNotice" type="warning" title="展柜数据导入当前未启用。" />
           <RouterView v-if="!props.startupError" v-slot="{ Component }">
             <KeepAlive include="DiscsView" :max="1">

@@ -74,15 +74,8 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const normalizedId = id.replace(/\\/g, "/")
-          if (
-            normalizedId.includes("node_modules/naive-ui")
-            || normalizedId.includes("node_modules/vueuc")
-            || normalizedId.includes("node_modules/vooks")
-            || normalizedId.includes("node_modules/css-render")
-            || normalizedId.includes("node_modules/evtd")
-          ) {
-            return "naive-ui"
-          }
+          // naive-ui 不整包打成一个 chunk：按组件实际被哪些页面使用来拆分，
+          // 日期选择器、数据表等只有内部页或维护页使用的组件不进入首屏。
           if (
             /node_modules\/(vue|@vue\/runtime-core|@vue\/runtime-dom|@vue\/reactivity|pinia|vue-router)\//.test(normalizedId)
           ) {

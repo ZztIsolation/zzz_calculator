@@ -134,7 +134,8 @@ export function useAdaptiveCascaderMenu(options: AdaptiveCascaderMenuOptions = {
 
   onMounted(() => {
     visualViewport = window.visualViewport ?? null
-    updateViewportHeight()
+    // 挂载时不读取任何尺寸（连 innerHeight 也会让浏览器先完成排版）：
+    // 菜单打开时 updateShow 会量视口和锚点，打开前高度用 CSS 的 50dvh 兜底
     window.addEventListener("resize", scheduleMeasure)
     window.addEventListener("scroll", scheduleMeasure, true)
     visualViewport?.addEventListener("resize", scheduleMeasure)

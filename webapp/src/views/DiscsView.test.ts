@@ -248,21 +248,33 @@ describe("DiscsView", () => {
     vi.restoreAllMocks()
   })
 
-  it("paginates warehouse rows by five while searching the full inventory", async () => {
-    seedInventory(Array.from({ length: 12 }, (_, i) => driveDisc(1, {
-      id: `page-disc-${i}`, setName: i === 11 ? "末页测试盘" : "啄木鸟电音",
+  it("paginates warehouse rows by a remembered page size while searching the full inventory", async () => {
+    seedInventory(Array.from({ length: 45 }, (_, i) => driveDisc(1, {
+      id: `page-disc-${i}`, setName: i === 44 ? "末页测试盘" : "啄木鸟电音",
     })))
     const wrapper = await mountView()
+    const pagination = () => wrapper.get('[aria-label="驱动盘分页"]').text()
     expect(wrapper.findAll(".inventory-table tbody tr")).toHaveLength(5)
-    expect(wrapper.get('[aria-label="驱动盘分页"]').text()).toContain("匹配 12 件")
+    expect(pagination()).toContain("匹配 45 件")
     await button(wrapper, "下一页").trigger("click")
-    expect(wrapper.get('[aria-label="驱动盘分页"]').text()).toContain("第 2 / 3 页")
+    expect(pagination()).toContain("第 2 / 9 页")
+
+    await wrapper.get('select[aria-label="每页显示数量"]').setValue("50")
+    expect(wrapper.findAll(".inventory-table tbody tr")).toHaveLength(45)
+    expect(pagination()).toContain("第 1 / 1 页")
+    expect(localStorage.getItem("zzz-calculator.webapp.discs.pageSize.v2")).toBe("50")
+
     useInventoryStore().search = "末页测试盘"
     await flushPromises()
     expect(wrapper.findAll(".inventory-table tbody tr")).toHaveLength(1)
-    expect(wrapper.get('[aria-label="驱动盘分页"]').text()).toContain("第 1 / 1 页")
-    expect(useInventoryStore().driveDiscs).toHaveLength(12)
+    expect(pagination()).toContain("第 1 / 1 页")
+    expect(useInventoryStore().driveDiscs).toHaveLength(45)
     wrapper.unmount()
+
+    // 重新打开页面时沿用上次选择的每页数量
+    const reopened = await mountView()
+    expect((reopened.get('select[aria-label="每页显示数量"]').element as HTMLSelectElement).value).toBe("50")
+    reopened.unmount()
   })
 
   it.each([true, false])("filters presets by agent, including unknown and public presets (visual=%s)", async visual => {
@@ -366,6 +378,7 @@ describe("DiscsView", () => {
     expect(toolbarButtons.map(item => item.text().trim())).toEqual([
       "新增单个",
       "刷新",
+      "撤销上次导入",
       "批量导入",
       "批量导出",
       "扫描",

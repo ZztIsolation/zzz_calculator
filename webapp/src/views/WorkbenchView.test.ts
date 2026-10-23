@@ -617,6 +617,16 @@ describe("WorkbenchView first-screen dedup", () => {
   })
 })
 
+describe("WorkbenchView drive disc contribution", () => {
+  it("computes per-disc contributions off the main calculation and passes them to slot cards", () => {
+    const logic = source.slice(source.indexOf("function updateDriveDiscContributions()"), source.indexOf("onBeforeUnmount(() => clearTimeout(driveDiscContributionTimer))"))
+    expect(logic).toContain("activeDriveDisc4pcRuntimeInputs(catalog, remaining, optimizerStore.settings)")
+    expect(logic).toContain("calculateInCombatPanel(catalog, buildStore.buildInput(catalog, meta, remaining, { runtimeInputs }))")
+    expect(logic).toContain("setTimeout(updateDriveDiscContributions, DRIVE_DISC_CONTRIBUTION_DELAY_MS)")
+    expect(source).toContain(':contribution="row.disc ? driveDiscContributions[String(row.disc.id)] ?? null : null"')
+  })
+})
+
 describe("WorkbenchView drive disc scheme source", () => {
   it("separates the scheme source segmented control from the action buttons", () => {
     expect(source).toContain("const driveDiscModeOptions = [")

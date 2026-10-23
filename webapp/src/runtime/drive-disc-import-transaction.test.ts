@@ -48,6 +48,7 @@ import {
   commitDriveDiscImportPlan,
   freezeDriveDiscInventoryImportPlan,
   recoverPendingDriveDiscImport,
+  previewLastDriveDiscImportUndo,
 } from "@runtime/drive-disc-import-transaction"
 
 const ownerId = "default"
@@ -130,6 +131,48 @@ beforeEach(() => {
 })
 
 describe("drive disc import runtime transaction", () => {
+  async function importForUndo() {
+    const next = clone(memory.store)
+    next.driveDiscs[0].level = 15
+    next.driveDiscs.push({ id: "added", ownerId, level: 15 })
+    const plan = await freezeDriveDiscInventoryImportPlan({ currentStore: clone(memory.store), nextStore: next, ownerId,
+      normalized: { importRecord: { type: "zzz-calculator-drive-disc-export" } } })
+    await commitDriveDiscImportPlan(plan)
+  }
+
+  it("undoes only the latest successful import and preserves unrelated new discs", async () => {
+    await importForUndo()
+    memory.store.driveDiscs.push({ id: "unrelated-new", ownerId, level: 1 })
+    await commitDriveDiscImportPlan(await previewLastDriveDiscImportUndo(ownerId))
+    expect(memory.store.driveDiscs.map((disc: any) => disc.id)).toEqual(["disc-old", "unrelated-new"])
+    expect(memory.store.driveDiscs[0].level).toBe(12)
+    expect(memory.store.driveDiscImportState.byOwner[ownerId].undoJournal).toBeUndefined()
+  })
+
+  it("blocks undo after an imported disc changes", async () => {
+    await importForUndo()
+    memory.store.driveDiscs[0].level = 14
+    await expect(previewLastDriveDiscImportUndo(ownerId)).rejects.toThrow("已变化")
+    expect(memory.store.driveDiscs[0].level).toBe(14)
+  })
+
+  it("blocks undo when a new configuration references an imported disc", async () => {
+    await importForUndo()
+    memory.buildSelection.byOwner.default.byAgent["new-agent"] = { manualDriveDiscIdsBySlot: { 2: "added" } }
+    await expect(previewLastDriveDiscImportUndo(ownerId)).rejects.toThrow("已变化")
+  })
+
+  it("restores undo availability after an interrupted import completed both writes", async () => {
+    const next = clone(memory.store)
+    next.driveDiscs[0].level = 15
+    const plan = await freezeDriveDiscInventoryImportPlan({ currentStore: clone(memory.store), nextStore: next, ownerId })
+    memory.store = clone(plan.preparedStore)
+    memory.buildSelection = clone(plan.nextBuildSelection)
+    memory.legacySelection = clone(plan.nextLegacySelection)
+    expect(await recoverPendingDriveDiscImport(ownerId)).toBe("committed")
+    await expect(previewLastDriveDiscImportUndo(ownerId)).resolves.toMatchObject({ kind: "drive-disc-undo" })
+  })
+
   it("checks for a pending journal before acquiring the startup recovery lock", async () => {
     const request = vi.fn()
     const original = Object.getOwnPropertyDescriptor(navigator, "locks")

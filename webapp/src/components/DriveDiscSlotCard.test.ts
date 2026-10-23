@@ -314,4 +314,24 @@ describe("DriveDiscSlotCard important substat highlight", () => {
     expect(source).not.toMatch(/\.disc-slot-card-sub-stat-important dd\s*\{[\s\S]*color: var\(--app-highlight\);/)
     expect(source).toMatch(/\.disc-slot-card-copy \.disc-slot-card-sub-stat-rolls-important\s*\{[\s\S]*color: var\(--app-highlight\);/)
   })
+
+  it("shows the disc contribution badge only for an equipped disc with a meaningful change", async () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: { slot: 1, disc, driveDiscSets, contribution: { discId: "disc-1", withoutValue: 880, share: 0.12 } },
+    })
+    const badge = wrapper.get("[data-testid='disc-contribution']")
+    expect(badge.text()).toBe("贡献 12.0%")
+    expect(badge.classes()).toContain("is-positive")
+    expect(badge.attributes("title")).toContain("去掉这张盘后伤害下降 12.0%")
+
+    await wrapper.setProps({ contribution: { discId: "disc-1", withoutValue: 1010, share: -0.01 } })
+    expect(wrapper.get("[data-testid='disc-contribution']").text()).toBe("去掉反而 +1.00%")
+    expect(wrapper.get("[data-testid='disc-contribution']").classes()).toContain("is-negative")
+
+    await wrapper.setProps({ contribution: { discId: "disc-1", withoutValue: 1000, share: 0.0001 } })
+    expect(wrapper.find("[data-testid='disc-contribution']").exists()).toBe(false)
+
+    await wrapper.setProps({ disc: null, contribution: { discId: "disc-1", withoutValue: 880, share: 0.12 } })
+    expect(wrapper.find("[data-testid='disc-contribution']").exists()).toBe(false)
+  })
 })

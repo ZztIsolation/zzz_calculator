@@ -86,3 +86,18 @@ export function countEffectiveDriveDiscSubstats(
     includesPenFlat,
   }
 }
+
+/** 角色配置的重要副词条：优先目录元数据，其次传入的角色列表 */
+export function importantSubStatsForAgent(agentId: unknown, meta?: any, agents: any[] = []): string[] {
+  const id = String(agentId ?? "").trim()
+  if (!id) return []
+  const fromMeta = (meta?.agents ?? []).find((agent: any) => String(agent?.id ?? "") === id)?.importantSubStats
+  const fromAgents = (agents ?? []).find((agent: any) => String(agent?.id ?? "") === id)?.importantSubStats
+  const values = Array.isArray(fromMeta) ? fromMeta : Array.isArray(fromAgents) ? fromAgents : []
+  return values.map((stat: unknown) => String(stat ?? "").trim()).filter(Boolean)
+}
+
+/** 单张盘的有效副词条条数（含强化次数），用于选盘时排序 */
+export function driveDiscEffectiveRolls(disc: any, importantSubStats: unknown[] = [], meta?: any): number {
+  return countEffectiveDriveDiscSubstats([disc], importantSubStats, meta).total
+}
