@@ -82,7 +82,7 @@ async function mockAppConfig(page: Page, enkaImportEnabled: boolean) {
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
-  const metrics = await page.evaluate(() => ({
+  const readMetrics = () => page.evaluate(() => ({
     viewportWidth: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
     clipped: Array.from(document.querySelectorAll<HTMLElement>(".nav, .nav a, .nav a span"))
@@ -93,8 +93,14 @@ async function expectNoHorizontalOverflow(page: Page) {
         scrollWidth: element.scrollWidth,
       })),
   }))
-  expect(metrics.scrollWidth - metrics.viewportWidth, JSON.stringify(metrics, null, 2)).toBeLessThanOrEqual(2)
-  expect(metrics.clipped, JSON.stringify(metrics, null, 2)).toEqual([])
+  await expect.poll(async () => {
+    const metrics = await readMetrics()
+    return metrics.scrollWidth - metrics.viewportWidth
+  }).toBeLessThanOrEqual(2)
+  await expect.poll(async () => {
+    const metrics = await readMetrics()
+    return metrics.clipped
+  }).toEqual([])
 }
 
 async function readInventoryStore(page: Page): Promise<any> {

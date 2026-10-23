@@ -1,10 +1,17 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
 
 const viewPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "WorkbenchView.vue")
-const source = readFileSync(viewPath, "utf8").replace(/\r\n/g, "\n")
+const viewDir = path.dirname(fileURLToPath(import.meta.url))
+const workbenchComponentDir = path.resolve(viewDir, "../components/workbench")
+const viewSource = readFileSync(viewPath, "utf8").replace(/\r\n/g, "\n")
+const source = [
+  viewSource,
+  ...readdirSync(workbenchComponentDir).filter(file => file.endsWith(".vue")).sort().map(file => readFileSync(path.join(workbenchComponentDir, file), "utf8")),
+  readFileSync(path.resolve(viewDir, "../styles/workbench.css"), "utf8"),
+].join("\n")
 const componentDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../components")
 const slotCardSource = readFileSync(path.join(componentDir, "DriveDiscSlotCard.vue"), "utf8")
 const pickerSource = readFileSync(path.join(componentDir, "DriveDiscPickerModal.vue"), "utf8")
@@ -200,9 +207,18 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("workbench-section")
     expect(source).toContain("DamageWhiteBox")
     expect(source).toContain("PanelStatTable")
-    expect(source.match(/:important-stats="selectedAgent\?\.importantPanelStats"/g)).toHaveLength(2)
-    expect(source).toContain("damage-panel-grid")
-    expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));")
+    expect(source.match(/<PanelStatTable/g)).toHaveLength(1)
+    expect(source.match(/:important-stats="selectedAgent\?\.importantPanelStats"/g)).toHaveLength(1)
+    expect(source).toContain(':in-combat-panel="buildStore.result?.inCombat?.panel ?? null"')
+    expect(source).toContain("damage-panel-compare")
+    expect(source).not.toContain("damage-panel-grid")
+  })
+
+  it("offers one-click skill level presets that write all categories at once", () => {
+    expect(source).toContain('data-testid="skill-level-preset-12"')
+    expect(source).toContain('data-testid="skill-level-preset-max"')
+    expect(source).toContain("buildStore.updateSkillLevels(levels)")
+    expect(source).toContain(':aria-pressed="skillLevelPresetActive(12)"')
   })
 
   it("orders the right column as panel, damage summary, then white box", () => {
@@ -263,8 +279,8 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain(".calculation-event-summary-toggle:focus-visible")
   })
 
-  it("passes the rupture sheer-force flag to both panel tables", () => {
-    expect(source.match(/:include-sheer-force=\"selectedAgent\?\.specialty === 'rupture'\"/g)).toHaveLength(2)
+  it("passes the rupture sheer-force flag to the panel comparison table", () => {
+    expect(source.match(/:include-sheer-force=\"selectedAgent\?\.specialty === 'rupture'\"/g)).toHaveLength(1)
   })
 
   it("splits event management from optimizer configuration", () => {
@@ -345,7 +361,7 @@ describe("WorkbenchView optimizer progress", () => {
   it("keeps workbench borders scoped to one surface per column", () => {
     expect(source).toContain(".workbench-surface {")
     expect(source).toContain(".workbench-section + .workbench-section")
-    expect(source).toContain(".workbench-surface :deep(.metric:not(.layer-metric))")
+    expect(source).toContain(".workbench-surface .metric:not(.layer-metric)")
     expect(source).toContain(".workbench-summary-section")
     expect(source).not.toContain('class="panel optimizer-constraint-panel"')
     expect(source).not.toContain('class="panel drive-disc-workbench-panel"')
@@ -415,12 +431,13 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
-    expect(source).toContain("draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length")
-    expect(source).toContain("optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)")
-    expect(source).toContain("draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]")
-    expect(source).toContain("optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)")
-    expect(source).toContain('@click="showFourPieceSetModal = false">取消')
-    expect(source).toContain('@click="showTwoPieceSetModal = false">取消')
+    // 草稿由 OptimizerSetChoiceModal 管理（见组件测试），这里只检查打开时的初始值和提交路径
+    expect(source).toContain("fourPieceSetModalInitialIds.value = optimizerStore.fourPieceSetIds.length")
+    expect(source).toContain("optimizerStore.setFourPieceSets(ids)")
+    expect(source).toContain("twoPieceSetModalInitialIds.value = [...optimizerStore.twoPieceSetIds]")
+    expect(source).toContain("optimizerStore.setTwoPieceSetIds(ids)")
+    expect(source).toContain('@apply="applyFourPieceSetModalSelection"')
+    expect(source).toContain('@apply="applyTwoPieceSetModalSelection"')
   })
 })
 

@@ -8,8 +8,10 @@ import { recoverAllPendingDriveDiscImports } from "@runtime/drive-disc-import-tr
 import { recoverPendingEnkaImport } from "@runtime/enka-import-transaction"
 import { loadUserDriveDiscStoreFresh } from "@runtime/local-store.js"
 import { formatStartupError } from "@runtime/startup-errors"
+import { recoverPersonalRestore } from "@runtime/personal-backup"
 import "@/styles/tokens.css"
 import { initTheme } from "@/runtime/theme"
+import "@/styles/workbench.css"
 
 const STARTUP_RECOVERY_LOCK_TIMEOUT_MS = 5_000
 initTheme()
@@ -19,6 +21,7 @@ async function bootstrap() {
   const accountStore = useAccountStore(pinia)
   let startupError = ""
   try {
+    await recoverPersonalRestore()
     const recoveryLockOptions = {
       waitTimeoutMs: STARTUP_RECOVERY_LOCK_TIMEOUT_MS,
       purpose: "恢复未完成的驱动盘导入",
@@ -34,7 +37,7 @@ async function bootstrap() {
       await recoverPendingEnkaImport(ownerId, recoveryLockOptions)
     }
   } catch (error) {
-    startupError = formatStartupError(error)
+    startupError = `${formatStartupError(error)}；也可尝试从完整个人备份恢复。`
   }
   if (!startupError) {
     try {

@@ -812,3 +812,15 @@ textarea {
 
   .nav a svg { width: 14px; height: 14px; flex-shrink: 0; }
 }
+
+@media (max-width: 360px) {
+  .nav a {
+    gap: 0;
+    padding: 0 1px;
+    font-size: 11px;
+  }
+
+  .nav a svg {
+    display: none;
+  }
+}

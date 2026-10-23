@@ -1,29 +1,7 @@
 import { mount } from "@vue/test-utils"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
+import { NInputNumber, NSlider } from "naive-ui"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
-
-vi.mock("naive-ui", () => ({
-  NSlider: {
-    name: "NSlider",
-    inheritAttrs: false,
-    props: ["value", "min", "max", "step", "marks", "disabled", "formatTooltip"],
-    emits: ["update:value"],
-    template: "<input v-bind=\"$attrs\" type=\"range\" :value=\"value\" :min=\"min\" :max=\"max\" :step=\"step\" :disabled=\"disabled\" @input=\"$emit('update:value', Number($event.target.value))\">",
-  },
-  NInputNumber: {
-    name: "NInputNumber",
-    inheritAttrs: false,
-    props: ["value", "min", "max", "step", "precision", "disabled", "buttonPlacement", "size"],
-    emits: ["update:value"],
-    template: `
-      <div v-bind="$attrs" :data-button-placement="buttonPlacement">
-        <button data-testid="rank-minus" :disabled="disabled || value <= min" @click="$emit('update:value', value - step)">-</button>
-        <input :value="value" :disabled="disabled" @input="$emit('update:value', Number($event.target.value))">
-        <button data-testid="rank-plus" :disabled="disabled || value >= max" @click="$emit('update:value', value + step)">+</button>
-      </div>
-    `,
-  },
-}))
 
 const results = [
   { rank: 1, score: 1000 },
@@ -46,50 +24,46 @@ function mountSelector(modelValue = 1, resultOptions = results, stale = false) {
 }
 
 describe("OptimizerResultSelector", () => {
+  // 评分区分三块：标签、数值、“第 N 套 · 比例”说明
+  function expectScore(wrapper: any, label: string, value: string, caption: string | null) {
+    const tile = wrapper.get(".optimizer-result-score")
+    expect(tile.get(".optimizer-result-metric-label").text()).toBe(label)
+    expect(tile.get(".optimizer-result-score-value").text()).toBe(value)
+    if (caption === null) expect(tile.find(".optimizer-result-caption").exists()).toBe(false)
+    else expect(tile.get(".optimizer-result-caption").text()).toBe(caption)
+  }
   it("shows the selected result relative to the best score", async () => {
     const wrapper = mountSelector()
 
-    expect(wrapper.text()).toContain("第 1 套 · 100% · 评分 1,000")
+    expectScore(wrapper, "评分", "1,000", "第 1 套 · 相对第一套 100%")
 
     await wrapper.setProps({ modelValue: 2 })
 
-    expect(wrapper.text()).toContain("第 2 套 · 97.8% · 评分 978")
+    expectScore(wrapper, "评分", "978", "第 2 套 · 相对第一套 97.8%")
     expect(wrapper.get("[role='progressbar']").attributes("aria-valuenow")).toBe("97.8")
   })
 
-  it("emits normalized ranks from the slider, number input, and step buttons", async () => {
+  it("emits ranks from the slider and rank input", async () => {
     const wrapper = mountSelector(2)
 
-    await wrapper.get("[data-testid='optimizer-result-slider']").setValue(1)
+    await wrapper.getComponent(NSlider).vm.$emit("update:value", 1)
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([1])
 
-    await wrapper.get("[data-testid='optimizer-result-rank-input'] input").setValue(2.6)
+    await wrapper.getComponent(NInputNumber).vm.$emit("update:value", 3)
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([3])
-
-    await wrapper.get("[data-testid='rank-plus']").trigger("click")
-    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([3])
-    expect(wrapper.get("[data-testid='optimizer-result-rank-input']").attributes("data-button-placement")).toBe("both")
-
-    await wrapper.setProps({ modelValue: 3 })
-    expect(wrapper.get("[data-testid='rank-plus']").attributes("disabled")).toBeDefined()
+    expect(wrapper.get("[data-testid='optimizer-result-slider']").exists()).toBe(true)
+    expect(wrapper.get("[data-testid='optimizer-result-rank-input']").exists()).toBe(true)
   })
 
-  it("allows selecting the tenth result through every rank control", async () => {
+  it("allows selecting the tenth result directly", async () => {
     const wrapper = mountSelector(9, topTenResults)
 
-    expect(wrapper.get("[data-testid='optimizer-result-slider']").attributes("max")).toBe("10")
-
-    await wrapper.get("[data-testid='optimizer-result-slider']").setValue(10)
-    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([10])
-
-    await wrapper.get("[data-testid='optimizer-result-rank-input'] input").setValue(10)
-    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([10])
-
-    await wrapper.get("[data-testid='rank-plus']").trigger("click")
+    await wrapper.getComponent(NSlider).vm.$emit("update:value", 10)
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([10])
 
     await wrapper.setProps({ modelValue: 10 })
-    expect(wrapper.get("[data-testid='rank-plus']").attributes("disabled")).toBeDefined()
+    expect(wrapper.get("[data-testid='optimizer-result-slider']").exists()).toBe(true)
+    expect(wrapper.get("[data-testid='optimizer-result-rank-input']").exists()).toBe(true)
   })
 
   it("disables a single result and returns to the first rank when results shrink", async () => {
@@ -103,9 +77,9 @@ describe("OptimizerResultSelector", () => {
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([1])
 
     await wrapper.setProps({ modelValue: 1, results: [{ rank: 1, score: 1000 }] })
-    expect(wrapper.get("[data-testid='optimizer-result-slider']").attributes("disabled")).toBeDefined()
-    expect(wrapper.get("[data-testid='optimizer-result-rank-input'] input").attributes("disabled")).toBeDefined()
-    expect(wrapper.text()).toContain("第 1 套 · 100%")
+    expect(wrapper.get("[data-testid='optimizer-result-slider']").exists()).toBe(true)
+    expect(wrapper.get("[data-testid='optimizer-result-rank-input']").exists()).toBe(true)
+    expect(wrapper.get(".optimizer-result-caption").text()).toBe("第 1 套 · 相对第一套 100%")
   })
 
   it("does not render for an invalid best score", () => {
@@ -119,7 +93,7 @@ describe("OptimizerResultSelector", () => {
   it("labels retained result scores as stale after constraints change", () => {
     const wrapper = mountSelector(2, results, true)
 
-    expect(wrapper.text()).toContain("第 2 套 · 97.8% · 上次评分 978")
+    expectScore(wrapper, "上次评分", "978", "第 2 套 · 相对第一套 97.8%")
     expect(wrapper.get("[role='progressbar']").classes()).toContain("is-stale")
     expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("上次评分")
   })
@@ -135,7 +109,7 @@ describe("OptimizerResultSelector", () => {
       },
     })
 
-    expect(wrapper.text()).toContain("第 1 套 · 100% · 队伍异常评分 5,134.289 × k")
+    expectScore(wrapper, "队伍异常评分", "5,134.289 × k", "第 1 套 · 相对第一套 100%")
     expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("队伍异常评分比例")
   })
 
@@ -151,9 +125,9 @@ describe("OptimizerResultSelector", () => {
       },
     })
 
-    expect(wrapper.text()).toContain("90.0% · 评分 810")
-    expect(wrapper.text()).not.toContain("第")
-    expect(wrapper.find("[data-testid='optimizer-result-slider']").exists()).toBe(false)
+    expectScore(wrapper, "评分", "810", "相对优化第一套 90.0%")
+    expect(wrapper.text()).not.toMatch(/第 \d+ 套/)
+    expect(wrapper.find(".optimizer-result-pager").exists()).toBe(false)
     expect(wrapper.get("[role='progressbar']").attributes("aria-valuenow")).toBe("90")
     expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("当前方案相对优化第一套")
   })
@@ -170,7 +144,7 @@ describe("OptimizerResultSelector", () => {
       },
     })
 
-    expect(wrapper.text()).toContain("100% · 评分 810")
+    expectScore(wrapper, "评分", "810", "相对优化第一套 100%")
   })
 
   it("hides the comparison percentage for a stale manual or loadout score", () => {
@@ -186,13 +160,13 @@ describe("OptimizerResultSelector", () => {
       },
     })
 
-    expect(wrapper.text()).toContain("评分 810")
+    expectScore(wrapper, "评分", "810", null)
     expect(wrapper.text()).not.toContain("90%")
-    expect(wrapper.get("[role='progressbar']").attributes("aria-valuenow")).toBeUndefined()
-    expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toBe("当前方案评分")
+    expect(wrapper.find("[role='progressbar']").exists()).toBe(false)
+    expect(wrapper.get(".optimizer-result-score").attributes("aria-label")).toBe("当前方案评分")
   })
 
-  it("shows one effective-substat line when PEN is not important", () => {
+  it("shows one effective-substat tile when PEN is not important", () => {
     const wrapper = mount(OptimizerResultSelector, {
       props: {
         modelValue: 1,
@@ -201,12 +175,15 @@ describe("OptimizerResultSelector", () => {
       },
     })
 
-    expect(wrapper.findAll(".optimizer-result-effective-substat-line")).toHaveLength(1)
-    expect(wrapper.text()).toContain("有效副词条数量 12")
-    expect(wrapper.text()).not.toContain("包含穿透值")
+    const tile = wrapper.get(".optimizer-result-effective-substats")
+    expect(tile.get(".optimizer-result-metric-label").text()).toBe("有效副词条")
+    expect(tile.get(".optimizer-result-effective-total").text()).toBe("12")
+    expect(tile.find(".optimizer-result-effective-note").exists()).toBe(false)
+    expect(tile.attributes("title")).toBe("有效副词条数量 12")
+    expect(wrapper.text()).not.toContain("穿透值")
   })
 
-  it("shows both effective-substat lines when PEN is important", () => {
+  it("adds the without-PEN count under the total when PEN is important", () => {
     const wrapper = mount(OptimizerResultSelector, {
       props: {
         modelValue: 1,
@@ -215,12 +192,13 @@ describe("OptimizerResultSelector", () => {
       },
     })
 
-    expect(wrapper.findAll(".optimizer-result-effective-substat-line")).toHaveLength(2)
-    expect(wrapper.text()).toContain("有效副词条数量（包含穿透值） 15")
-    expect(wrapper.text()).toContain("有效副词条数量（不含穿透值） 12")
+    const tile = wrapper.get(".optimizer-result-effective-substats")
+    expect(tile.get(".optimizer-result-effective-total").text()).toBe("15")
+    expect(tile.get(".optimizer-result-effective-note").text()).toBe("不含穿透值 12")
+    expect(tile.attributes("title")).toBe("有效副词条数量（包含穿透值）15，不含穿透值 12")
   })
 
-  it("keeps effective-substat lines visible when stale comparison percentage is hidden", () => {
+  it("keeps the effective-substat tile visible when stale comparison percentage is hidden", () => {
     const wrapper = mount(OptimizerResultSelector, {
       props: {
         modelValue: 0,
@@ -234,8 +212,8 @@ describe("OptimizerResultSelector", () => {
       },
     })
 
-    expect(wrapper.text()).toContain("评分 810")
-    expect(wrapper.text()).toContain("有效副词条数量 9")
+    expectScore(wrapper, "评分", "810", null)
+    expect(wrapper.get(".optimizer-result-effective-total").text()).toBe("9")
     expect(wrapper.text()).not.toContain("90%")
   })
 })

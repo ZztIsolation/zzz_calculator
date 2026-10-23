@@ -7,9 +7,11 @@ import { storageIssues } from "@runtime/storage-guard.js"
 vi.mock("naive-ui", () => ({
   NAlert: { props: ["title"], template: '<div role="alert"><span>{{ title }}</span><slot /></div>' },
   NButton: { emits: ["click"], template: '<button @click="$emit(\'click\')"><slot /></button>' },
+  NCheckbox: { template: '<label><input type="checkbox"><slot /></label>' },
   NConfigProvider: { template: "<div><slot /></div>" },
   NMessageProvider: { template: "<div><slot /></div>" },
   darkTheme: { name: "dark" },
+  NModal: { props: ["show"], template: '<div v-if="show"><slot /><slot name="footer" /></div>' },
 }))
 
 const routeFixture = vi.hoisted(() => ({ query: {} as Record<string, string> }))
@@ -122,7 +124,7 @@ describe("App maintenance navigation", () => {
     const wrapper = mountApp({ startupError: "未完成的驱动盘导入自动恢复失败，请刷新页面后再修改配置：数据库锁定" })
 
     expect(wrapper.text()).toContain("请刷新页面后再修改配置")
-    expect(wrapper.find('[role="alert"] button').exists()).toBe(false)
+    expect(wrapper.findAll("button").map(button => button.text())).toContain("从备份恢复…")
   })
 })
 

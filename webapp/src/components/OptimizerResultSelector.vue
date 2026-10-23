@@ -93,22 +93,21 @@ const ratioAriaLabel = computed(() => {
   if (showRank.value) return `当前优化结果相对第一套的${displayedScoreLabel.value}比例`
   return `当前方案相对优化第一套的${displayedScoreLabel.value}比例`
 })
-const resultSummaryText = computed(() => [
+// 评分下方的说明：第几套、相对第一套的比例
+const resultCaptionText = computed(() => [
   showRank.value ? `第 ${currentRank.value} 套` : "",
-  showPercentage.value ? percentageText.value : "",
-  `${displayedScoreLabel.value} ${scoreText.value}`,
+  showPercentage.value ? `${showRank.value ? "相对第一套" : "相对优化第一套"} ${percentageText.value}` : "",
 ].filter(Boolean).join(" · "))
-const effectiveSubstatLines = computed(() => {
+// 有效副词条合成一个指标：大号数字为总数（穿透值重要时含穿透值），下方补充不含穿透值的数量
+const effectiveSubstatSummary = computed(() => {
   const counts = props.effectiveSubstatCounts
-  if (!counts) return []
+  if (!counts) return null
   const total = Math.max(0, Math.round(Number(counts.total) || 0))
   if (!counts.includesPenFlat) {
-    return [{ label: "有效副词条数量", count: total }]
+    return { total, withoutPenFlat: null as number | null, title: `有效副词条数量 ${total}` }
   }
-  return [
-    { label: "有效副词条数量（包含穿透值）", count: total },
-    { label: "有效副词条数量（不含穿透值）", count: Math.max(0, Math.round(Number(counts.withoutPenFlat) || 0)) },
-  ]
+  const withoutPenFlat = Math.max(0, Math.round(Number(counts.withoutPenFlat) || 0))
+  return { total, withoutPenFlat, title: `有效副词条数量（包含穿透值）${total}，不含穿透值 ${withoutPenFlat}` }
 })
 const ratioStyle = computed(() => ({
   "--optimizer-result-ratio": `${scorePercentage.value ?? 0}%`,
@@ -186,30 +185,42 @@ function rankTooltip(value: number) {
       </div>
     </div>
 
-    <div
-      class="optimizer-result-ratio"
-      :class="{ 'is-stale': props.stale }"
-      :style="ratioStyle"
-      role="progressbar"
-      :aria-label="ratioAriaLabel"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      :aria-valuenow="scorePercentage ?? undefined"
-    >
-      <span class="optimizer-result-ratio-fill"></span>
-      <strong>{{ resultSummaryText }}</strong>
-      <span
-        v-if="effectiveSubstatLines.length"
+    <div class="optimizer-result-metrics" :class="{ 'is-stale': props.stale }">
+      <div
+        class="optimizer-result-score"
+        :role="showPercentage ? undefined : 'group'"
+        :aria-label="showPercentage ? undefined : ratioAriaLabel"
+      >
+        <span class="optimizer-result-metric-label">{{ displayedScoreLabel }}</span>
+        <strong class="optimizer-result-score-value num">{{ scoreText }}</strong>
+        <div
+          v-if="showPercentage"
+          class="optimizer-result-ratio"
+          :class="{ 'is-stale': props.stale }"
+          :style="ratioStyle"
+          role="progressbar"
+          :aria-label="ratioAriaLabel"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="scorePercentage ?? undefined"
+        >
+          <span class="optimizer-result-ratio-fill"></span>
+        </div>
+        <span v-if="resultCaptionText" class="optimizer-result-caption">{{ resultCaptionText }}</span>
+      </div>
+      <div
+        v-if="effectiveSubstatSummary"
         class="optimizer-result-effective-substats"
         role="group"
-        aria-label="有效副词条统计"
+        :aria-label="effectiveSubstatSummary.title"
+        :title="effectiveSubstatSummary.title"
       >
-        <span
-          v-for="line in effectiveSubstatLines"
-          :key="line.label"
-          class="optimizer-result-effective-substat-line"
-        >{{ line.label }} <b>{{ line.count }}</b></span>
-      </span>
+        <span class="optimizer-result-metric-label">有效副词条</span>
+        <b class="optimizer-result-effective-total num">{{ effectiveSubstatSummary.total }}</b>
+        <small v-if="effectiveSubstatSummary.withoutPenFlat !== null" class="optimizer-result-effective-note">
+          不含穿透值 <b class="num">{{ effectiveSubstatSummary.withoutPenFlat }}</b>
+        </small>
+      </div>
     </div>
   </div>
 </template>
@@ -221,6 +232,7 @@ function rankTooltip(value: number) {
   min-width: 0;
 }
 
+/* 第几套滑轨与右侧输入框，右侧还可插入“一键锁定”等操作 */
 .optimizer-result-control-row {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) auto;
@@ -249,74 +261,103 @@ function rankTooltip(value: number) {
   max-width: 100%;
 }
 
+/* 评分区：左侧大号评分 + 比例条，右侧有效副词条 */
+.optimizer-result-metrics {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.optimizer-result-score,
+.optimizer-result-effective-substats {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-panel-muted, #f4f6fa);
+}
+
+.optimizer-result-metrics.is-stale .optimizer-result-score {
+  border-color: var(--app-amber-line);
+  background: var(--app-amber-soft);
+}
+
+.optimizer-result-metric-label {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.optimizer-result-score-value {
+  color: var(--app-text);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
 .optimizer-result-ratio {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  min-height: 36px;
+  height: 6px;
   overflow: hidden;
-  padding: 8px 12px;
-  border: 1px solid var(--app-blue-line);
-  border-radius: var(--app-radius-sm);
-  background: var(--app-panel-muted);
-  color: var(--app-text);
-  text-align: center;
+  border-radius: 999px;
+  background: var(--app-panel-sunken);
 }
 
 .optimizer-result-ratio-fill {
   position: absolute;
   inset: 0 auto 0 0;
   width: var(--optimizer-result-ratio);
+  border-radius: inherit;
   background: var(--app-blue-soft);
   transition: width 160ms ease;
-}
-
-.optimizer-result-ratio.is-stale {
-  border-color: var(--app-amber-line);
-  background: var(--app-amber-soft);
 }
 
 .optimizer-result-ratio.is-stale .optimizer-result-ratio-fill {
   background: var(--app-amber-soft);
 }
 
-.optimizer-result-ratio strong {
-  position: relative;
-  z-index: 1;
-  max-width: 100%;
-  font-size: 13px;
-  line-height: 1.35;
+.optimizer-result-caption {
+  color: var(--app-text-secondary, #334155);
+  font-size: 12px;
+  font-weight: 650;
   overflow-wrap: anywhere;
 }
 
-.optimizer-result-effective-substats {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  max-width: 100%;
-  gap: 1px;
+.optimizer-result-effective-total {
+  color: var(--app-text);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.optimizer-result-effective-note {
   color: var(--app-muted);
   font-size: 12px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
-.optimizer-result-effective-substat-line b {
+.optimizer-result-effective-note b {
   color: var(--app-text);
   font-weight: 800;
 }
 
-@container ui-layout (max-width: 680px) {
-  .optimizer-result-control-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+@media (prefers-reduced-motion: reduce) {
+  .optimizer-result-ratio-fill {
+    transition: none;
   }
+}
 
-  .optimizer-result-rank-controls {
-    justify-self: end;
+@container ui-layout (max-width: 420px) {
+  .optimizer-result-metrics {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

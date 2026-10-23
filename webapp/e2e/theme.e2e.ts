@@ -35,8 +35,9 @@ for (const width of [1440, 390, 320]) {
     await page.emulateMedia({ colorScheme: "light" })
     await page.goto("/")
     const button = page.getByTestId("theme-toggle")
+    const resultScore = page.locator(".optimizer-result-score-value")
     await expect(button).toHaveAccessibleName("主题：跟随系统（点击切换为浅色）")
-    await expect(page.locator(".optimizer-result-ratio strong")).toBeVisible()
+    await expect(resultScore).toBeVisible()
     await button.focus()
     await expect(button).toBeFocused()
     expect(await button.evaluate(el => parseFloat(getComputedStyle(el).outlineWidth))).toBeGreaterThanOrEqual(2)
@@ -49,7 +50,7 @@ for (const width of [1440, 390, 320]) {
     for (const selector of [".drive-disc-source-label", ".selected-set-chip", ".optimizer-set-select-button"]) {
       await expectReadable(page.locator(selector).first())
     }
-    await expectReadable(page.locator(".optimizer-result-ratio strong"), ".optimizer-result-ratio-fill")
+    await expectReadable(resultScore, ".optimizer-result-ratio-fill")
     await expectReadable(page.locator(".drive-disc-analysis-strip span"))
     await expectReadable(page.locator(".optimizer-result-effective-substats"))
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`dark-${width}.png`) })
