@@ -172,9 +172,6 @@ async function loadWorkbench(initial = false) {
       optimizerStore.reset()
       optimizerStore.loadAgentSettings(catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId), catalogStore.catalog)
     }
-    if (!optimizerStore.fourPieceSetIds.length) {
-      optimizerStore.setFourPieceSets([catalogStore.displayDriveDiscSets[0]?.id ?? ""].filter(Boolean))
-    }
     recalculate()
     await refreshAutomaticTeammates()
     await nextTick()
@@ -1296,9 +1293,7 @@ function twoPieceSetEffectText(set: any) {
 }
 
 function openFourPieceSetModal() {
-  draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length
-    ? [...optimizerStore.fourPieceSetIds]
-    : [optimizerSetChoices.value[0]?.id].filter(Boolean)
+  draftFourPieceSetIds.value = [...optimizerStore.fourPieceSetIds]
   showFourPieceSetModal.value = true
 }
 

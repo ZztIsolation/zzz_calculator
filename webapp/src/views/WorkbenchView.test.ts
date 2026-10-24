@@ -395,6 +395,9 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("if (!canRunOptimization.value)")
     expect(source).toContain(':disabled="!canRunOptimization"')
     expect(source).toContain("当前没有可用于优化的可见角色、音擎或驱动盘套装")
+    expect(source).toContain("&& optimizerStore.fourPieceSetIds.length")
+    expect(source).toContain(':disabled="!draftFourPieceSetIds.length || fourPieceDraftUnchanged"')
+    expect(source).not.toContain('optimizerStore.setFourPieceSets([catalogStore.displayDriveDiscSets[0]?.id ?? ""].filter(Boolean))')
   })
 
   it("applies the currently saved matching four-piece runtime to every drive-disc mode", () => {
@@ -415,7 +418,7 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
-    expect(source).toContain("draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length")
+    expect(source).toContain("draftFourPieceSetIds.value = [...optimizerStore.fourPieceSetIds]")
     expect(source).toContain("optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)")
     expect(source).toContain("draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]")
     expect(source).toContain("optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)")

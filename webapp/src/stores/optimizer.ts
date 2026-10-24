@@ -180,6 +180,7 @@ function normalizedSetIds(value: any, fallback: any = "") {
 function optimizerSettingsFingerprint(settings: any = {}) {
   const mainStatLimits = cleanMainStatLimits(settings.explicitMainStatLimits ?? settings.mainStatLimits)
   return JSON.stringify(canonicalValue({
+    constraintSemanticsVersion: 2,
     algorithm: normalizeBrowserOptimizerAlgorithm(settings.algorithm),
     fourPieceSetIds: normalizedSetIds(settings.fourPieceSetIds, settings.fourPieceSetId),
     twoPieceSetIds: normalizedSetIds(settings.twoPieceSetIds, settings.twoPieceSetId),
@@ -284,10 +285,15 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
   )
   const preferredFourPieceSetIds = preferredDriveDiscDefaultSetIds(agent, catalog)
   const legacySavedSetId = String(saved.fourPieceSetId ?? "").trim()
-  const savedFourPieceSetIds = [...new Set(normalizeArray(
+  const rawSavedFourPieceSetIds = normalizeArray(
     saved.fourPieceSetIds ?? (legacySavedSetId ? [legacySavedSetId] : []),
-  ))].filter(id => !catalog || visibleSetIds.has(id))
-  const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetIds.length > 0
+  )
+  const savedFourPieceSetIds = [...new Set(rawSavedFourPieceSetIds)]
+    .filter(id => !catalog || visibleSetIds.has(id))
+  const hasSavedFourPieceSets = saved.fourPieceSetIds !== undefined || saved.fourPieceSetId !== undefined
+  const hasManualFourPieceSet = (saved.fourPieceSetSource === "manual"
+    || (saved.fourPieceSetSource !== "preferred" && hasSavedFourPieceSets))
+    && (savedFourPieceSetIds.length > 0 || rawSavedFourPieceSetIds.length === 0)
   const fourPieceSetIds = hasManualFourPieceSet
     ? savedFourPieceSetIds
     : preferredFourPieceSetIds.length
@@ -297,19 +303,29 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
         : [firstDriveDiscSetId(catalog)].filter(Boolean)
   const preferredTwoPieceSetIds = [...new Set(normalizeArray(agent?.preferredDriveDiscs?.defaultTwoPieceSetIds))]
     .filter(id => !catalog || visibleSetIds.has(id))
-  const savedTwoPieceSetIds = [...new Set(normalizeArray(saved.twoPieceSetIds ?? saved.twoPieceSetId))]
+  const legacyTwoPieceSetId = String(saved.twoPieceSetId ?? "").trim()
+  const savedTwoPieceSetIds = [...new Set(normalizeArray(saved.twoPieceSetIds
+    ?? (legacyTwoPieceSetId ? [legacyTwoPieceSetId] : [])))]
     .filter(id => !catalog || visibleSetIds.has(id))
-  // Apply the new recommendation once, including over legacy manual selections.
-  // Afterwards an explicit manual empty list must continue to mean unrestricted.
+  // Recommendations initialize missing settings; saved choices (including empty) win.
   const migrateTwoPieceDefaults = preferredTwoPieceSetIds.length > 0
     && Number(saved.twoPieceDefaultsVersion ?? 0) < TWO_PIECE_DEFAULTS_VERSION
   const hasSavedTwoPieceSets = saved.twoPieceSetIds !== undefined || saved.twoPieceSetId !== undefined
-  const followsTwoPieceDefaults = migrateTwoPieceDefaults
-    || saved.twoPieceSetSource === "preferred"
+  const followsTwoPieceDefaults = saved.twoPieceSetSource === "preferred"
     || (!hasSavedTwoPieceSets && saved.twoPieceSetSource !== "manual")
   const migrateFourPieceBuffDefaults = Number(saved.fourPieceBuffDefaultsVersion ?? 0) < FOUR_PIECE_BUFF_DEFAULTS_VERSION
   const migratePreferredFourPieceBuffDefaults = Number(saved.preferredFourPieceBuffDefaultsVersion ?? 0) < PREFERRED_FOUR_PIECE_BUFF_DEFAULTS_VERSION
   const defaultFourPieceBuffRuntimeInputs = preferredFourPieceBuffRuntimeInputs(agent, catalog)
+  const preferredMainStatLimits = agent?.preferredDriveDiscs?.mainStatLimits
+    ?? agent?.preferredDriveDiscs?.mainStats
+    ?? agent?.preferredDriveDiscs
+    ?? {}
+  // Keep recommendations visible in new configurations. Existing empty slots mean unrestricted.
+  const mainStatLimits = Object.fromEntries([4, 5, 6].map(slot => {
+    const preferred = preferredMainStatLimits[String(slot)]
+    return [String(slot), saved.mainStatLimits?.[String(slot)]
+      ?? (Array.isArray(preferred) ? preferred : preferred ? [preferred] : [])]
+  }))
   return {
     algorithm: normalizeBrowserOptimizerAlgorithm(saved.algorithm),
     fourPieceSetIds,
@@ -324,7 +340,7 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
     fourPieceBuffRuntimeInputs: migratePreferredFourPieceBuffDefaults
       ? mergeFourPieceBuffRuntimeInputs(defaultFourPieceBuffRuntimeInputs, saved.fourPieceBuffRuntimeInputs)
       : plainObject(saved.fourPieceBuffRuntimeInputs),
-    mainStatLimits: cleanMainStatLimits(saved.mainStatLimits),
+    mainStatLimits: cleanMainStatLimits(mainStatLimits),
     minimums: normalizeMinimums(
       saved.minimums,
       saved.minimumDefaultsVersion !== MINIMUM_DEFAULTS_VERSION,
@@ -595,6 +611,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     applyAgentPreferredDriveDiscSet(agent: any = null, catalog: any = null) {
+      if (this.fourPieceSetSource === "manual") return
       const preferredFourPieceSetIds = preferredDriveDiscDefaultSetIds(agent, catalog)
       if (!preferredFourPieceSetIds.length
         || JSON.stringify(preferredFourPieceSetIds) === JSON.stringify(this.fourPieceSetIds)) {

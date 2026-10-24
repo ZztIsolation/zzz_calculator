@@ -70,7 +70,7 @@ test("default two-piece choices can be edited, previewed, saved and cleared", as
   }
 })
 
-test("Velina silently replaces old two-piece settings once and preserves a manual clear", async ({ page }) => {
+test("Velina preserves old two-piece settings and a manual clear", async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem("two-piece-seeded")) return
     sessionStorage.setItem("two-piece-seeded", "1")
@@ -79,9 +79,9 @@ test("Velina silently replaces old two-piece settings once and preserves a manua
   })
   await page.goto("/")
   const field = page.locator(".optimizer-set-choice-field").filter({ hasText: "额外 2 件套" })
-  await expect(field).toContainText("摇摆爵士")
-  await expect(field).toContainText("月光骑士颂")
-  await expect(field).not.toContainText("激素朋克")
+  await expect(field).toContainText("激素朋克")
+  await expect(field).not.toContainText("摇摆爵士")
+  await expect(field).not.toContainText("月光骑士颂")
   await field.getByRole("button", { name: "清空", exact: true }).click()
   await expect(field).toContainText("自动匹配任意 2 件套")
   await page.reload()
