@@ -1,10 +1,17 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
 
 const viewPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "WorkbenchView.vue")
-const source = readFileSync(viewPath, "utf8").replace(/\r\n/g, "\n")
+const viewDir = path.dirname(fileURLToPath(import.meta.url))
+const workbenchComponentDir = path.resolve(viewDir, "../components/workbench")
+const viewSource = readFileSync(viewPath, "utf8").replace(/\r\n/g, "\n")
+const source = [
+  viewSource,
+  ...readdirSync(workbenchComponentDir).filter(file => file.endsWith(".vue")).sort().map(file => readFileSync(path.join(workbenchComponentDir, file), "utf8")),
+  readFileSync(path.resolve(viewDir, "../styles/workbench.css"), "utf8"),
+].join("\n")
 const componentDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../components")
 const slotCardSource = readFileSync(path.join(componentDir, "DriveDiscSlotCard.vue"), "utf8")
 const pickerSource = readFileSync(path.join(componentDir, "DriveDiscPickerModal.vue"), "utf8")
@@ -354,7 +361,7 @@ describe("WorkbenchView optimizer progress", () => {
   it("keeps workbench borders scoped to one surface per column", () => {
     expect(source).toContain(".workbench-surface {")
     expect(source).toContain(".workbench-section + .workbench-section")
-    expect(source).toContain(".workbench-surface :deep(.metric:not(.layer-metric))")
+    expect(source).toContain(".workbench-surface .metric:not(.layer-metric)")
     expect(source).toContain(".workbench-summary-section")
     expect(source).not.toContain('class="panel optimizer-constraint-panel"')
     expect(source).not.toContain('class="panel drive-disc-workbench-panel"')
@@ -405,7 +412,10 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain(':disabled="!canRunOptimization"')
     expect(source).toContain("当前没有可用于优化的可见角色、音擎或驱动盘套装")
     expect(source).toContain("&& optimizerStore.fourPieceSetIds.length")
-    expect(source).toContain(':disabled="!draftFourPieceSetIds.length || fourPieceDraftUnchanged"')
+    // 弹窗内部用 require-selection + 草稿是否变化控制“应用限制”，细节见 OptimizerSetChoiceModal.test.ts
+    expect(source).toContain("require-selection")
+    expect(source).toContain(':initial-ids="fourPieceSetModalInitialIds"')
+    expect(source).toContain('@apply="applyFourPieceSetModalSelection"')
     expect(source).not.toContain('optimizerStore.setFourPieceSets([catalogStore.displayDriveDiscSets[0]?.id ?? ""].filter(Boolean))')
   })
 
@@ -427,12 +437,12 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
-    expect(source).toContain("draftFourPieceSetIds.value = [...optimizerStore.fourPieceSetIds]")
-    expect(source).toContain("optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)")
-    expect(source).toContain("draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]")
-    expect(source).toContain("optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)")
-    expect(source).toContain('@click="showFourPieceSetModal = false">取消')
-    expect(source).toContain('@click="showTwoPieceSetModal = false">取消')
+    expect(source).toContain("fourPieceSetModalInitialIds.value = [...optimizerStore.fourPieceSetIds]")
+    expect(source).toContain("optimizerStore.setFourPieceSets(ids)")
+    expect(source).toContain("twoPieceSetModalInitialIds.value = [...optimizerStore.twoPieceSetIds]")
+    expect(source).toContain("optimizerStore.setTwoPieceSetIds(ids)")
+    expect(source).toContain('@apply="applyFourPieceSetModalSelection"')
+    expect(source).toContain('@apply="applyTwoPieceSetModalSelection"')
   })
 })
 

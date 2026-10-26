@@ -4,6 +4,13 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-10-27 — PR #103 工作台结果栏与套装选择弹窗拆分（内部重构）
+
+- 问题：`WorkbenchView` 同时承担左/中/右三栏与结果、白盒、套装弹窗逻辑，文件过大且样式在主视图与子组件间重复，后续工作台改版难以分层。
+- 变化：右栏（面板 → 结果条 → 伤害白盒）抽成 `components/workbench/WorkbenchResultColumn.vue`；4/2 件套弹窗抽成 `components/workbench/OptimizerSetChoiceModal.vue`（草稿仅点“应用限制”提交）；共用区块样式移到全局 `styles/workbench.css`。
+- 关键边界：纯内部重构，不改变计算、持久化键、右侧栏目顺序、弹窗草稿语义与视觉；保留 #93 任务清理、#94 结果恢复提示、#97“不预填 4 件套首套”行为；不包含吸顶布局、分段控件、Buff 弹窗改版等后续层。实现边界见[布局契约](frontend-layout-contract.md#工作台代码组织2026-10-27)。
+- 验证：本地 webapp 单测、构建、根目录回归通过；Playwright 主题+布局 19/19 通过；8787 同源回归以合并后 main 构建为准。远端完整 CI 以该 PR 检查为准。
+
 ## 2026-10-26 — PR #102 驱动盘分析副词条收益条形图
 
 - 问题：词条分析只有精确表格，难以一眼看出“再刷一条时哪个副词条收益最高”。
