@@ -46,6 +46,8 @@
   --app-radius-sm: 6px;
   --app-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
   --app-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.03);
+  /* 顶栏高度：布局与吸顶逻辑统一引用，避免魔法数字散落。 */
+  --app-topbar-height: 56px;
 }
 
 /* 深色主题：跟随系统时由媒体查询生效；手动选择时 data-theme 覆盖系统设置。 */
@@ -211,7 +213,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 56px;
+  min-height: var(--app-topbar-height);
   padding: 0 24px;
   border-bottom: 1px solid var(--app-border);
   background: var(--app-topbar-bg);

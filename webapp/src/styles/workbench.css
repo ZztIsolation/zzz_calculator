@@ -10,9 +10,9 @@
   gap: 0;
   overflow: hidden;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
+  border-radius: var(--app-radius);
   background: var(--app-panel);
-  box-shadow: none;
+  box-shadow: var(--app-shadow-sm);
 }
 
 .workbench-section {
@@ -31,13 +31,17 @@
 
 .workbench-section-header {
   min-height: 0;
-  padding: 10px 12px;
+  padding: 12px 14px 8px;
   border-bottom: 0;
+}
+
+.workbench-section-header .panel-title {
+  font-size: 15px;
 }
 
 .workbench-section-body {
   min-width: 0;
-  padding: 8px 12px 12px;
+  padding: 6px 14px 14px;
 }
 
 .workbench-surface .metric:not(.layer-metric) {

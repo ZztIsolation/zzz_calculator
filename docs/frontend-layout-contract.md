@@ -69,7 +69,9 @@
 - 计算页右栏（面板 → 结果条 → 伤害白盒）由 `webapp/src/components/workbench/WorkbenchResultColumn.vue` 承载，主视图只负责布局与状态；右栏的 props/emit 契约变化需同步主视图与测试。
 - “限定 4 件套 / 额外 2 件套”弹窗由 `OptimizerSetChoiceModal.vue` 承载：草稿只在点击“应用限制”时提交；打开时草稿取当前已生效选择，**不预填首套**（尊重玩家已有选择）；至少选一套时“应用限制”才可用。
 - 工作台共用区块样式（surface / section / header / body / panel-subtitle 等）集中在全局 `webapp/src/styles/workbench.css`，由 `main.ts` 引入；组件内不得再定义同名规则，避免两套样式源。
-- 验收入口：`webapp/src/views/WorkbenchView.test.ts`（结果栏顺序与弹窗接线）、`webapp/src/components/workbench/OptimizerSetChoiceModal.test.ts`（草稿/应用/至少一项）、`webapp/e2e/layout.e2e.ts`（右栏布局）。
+- `ExpandToggle` 是后续折叠交互的统一按钮（`aria-expanded` + 箭头翻转 + 主题焦点框），当前仅供后续层接入，不改变现有面板行为。
+- 顶栏高度统一走 `--app-topbar-height`（56px），布局或吸顶计算不得再写死高度数字。
+- 验收入口：`webapp/src/views/WorkbenchView.test.ts`（结果栏顺序与弹窗接线）、`webapp/src/components/workbench/OptimizerSetChoiceModal.test.ts`（草稿/应用/至少一项）、`webapp/src/components/ExpandToggle.test.ts`（展开按钮语义）、`webapp/e2e/layout.e2e.ts`（右栏布局）。
 
 ## 深色模式与颜色变量
 
