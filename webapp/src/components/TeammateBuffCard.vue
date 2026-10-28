@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue"
 import { NCheckbox, NInputNumber, NRadioButton, NRadioGroup } from "naive-ui"
 import ExpandToggle from "@/components/ExpandToggle.vue"
+import { buffEffectSummary } from "@/utils/buffEffectSummary"
 import { buffDisplayName, buffSubtitle } from "@/utils/format"
 import {
   localizedText,
@@ -40,7 +41,7 @@ const description = computed(() => buffSubtitle(props.buff))
 // 已选默认展开、未选默认收起；箭头在默认值上取反，勾选状态变化时回到默认。
 const toggledByUser = ref(false)
 const expanded = computed(() => props.selected !== toggledByUser.value)
-const effectSummary = computed(() => [...props.effectRows.map(row => String(row.text).replace(/（[^）]*）/g, "").trim()), ...props.modifierLines].filter(Boolean).join(" · ") || description.value)
+const effectSummary = computed(() => buffEffectSummary(props.effectRows, props.modifierLines, description.value))
 watch(description, () => { toggledByUser.value = false })
 watch(() => props.selected, () => { toggledByUser.value = false })
 

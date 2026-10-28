@@ -21,6 +21,7 @@ import WorkbenchSegmentedControl from "@/components/workbench/WorkbenchSegmented
 import WorkbenchResultColumn from "@/components/workbench/WorkbenchResultColumn.vue"
 import WEngineSelect from "@/components/WEngineSelect.vue"
 import { groupActiveBuffs } from "@/utils/activeBuffGroups"
+import { readBuffSectionExpanded, writeBuffSectionExpanded } from "@/utils/workbenchPreferences"
 import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { buffLabelForId, teammateBuffCandidates } from "@/utils/combatBuffs"
 import { inferBuffPickerState, selectedTeammateOwnerIds } from '@/utils/teammateBuffPicker'
@@ -72,22 +73,11 @@ const openingBuffPicker = ref(false)
 const buffContextReady = ref(false)
 const buffContextError = ref('')
 const buffPickerResetNotice = ref("")
-const BUFF_SECTION_STORAGE_KEY = "zzz-workbench-buff-expanded"
 const buffSectionExpanded = ref(false)
 function restoreBuffSectionState() {
-  try {
-    buffSectionExpanded.value = window.localStorage.getItem(BUFF_SECTION_STORAGE_KEY) === "true"
-  } catch {
-    buffSectionExpanded.value = false
-  }
+  buffSectionExpanded.value = readBuffSectionExpanded()
 }
-watch(buffSectionExpanded, expanded => {
-  try {
-    window.localStorage.setItem(BUFF_SECTION_STORAGE_KEY, String(expanded))
-  } catch {
-    // 隐私模式或禁用存储时保持当前会话状态即可。
-  }
-})
+watch(buffSectionExpanded, expanded => writeBuffSectionExpanded(expanded))
 const teammateSources = ref<TeammateSources>()
 let buffSession: { context: Awaited<ReturnType<typeof readTeammateSources>>, state: string, agentId: string } | null = null
 let disposed = false

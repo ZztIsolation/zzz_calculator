@@ -190,13 +190,13 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("keeps the in-combat Buff section collapsed by default and persists the toggle", () => {
-    expect(source).toContain('const BUFF_SECTION_STORAGE_KEY = "zzz-workbench-buff-expanded"')
+    expect(source).toContain('import { readBuffSectionExpanded, writeBuffSectionExpanded } from "@/utils/workbenchPreferences"')
     expect(source).toContain("const buffSectionExpanded = ref(false)")
     expect(source).toContain('data-testid="toggle-workbench-buff"')
     expect(source).toContain(':expanded="buffSectionExpanded"')
     expect(source).toContain('aria-controls="workbench-buff-content"')
-    expect(source).toContain("localStorage.getItem(BUFF_SECTION_STORAGE_KEY)")
-    expect(source).toContain("localStorage.setItem(BUFF_SECTION_STORAGE_KEY, String(expanded))")
+    expect(source).toContain("buffSectionExpanded.value = readBuffSectionExpanded()")
+    expect(source).toContain("watch(buffSectionExpanded, expanded => writeBuffSectionExpanded(expanded))")
     expect(source).toContain(':hidden="!buffSectionExpanded && !buffContextError"')
   })
 

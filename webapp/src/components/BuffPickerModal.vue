@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue"
 import { NButton, NCheckbox, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NScrollbar, NTabPane, NTabs, NTag } from "naive-ui"
 import ExpandToggle from "@/components/ExpandToggle.vue"
 import { BUFF_EFFECT_GROUPS, effectGroupsForRules, type BuffEffectGroup } from "@/utils/buffEffectGroups"
+import { buffEffectSummary } from "@/utils/buffEffectSummary"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import LayerSlider from "@/components/LayerSlider.vue"
 import TeammateSelect from "@/components/TeammateSelect.vue"
@@ -836,6 +837,18 @@ const visibleBuffs = computed(() => {
   return filteredCategoryBuffs.value
 })
 
+// 每行摘要只算一次，避免在文本和 title 里各算一遍。
+const effectSummaryById = computed(() => {
+  const summaries = new Map<string, string>()
+  for (const buff of visibleBuffs.value) {
+    summaries.set(String(buff?.id ?? ""), effectSummaryFor(buff))
+  }
+  return summaries
+})
+function summaryFor(buff: any) {
+  return effectSummaryById.value.get(String(buff?.id ?? "")) ?? ""
+}
+
 // 置顶区后面的第一条前显示“未选”分隔
 function startsUnpinned(buffs: any[], index: number) {
   return index > 0 && !pinnedIds.value.has(buffs[index]?.id) && pinnedIds.value.has(buffs[index - 1]?.id)
@@ -1027,9 +1040,7 @@ function effectRowsFor(buff: any) {
 
 // 摘要行只保留“属性 +数值”，适用技能、异常类型等括注留在展开区
 function effectSummaryFor(buff: any) {
-  const rows = effectRowsFor(buff).map(row => String(row.text).replace(/（[^）]*）/g, "").trim())
-  const modifiers = modifierLinesFor(buff)
-  return [...rows, ...modifiers].filter(Boolean).join(" · ") || buffSubtitle(buff)
+  return buffEffectSummary(effectRowsFor(buff), modifierLinesFor(buff), buffSubtitle(buff))
 }
 
 // 适用技能超过 3 个时折叠成“适用 N 个技能”，点开再看完整列表；列表仍在页面文本中，搜索不受影响
@@ -1589,16 +1600,16 @@ async function apply() {
                 <ImageAvatar :src="thumbnailForBuff(buff)" :name="buffDisplayName(buff)" round />
                 <span class="buff-copy">
                   <strong :title="buffDisplayName(buff)">{{ buffDisplayName(buff) }}</strong>
-                  <small class="buff-effect-summary" :title="`${effectSummaryFor(buff)}
-${buffSubtitle(buff)}`">{{ effectSummaryFor(buff) }}</small>
+                  <small class="buff-effect-summary" :title="`${summaryFor(buff)}
+${buffSubtitle(buff)}`">{{ summaryFor(buff) }}</small>
                 </span>
               </button>
               <span v-else class="buff-row-toggle is-static">
                 <ImageAvatar :src="thumbnailForBuff(buff)" :name="buffDisplayName(buff)" round />
                 <span class="buff-copy">
                   <strong :title="buffDisplayName(buff)">{{ buffDisplayName(buff) }}</strong>
-                  <small class="buff-effect-summary" :title="`${effectSummaryFor(buff)}
-${buffSubtitle(buff)}`">{{ effectSummaryFor(buff) }}</small>
+                  <small class="buff-effect-summary" :title="`${summaryFor(buff)}
+${buffSubtitle(buff)}`">{{ summaryFor(buff) }}</small>
                 </span>
               </span>
               <ExpandToggle

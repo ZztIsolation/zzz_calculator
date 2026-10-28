@@ -72,9 +72,10 @@
 - 计算页右栏（面板 → 结果条 → 伤害白盒）由 `webapp/src/components/workbench/WorkbenchResultColumn.vue` 承载，主视图只负责布局与状态；右栏的 props/emit 契约变化需同步主视图与测试。
 - “限定 4 件套 / 额外 2 件套”弹窗由 `OptimizerSetChoiceModal.vue` 承载：草稿只在点击“应用限制”时提交；打开时草稿取当前已生效选择，**不预填首套**（尊重玩家已有选择）；至少选一套时“应用限制”才可用。
 - 工作台共用区块样式（surface / section / header / body / panel-subtitle 等）集中在全局 `webapp/src/styles/workbench.css`，由 `main.ts` 引入；组件内不得再定义同名规则，避免两套样式源。
-- `ExpandToggle` 是后续折叠交互的统一按钮（`aria-expanded` + 箭头翻转 + 主题焦点框），当前仅供后续层接入，不改变现有面板行为。
+- 展开/收起统一用 `ExpandToggle`（`aria-expanded` + 箭头翻转 + 主题焦点框），放在被展开内容上方或标题行；左栏「局内 Buff」、事件摘要与 Buff 弹窗均使用它。
+- 左栏事件摘要与已启用 Buff 用 `.workbench-inset-list`（每行左名称、右数值），已启用数量用 `.workbench-count-badge` 小徽标。
 - 顶栏高度统一走 `--app-topbar-height`（56px），布局或吸顶计算不得再写死高度数字。
-- 验收入口：`webapp/src/views/WorkbenchView.test.ts`（结果栏顺序与弹窗接线）、`webapp/src/components/workbench/OptimizerSetChoiceModal.test.ts`（草稿/应用/至少一项）、`webapp/src/components/ExpandToggle.test.ts`（展开按钮语义）、`webapp/e2e/layout.e2e.ts`（右栏布局）。
+- 验收入口：`webapp/src/views/WorkbenchView.test.ts`（结果栏顺序与弹窗接线）、`webapp/src/components/workbench/OptimizerSetChoiceModal.test.ts`（草稿/应用/至少一项）、`webapp/src/components/ExpandToggle.test.ts`（展开按钮语义）、`webapp/src/utils/workbenchPreferences.test.ts`（Buff 收起状态持久化）、`webapp/e2e/layout.e2e.ts`（右栏布局）。
 
 
 ## 工作台交互（2026-10-28）
@@ -129,8 +130,3 @@
 - 保存、刷新和重新打开后字段仍是预期值。
 
 具体浏览器场景维护在 [layout.e2e.ts](../webapp/e2e/layout.e2e.ts) 和 [agent-maintenance.e2e.ts](../webapp/e2e/agent-maintenance.e2e.ts)。
-
-### 工作台代码组织
-
-- 计算页各栏共用的区块样式（`.workbench-surface`、`.workbench-section`、吸顶栏等）在全局 `webapp/src/styles/workbench.css`，页面与拆出的子组件共用。
-- 展开/收起统一用 `ExpandToggle`（蓝色箭头＋可选文字，展开后翻转），放在被展开内容的上方或标题行，展开后位置不变。左栏的事件摘要和已启用 Buff 用 `.workbench-inset-list`（每行左名称、右数值），数量用 `.workbench-count-badge` 小徽标，不用换行乱排的圆角标签。
