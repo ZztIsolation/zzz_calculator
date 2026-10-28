@@ -751,7 +751,7 @@ async function openModal(wrapper: ReturnType<typeof mountModal>) {
 async function openCustomTab(wrapper: ReturnType<typeof mountModal>) {
   await openModal(wrapper)
   const customTab = wrapper.findAll(".n-tabs-tab")
-    .find(tab => tab.text() === "自定义 Buff")
+    .find(tab => tab.text().includes("自定义 Buff"))
   expect(customTab).toBeTruthy()
   await customTab!.trigger("click")
   await nextTick()
@@ -760,7 +760,7 @@ async function openCustomTab(wrapper: ReturnType<typeof mountModal>) {
 async function openFieldTab(wrapper: ReturnType<typeof mountModal>) {
   await openModal(wrapper)
   const fieldTab = wrapper.findAll(".n-tabs-tab")
-    .find(tab => tab.text() === "场地 Buff")
+    .find(tab => tab.text().includes("场地 Buff"))
   expect(fieldTab).toBeTruthy()
   await fieldTab!.trigger("click")
   await nextTick()
@@ -769,7 +769,7 @@ async function openFieldTab(wrapper: ReturnType<typeof mountModal>) {
 async function openBossTab(wrapper: ReturnType<typeof mountModal>) {
   await openModal(wrapper)
   const bossTab = wrapper.findAll(".n-tabs-tab")
-    .find(tab => tab.text() === "Boss Buff")
+    .find(tab => tab.text().includes("Boss Buff"))
   expect(bossTab).toBeTruthy()
   await bossTab!.trigger("click")
   await nextTick()
@@ -778,7 +778,7 @@ async function openBossTab(wrapper: ReturnType<typeof mountModal>) {
 async function openTeammateTab(wrapper: ReturnType<typeof mountModal>) {
   await openModal(wrapper)
   const tab = wrapper.findAll(".n-tabs-tab")
-    .find(item => item.text() === "队友 Buff")
+    .find(item => item.text().includes("队友 Buff"))
   expect(tab).toBeTruthy()
   await tab!.trigger("click")
   await nextTick()
@@ -787,7 +787,7 @@ async function openTeammateTab(wrapper: ReturnType<typeof mountModal>) {
 async function openTeammateWEngineTab(wrapper: ReturnType<typeof mountModal>) {
   await openModal(wrapper)
   const tab = wrapper.findAll(".n-tabs-tab")
-    .find(item => item.text() === "队友音擎buff")
+    .find(item => item.text().includes("队友音擎 Buff"))
   expect(tab).toBeTruthy()
   await tab!.trigger("click")
   await nextTick()
@@ -795,9 +795,27 @@ async function openTeammateWEngineTab(wrapper: ReturnType<typeof mountModal>) {
 
 function buffRowByText(wrapper: ReturnType<typeof mountModal>, text: string) {
   const row = wrapper.findAll(".buff-row").find(item => item.text().includes(text)
-    || item.find(".buff-row-toggle").attributes("aria-label")?.includes(text))
+    || item.find(".buff-row-toggle").attributes("aria-label")?.includes(text)
+    || item.find(".buff-effect-summary").attributes("title")?.includes(text))
   expect(row).toBeTruthy()
   return row!
+}
+
+async function expandBuffRow(wrapper: ReturnType<typeof mountModal>, text: string) {
+  const row = buffRowByText(wrapper, text)
+  if (row.find(".buff-expand-toggle").attributes("aria-expanded") === "false") {
+    await row.find(".buff-expand-toggle").trigger("click")
+    await nextTick()
+  }
+  return row
+}
+
+// 未选条目默认收起效果控件；需要检查控件时先全部展开
+async function expandAllRows(wrapper: ReturnType<typeof mountModal>) {
+  for (const toggle of wrapper.findAll(".buff-expand-toggle[aria-expanded='false']")) {
+    await toggle.trigger("click")
+  }
+  await nextTick()
 }
 
 function buttonByText(wrapper: ReturnType<typeof mountModal>, text: string) {
@@ -1111,7 +1129,7 @@ describe("BuffPickerModal", () => {
     const effectText = row.find(".buff-effect-lines").text()
     expect(effectText).toContain("指定异常增伤% +10%（属性异常：风化）")
     expect(effectText).toContain("乱流增伤% +10%（乱流）")
-    expect(row.findAll(".chip-row span").map(item => item.text())).toEqual(["风化增伤", "乱流增伤"])
+    expect(row.find(".chip-row").exists()).toBe(false)
   })
 
   it("shows a skill-sourced Buff and keeps it independently disabled after reopening", async () => {
@@ -1210,6 +1228,7 @@ describe("BuffPickerModal", () => {
     }
     const wrapper = mountModal({ meta: dynamicMeta, agentId: "aria", coreSkillLevel: "F" })
     await openModal(wrapper)
+    await expandAllRows(wrapper)
     expect(wrapper.find(".buff-effect-lines").text()).toContain("异常精通 +90")
 
     await wrapper.setProps({ coreSkillLevel: "A" })
@@ -1257,6 +1276,7 @@ describe("BuffPickerModal", () => {
     const wrapper = mountModal({ meta: ariaMeta, agentId: "aria", cinemaLevel: 1 })
 
     await openModal(wrapper)
+    await expandAllRows(wrapper)
 
     const text = wrapper.find(".buff-effect-lines").text()
     expect(text).toContain("异常暴击率% +25%（异放）")
@@ -1335,10 +1355,51 @@ describe("BuffPickerModal", () => {
     const wrapper = mountModal({ meta: vivianMeta, agentId: "vivian", cinemaLevel: 2 })
 
     await openModal(wrapper)
+    await expandAllRows(wrapper)
 
     const text = wrapper.find(".buff-effect-lines").text()
     expect(text).toContain("异放精通收益提升 +30%（异放）")
     expect(text).not.toContain("异放：全部原异常")
+  })
+
+  it("folds long skill target lists behind a toggle and keeps short ones inline", async () => {
+    const longTargets = ["basic", "dodge", "special", "chain"].map(skillType => ({ kind: "skillType", skillType }))
+    const foldMeta = {
+      ...meta,
+      agents: [{
+        ...meta.agents[0],
+        combatBuffs: {
+          corePassive: {
+            scope: "inCombat",
+            source: { zhCN: "核心被动" },
+            effects: [
+              { id: "long", type: "fixed", stat: "critDmg", value: 20, target: { kind: "skill", skillTargets: longTargets } },
+              { id: "short", type: "fixed", stat: "critRate", value: 10, target: { kind: "skill", skillTargets: longTargets.slice(0, 2) } },
+            ],
+          },
+        },
+      }],
+    }
+    const wrapper = mountModal({ meta: foldMeta })
+    await openModal(wrapper)
+
+    await wrapper.find(".standard-buff-row .buff-expand-toggle").trigger("click")
+
+    const toggles = wrapper.findAll(".skill-target-toggle")
+    expect(toggles).toHaveLength(1)
+    expect(toggles[0]!.text()).toBe("适用 4 个技能")
+    expect(toggles[0]!.attributes("aria-expanded")).toBe("false")
+    const list = wrapper.get(".skill-target-list")
+    expect((list.element as HTMLElement).style.display).toBe("none")
+    // 折叠时完整列表仍在页面文本中，搜索不受影响
+    expect(list.text()).toMatch(/^（技能：.+；.+；.+；.+）$/)
+
+    await toggles[0]!.trigger("click")
+    expect(wrapper.get(".skill-target-toggle").attributes("aria-expanded")).toBe("true")
+    expect((wrapper.get(".skill-target-list").element as HTMLElement).style.display).toBe("")
+
+    // 两个技能的短列表保持原样内联
+    expect(wrapper.text()).toMatch(/暴击率[^（]*（技能：[^；）]+；[^；）]+）/)
   })
 
   it("renders the buff category tabs as a dedicated control strip", async () => {
@@ -1353,6 +1414,118 @@ describe("BuffPickerModal", () => {
     expect(tabs.text()).toContain("场地 Buff")
     expect(tabs.text()).toContain("Boss Buff")
     expect(tabs.text()).toContain("自定义 Buff")
+  })
+
+  it("keeps unselected rows collapsed, expands selected rows, and exposes an accessible arrow", async () => {
+    const buffs = fieldBuffs.filter(buff => buff.period.modeId === "critical_assault" && buff.period.gameVersion === "3.1" && buff.period.phaseNo === 1)
+    const wrapper = mountModal({ selectedIds: ["field.critical_assault.v3_1.p1.cuixin"], buffs })
+    await openFieldTab(wrapper)
+
+    const selected = buffRowByText(wrapper, "摧心")
+    expect(selected.classes()).toContain("is-selected")
+    expect(selected.find(".buff-effect-lines").exists()).toBe(true)
+    expect(selected.find(".buff-expand-toggle").attributes("aria-expanded")).toBe("true")
+
+    const unselected = buffRowByText(wrapper, "勠力")
+    expect(unselected.find(".buff-effect-lines").exists()).toBe(false)
+    const arrow = unselected.find(".buff-expand-toggle")
+    expect(arrow.attributes("aria-expanded")).toBe("false")
+    await arrow.trigger("click")
+    expect(arrow.attributes("aria-expanded")).toBe("true")
+    expect(unselected.find(".buff-effect-lines").exists()).toBe(true)
+  })
+
+  it("pins Buffs selected at open time first and keeps the order while ticking more", async () => {
+    const buffs = fieldBuffs.filter(buff => buff.period.modeId === "critical_assault" && buff.period.gameVersion === "3.1" && buff.period.phaseNo === 1)
+    expect(buffs.length).toBeGreaterThan(2)
+    const last = buffs.at(-1)!
+    const wrapper = mountModal({ selectedIds: [last.id], buffs })
+    await openFieldTab(wrapper)
+
+    const rows = () => wrapper.findAll(".buff-row")
+    expect(rows()[0]!.classes()).toContain("is-selected")
+    expect(rows()[0]!.attributes("data-buff-id") ?? rows()[0]!.html()).toContain(last.id)
+    expect(wrapper.find(".buff-list-divider").text()).toBe("未选")
+
+    // 勾选另一条时不立刻跳到顶部，避免列表在手下移动
+    const orderBefore = rows().map(row => row.text())
+    await rows()[2]!.find('input[type="checkbox"]').setValue(true)
+    expect(rows().map(row => row.text().replace(/\s+/g, ""))).toHaveLength(orderBefore.length)
+    expect(rows()[2]!.classes()).toContain("is-selected")
+    expect(rows()[1]!.classes()).not.toContain("is-selected")
+  })
+
+  it("filters the current tab by effect chips and resets them when switching tabs", async () => {
+    const buffs = fieldBuffs.filter(buff => buff.period.modeId === "critical_assault" && buff.period.gameVersion === "3.1" && buff.period.phaseNo === 1)
+    const wrapper = mountModal({ buffs })
+    await openFieldTab(wrapper)
+
+    const chips = wrapper.findAll("[data-effect-group]")
+    expect(chips.length).toBeGreaterThan(1)
+    const total = wrapper.findAll(".buff-row").length
+    await chips[0]!.trigger("click")
+    expect(chips[0]!.attributes("aria-pressed")).toBe("true")
+    const filtered = wrapper.findAll(".buff-row").length
+    expect(filtered).toBeGreaterThan(0)
+    expect(filtered).toBeLessThanOrEqual(total)
+
+    const otherTab = wrapper.findAll(".n-tabs-tab").find(tab => tab.text().includes("自身 Buff"))!
+    await otherTab.trigger("click")
+    await nextTick()
+    const fieldTab = wrapper.findAll(".n-tabs-tab").find(tab => tab.text().includes("场地 Buff"))!
+    await fieldTab.trigger("click")
+    await nextTick()
+    expect(wrapper.findAll(".buff-row")).toHaveLength(total)
+    expect(wrapper.find('.buff-filter-chip[aria-pressed="true"]').text()).toBe("全部")
+  })
+
+  it("clears an unavailable effect filter after searching another category", async () => {
+    const buffs = fieldBuffs.filter(buff => buff.period.modeId === "critical_assault" && buff.period.gameVersion === "3.1" && buff.period.phaseNo === 1)
+    const wrapper = mountModal({ buffs })
+    await openFieldTab(wrapper)
+    await wrapper.get('[data-effect-group="atk"]').trigger("click")
+    await wrapper.get('input[placeholder="搜索来源、名称、效果"]').setValue("摧心")
+    expect(wrapper.findAll(".buff-row")).toHaveLength(1)
+    expect(wrapper.get(".buff-row").text()).toContain("摧心")
+    await wrapper.get('input[placeholder="搜索来源、名称、效果"]').setValue("")
+    expect(wrapper.findAll(".buff-row")).toHaveLength(3)
+  })
+
+  it("clears an unavailable specialty filter after searching another engine", async () => {
+    const wrapper = mountModal({ meta: { ...meta, wEngines: teammateWEngines.map((engine, index) => ({ ...engine, specialty: index ? "support" : "attack" })) } })
+    await openTeammateWEngineTab(wrapper)
+    await wrapper.get('[aria-label="按特性筛选"]').findAll("button").find(button => button.text() === "强攻")!.trigger("click")
+    await wrapper.get('input[placeholder="搜索来源、名称、效果"]').setValue("队友音擎乙")
+    expect(wrapper.findAll(".buff-row")).toHaveLength(1)
+    expect(wrapper.get(".buff-row").text()).toContain("队友音擎乙")
+    await wrapper.get('input[placeholder="搜索来源、名称、效果"]').setValue("")
+    expect(wrapper.findAll(".buff-row")).toHaveLength(2)
+  })
+
+  it("shows selected counts beside category tabs without changing the total", async () => {
+    const wrapper = mountModal({ selectedIds: [fieldBuffs[0]!.id] })
+    await openModal(wrapper)
+    expect(wrapper.findAll(".n-tabs-tab").find(tab => tab.text().includes("场地 Buff"))?.text()).toBe("场地 Buff (1)")
+    expect(wrapper.text()).toContain("已选 1 项")
+  })
+
+  it("keeps apply and cancel semantics while the row disclosure is open", async () => {
+    const buffs = fieldBuffs.filter(buff => buff.period.modeId === "critical_assault" && buff.period.gameVersion === "3.1" && buff.period.phaseNo === 1)
+    const wrapper = mountModal({ buffs })
+    await openFieldTab(wrapper)
+    const row = buffRowByText(wrapper, "摧心")
+    await row.find(".buff-expand-toggle").trigger("click")
+    expect(row.find(".buff-effect-lines").exists()).toBe(true)
+    await buttonByText(wrapper, "取消").trigger("click")
+    expect(wrapper.emitted("apply")).toBeUndefined()
+
+    await wrapper.setProps({ show: false })
+    await openFieldTab(wrapper)
+    const reopened = buffRowByText(wrapper, "摧心")
+    expect(reopened.find(".buff-effect-lines").exists()).toBe(false)
+    await reopened.find(".buff-row-toggle").trigger("click")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    expect((wrapper.emitted("apply")?.[0]?.[0] as any).selectedBuffIds).toContain("field.critical_assault.v3_1.p1.cuixin")
   })
 
   it("starts with empty slots and groups teammate candidates by specialty without extra filters", async () => {
@@ -1396,14 +1569,13 @@ describe("BuffPickerModal", () => {
     const row = buffRowByText(wrapper, "队友甲 | 核心被动")
     expect(row.find(".avatar").exists()).toBe(false)
     expect(row.find(".chip-row").exists()).toBe(false)
-    expect(row.find(".buff-row-toggle").text()).toBe("核心被动")
-    expect(row.find(".teammate-buff-description").text()).toContain(longDescription)
-    const disclosure = row.find("button[aria-expanded]")
+    expect(row.find(".buff-row-toggle").text()).toContain("核心被动")
+    expect(row.find(".teammate-buff-description").exists()).toBe(false)
+    const disclosure = row.find(".buff-expand-toggle")
     expect(disclosure.attributes("aria-expanded")).toBe("false")
-    expect(disclosure.text()).toBe("展开")
     await disclosure.trigger("click")
     expect(disclosure.attributes("aria-expanded")).toBe("true")
-    expect(disclosure.text()).toBe("收起")
+    expect(row.find(".teammate-buff-description").text()).toContain(longDescription)
     expect(selectedRow(wrapper, "队友甲 | 核心被动")).toBe(false)
     await disclosure.trigger("click")
     expect(disclosure.attributes("aria-expanded")).toBe("false")
@@ -1462,6 +1634,9 @@ describe("BuffPickerModal", () => {
     await openTeammateTab(wrapper)
 
     expect(wrapper.findAll(".teammate-runtime-header")).toHaveLength(0)
+    await expandBuffRow(wrapper, "异化系数")
+    await expandBuffRow(wrapper, "按异常特性代理人人数提升攻击力")
+    await expandBuffRow(wrapper, "全队伤害提升")
     expect(wrapper.findAll(".buff-runtime-parameters")).toHaveLength(2)
 
     const coreRow = buffRowByText(wrapper, "异化系数")
@@ -1524,12 +1699,13 @@ describe("BuffPickerModal", () => {
   it("renders Rina potential awakening as one Buff with PEN and potential-level controls", async () => {
     const wrapper = mountModal({ meta: rinaPotentialMeta(), buffPickerState: teammateSlotState("rina") })
     await openTeammateTab(wrapper)
+    await expandBuffRow(wrapper, "丽娜 | 潜能觉醒")
 
     const rows = wrapper.findAll(".buff-row")
     expect(rows).toHaveLength(1)
     const row = rows[0]
     expect(row.find(".buff-row-toggle").attributes("aria-label")).toContain("丽娜 | 潜能觉醒")
-    expect(row.find(".buff-row-toggle").text()).toBe("潜能觉醒")
+    expect(row.find(".buff-row-toggle").text()).toContain("潜能觉醒")
     expect(row.findAll(".buff-runtime-parameter")).toHaveLength(1)
     expect(row.find(".buff-runtime-parameter").text()).toContain("潜能觉醒等级")
     expect(row.findAll(".buff-runtime-parameter button").map(button => button.text())).toEqual(["P2", "P3", "P4", "P5", "P6"])
@@ -1558,6 +1734,7 @@ describe("BuffPickerModal", () => {
     await openTeammateTab(wrapper)
 
     const row = buffRowByText(wrapper, "锋御与非锋御角色增益")
+    await expandBuffRow(wrapper, "锋御与非锋御角色增益")
     expect(wrapper.findAll(".buff-row").filter(item => item.text().includes("锋御与非锋御角色增益"))).toHaveLength(1)
     expect(row.findAll(".buff-runtime-parameter")).toHaveLength(1)
     expect(row.find(".buff-runtime-parameter").text()).toContain("潜能觉醒等级")
@@ -1619,7 +1796,7 @@ describe("BuffPickerModal", () => {
     const wrapper = mountModal({ meta: juhufuMeta, buffPickerState: teammateSlotState("juhufu") })
     await openTeammateTab(wrapper)
 
-    const row = buffRowByText(wrapper, "橘福福初始攻击力")
+    const row = await expandBuffRow(wrapper, "虎啸")
     const initialAtkInput = row.find(".runtime-grid input[type='number']")
     expect(initialAtkInput.element.getAttribute("value")).toBe("3400")
     expect(initialAtkInput.element.getAttribute("step")).toBe("50")
@@ -1649,6 +1826,9 @@ describe("BuffPickerModal", () => {
   it("discards un-applied per-Buff counts and Special Skill runtime changes", async () => {
     const wrapper = mountModal({ meta: remielleRuntimeMeta(), buffPickerState: teammateSlotState("remielle_dan") })
     await openTeammateTab(wrapper)
+    await expandBuffRow(wrapper, "异化系数")
+    await expandBuffRow(wrapper, "按异常特性代理人人数提升攻击力")
+    await expandBuffRow(wrapper, "全队伤害提升")
     await buffRowByText(wrapper, "异化系数").find(".buff-runtime-parameter").findAll("button")
       .find(button => button.text() === "1")!.trigger("click")
     await buffRowByText(wrapper, "按异常特性代理人人数提升攻击力").find(".buff-runtime-parameter").findAll("button")
@@ -1658,6 +1838,8 @@ describe("BuffPickerModal", () => {
 
     await wrapper.setProps({ show: false })
     await openTeammateTab(wrapper)
+    await expandBuffRow(wrapper, "全队伤害提升")
+    await expandBuffRow(wrapper, "按异常特性代理人人数提升攻击力")
     expect(buffRowByText(wrapper, "全队伤害提升").find("input[type='number']").element.getAttribute("value")).toBe("12")
     expect(buffRowByText(wrapper, "按异常特性代理人人数提升攻击力").text()).toContain("攻击力 +1600")
     await buttonByText(wrapper, "应用选择").trigger("click")
@@ -1870,8 +2052,8 @@ describe("BuffPickerModal", () => {
     expect(selectedRow(wrapper, "影画二：进阶增益")).toBe(true)
     expect(selectedRow(wrapper, "队友甲 | 核心被动")).toBe(false)
     await wrapper.find("input[placeholder='搜索来源、名称、效果']").setValue("影画")
-    await wrapper.findAll(".n-tabs-tab").find(tab => tab.text() === "自身 Buff")!.trigger("click")
-    await wrapper.findAll(".n-tabs-tab").find(tab => tab.text() === "队友 Buff")!.trigger("click")
+    await wrapper.findAll(".n-tabs-tab").find(tab => tab.text().includes("自身 Buff"))!.trigger("click")
+    await wrapper.findAll(".n-tabs-tab").find(tab => tab.text().includes("队友 Buff"))!.trigger("click")
     await buttonByText(wrapper, "应用选择").trigger("click")
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
     expect(payload.selectedBuffIds).toEqual(["nonstandard_beta"])
@@ -1956,6 +2138,7 @@ describe("BuffPickerModal", () => {
     expect(wrapper.text()).toContain("Boss 乙")
     expect(wrapper.text()).not.toContain("Boss 丙")
     expect(wrapper.text()).not.toContain("Boss 丁")
+    await expandAllRows(wrapper)
     expect(wrapper.text()).toContain("仅说明，未计入计算")
     expect(wrapper.text()).toContain("防御 952")
     expect(wrapper.find("input[type='range']").exists()).toBe(true)
@@ -1986,6 +2169,7 @@ describe("BuffPickerModal", () => {
     await nextTick()
     await wrapper.findAll(".boss-buff-filter-row select")[1].setValue("critical_assault:3.1:2")
     await nextTick()
+    await expandAllRows(wrapper)
     expect(wrapper.findAll(".rule-enabled-control")).toHaveLength(2)
     expect(wrapper.findAll(".rule-coverage-control")).toHaveLength(2)
 
@@ -2118,6 +2302,7 @@ describe("BuffPickerModal", () => {
     const wrapper = mountModal({ selectedIds: [buffId], buffs: criticalAssault31Buffs })
 
     await openFieldTab(wrapper)
+    await expandAllRows(wrapper)
     expect(wrapper.findAll(".rule-enabled-control")).toHaveLength(3)
     expect(wrapper.findAll(".rule-coverage-control")).toHaveLength(3)
 
@@ -2264,6 +2449,7 @@ describe("BuffPickerModal", () => {
     await nextTick()
     await selects[1].setValue("critical_assault|3.0|3")
     await nextTick()
+    await expandAllRows(wrapper)
 
     const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(true)
@@ -2316,6 +2502,7 @@ describe("BuffPickerModal", () => {
     })
 
     await openModal(wrapper)
+    await expandAllRows(wrapper)
     const coverageInputs = wrapper.findAll(".rule-coverage-control input")
     expect(coverageInputs).toHaveLength(1)
     expect((coverageInputs[0].element as HTMLInputElement).disabled).toBe(true)
@@ -2807,7 +2994,7 @@ describe("BuffPickerModal", () => {
 
     await openModal(wrapper)
     expect(wrapper.text()).toContain("已选 2 项")
-    const customTab = wrapper.findAll(".n-tabs-tab").find(tab => tab.text() === "自定义 Buff")
+    const customTab = wrapper.findAll(".n-tabs-tab").find(tab => tab.text().includes("自定义 Buff"))
     await customTab!.trigger("click")
     await nextTick()
 
@@ -2862,7 +3049,7 @@ describe("BuffPickerModal", () => {
     })
 
     await openModal(wrapper)
-    const tab = wrapper.findAll(".n-tabs-tab").find(item => item.text() === "队友音擎buff")
+    const tab = wrapper.findAll(".n-tabs-tab").find(item => item.text().includes("队友音擎 Buff"))
     expect(tab).toBeTruthy()
     await tab!.trigger("click")
     await nextTick()
@@ -2909,12 +3096,13 @@ describe("BuffPickerModal", () => {
       inCombatPanel: { critRate: 1.188 },
     })
     await openModal(wrapper)
-    const tab = wrapper.findAll(".n-tabs-tab").find(item => item.text() === "自身音擎 Buff")
+    const tab = wrapper.findAll(".n-tabs-tab").find(item => item.text().includes("自身音擎 Buff"))
     expect(tab).toBeTruthy()
     await tab!.trigger("click")
     await nextTick()
 
     const row = buffRowByText(wrapper, "启封之刻")
+    await row.find(".buff-expand-toggle").trigger("click")
     expect(row.findAll(".buff-effect-row")).toHaveLength(1)
     expect(row.text()).toContain("局内暴击率超过100%时")
     expect(row.text()).toContain("当前局内暴击率118.8%")

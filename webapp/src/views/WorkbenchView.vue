@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { NAlert, NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NTag, useMessage } from "naive-ui"
-import { Ban, CheckSquare, ChevronDown, ChevronUp, LineChart, LockKeyhole, UnlockKeyhole, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
+import { NAlert, NButton, NInput, NInputNumber, NModal, NSelect, NTag, useMessage } from "naive-ui"
+import { Ban, CheckSquare, LineChart, LockKeyhole, UnlockKeyhole, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
 import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
 import DriveDiscPagination from "@/components/DriveDiscPagination.vue"
+import ExpandToggle from "@/components/ExpandToggle.vue"
 import { useDriveDiscPagination } from "@/utils/driveDiscPagination"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
@@ -16,8 +17,11 @@ import LuminescenceParameterFields from "@/components/LuminescenceParameterField
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import OptimizerSetChoiceModal from "@/components/workbench/OptimizerSetChoiceModal.vue"
+import WorkbenchSegmentedControl from "@/components/workbench/WorkbenchSegmentedControl.vue"
 import WorkbenchResultColumn from "@/components/workbench/WorkbenchResultColumn.vue"
 import WEngineSelect from "@/components/WEngineSelect.vue"
+import { groupActiveBuffs } from "@/utils/activeBuffGroups"
+import { readBuffSectionExpanded, writeBuffSectionExpanded } from "@/utils/workbenchPreferences"
 import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { buffLabelForId, teammateBuffCandidates } from "@/utils/combatBuffs"
 import { inferBuffPickerState, selectedTeammateOwnerIds } from '@/utils/teammateBuffPicker'
@@ -69,6 +73,11 @@ const openingBuffPicker = ref(false)
 const buffContextReady = ref(false)
 const buffContextError = ref('')
 const buffPickerResetNotice = ref("")
+const buffSectionExpanded = ref(false)
+function restoreBuffSectionState() {
+  buffSectionExpanded.value = readBuffSectionExpanded()
+}
+watch(buffSectionExpanded, expanded => writeBuffSectionExpanded(expanded))
 const teammateSources = ref<TeammateSources>()
 let buffSession: { context: Awaited<ReturnType<typeof readTeammateSources>>, state: string, agentId: string } | null = null
 let disposed = false
@@ -197,6 +206,7 @@ async function loadWorkbench(initial = false) {
   }
 }
 onMounted(() => loadWorkbench(true))
+onMounted(restoreBuffSectionState)
 watch(() => accountStore.currentOwnerId, () => loadWorkbench())
 
 // 优化结果只在内存里，刷新或切换角色后会丢失；这里从本地恢复该角色上次的结果。
@@ -640,16 +650,18 @@ function applySkillLevelPreset(target: number | "max") {
   }
   buildStore.updateSkillLevels(levels)
 }
+// 事件摘要拆成“名称 + 次数”两列显示；标题文字末尾的“×N”就是次数。默认全部收起，只显示总数。
 const damageEventSummary = computed(() => (buildStore.damageConfig.events ?? []).map((event: any) => {
+  const label = damageEventSummaryTitle(event, catalogStore.meta, selectedSkillCatalog.value)
+  const match = /^(.*?)\s*×\s*([\d.]+)$/.exec(label)
   return {
     id: event.id,
-    label: damageEventSummaryTitle(event, catalogStore.meta, selectedSkillCatalog.value),
+    label,
+    name: match ? match[1] : label,
+    count: match ? match[2] : "",
   }
 }))
-const visibleDamageEventSummary = computed(() => showAllDamageEvents.value
-  ? damageEventSummary.value
-  : damageEventSummary.value.slice(0, 2))
-const hiddenDamageEventCount = computed(() => Math.max(0, damageEventSummary.value.length - 2))
+const visibleDamageEventSummary = computed(() => showAllDamageEvents.value ? damageEventSummary.value : [])
 const damageEventSummarySignature = computed(() => [
   buildStore.agentId,
   buildStore.damageConfig.mode,
@@ -704,6 +716,7 @@ const activeBuffBadges = computed(() => activeBuffIdsForPanel.value.map(id => ({
     addedBuffs: buildStore.addedBuffs,
   }),
 })))
+const activeBuffGroups = computed(() => groupActiveBuffs(activeBuffBadges.value))
 const customAddedBuffCount = computed(() => buildStore.addedBuffs
   .filter((buff: any) => buff?.sourceKind === "custom").length)
 const optimizerProgress = computed(() => optimizerStore.progress ?? null)
@@ -1567,22 +1580,40 @@ function formatPercentValue(value: any) {
 
       <section class="workbench-section workbench-buff-section">
         <div class="panel-header workbench-section-header">
-          <h2 class="panel-title">局内 Buff</h2>
+          <div class="workbench-buff-title">
+            <h2 class="panel-title">局内 Buff</h2>
+            <!-- 已启用数量用小徽标显示，窄栏里不会被截断 -->
+            <span class="workbench-count-badge" :class="{ 'is-empty': !activeBuffIdsForPanel.length }" data-testid="workbench-buff-count" :title="`已启用 ${activeBuffIdsForPanel.length} 个 Buff`">{{ activeBuffIdsForPanel.length }}</span>
+            <ExpandToggle
+              class="workbench-collapse-button"
+              data-testid="toggle-workbench-buff"
+              :expanded="buffSectionExpanded"
+              aria-controls="workbench-buff-content"
+              :aria-label="buffSectionExpanded ? '收起局内 Buff' : '展开局内 Buff'"
+              @toggle="buffSectionExpanded = !buffSectionExpanded"
+            />
+          </div>
           <NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker" :loading="openingBuffPicker" :disabled="openingBuffPicker || !buffContextReady" @click="openBuffPicker">
             <template #icon><SlidersHorizontal :size="16" /></template>
             选择 Buff
           </NButton>
         </div>
-        <div class="workbench-section-body section-band">
+        <div id="workbench-buff-content" class="workbench-section-body section-band" :hidden="!buffSectionExpanded && !buffContextError">
           <p v-if="buffContextError" role="alert">
             {{ buffContextError }}
             <NButton size="small" @click="loadWorkbench()">重新加载队友资料</NButton>
           </p>
-          <div class="chip-row workbench-buff-tags">
-            <NTag v-for="item in activeBuffBadges" :key="item.id" size="small" round>{{ item.label }}</NTag>
-            <NTag v-if="!activeBuffIdsForPanel.length" size="small" round>未启用 Buff</NTag>
+          <!-- 按来源分组：同一位代理人的 Buff 放一组，组内只写“核心被动 / 影画一…” -->
+          <div v-if="buffSectionExpanded" class="workbench-buff-groups workbench-buff-tags">
+            <div v-for="group in activeBuffGroups" :key="group.key" class="workbench-buff-group">
+              <span class="workbench-buff-group-title">{{ group.title }}</span>
+              <div class="workbench-buff-group-items">
+                <span v-for="item in group.items" :key="item.id" class="workbench-buff-chip" :title="item.title">{{ item.label }}</span>
+              </div>
+            </div>
+            <p v-if="!activeBuffIdsForPanel.length" class="workbench-buff-empty">未启用 Buff</p>
           </div>
-          <NTag v-if="customAddedBuffCount" type="info" size="small" round>自定义 {{ customAddedBuffCount }} 条</NTag>
+          <NTag v-if="buffSectionExpanded && customAddedBuffCount" type="info" size="small" round>自定义 {{ customAddedBuffCount }} 条</NTag>
         </div>
       </section>
 
@@ -1613,57 +1644,40 @@ function formatPercentValue(value: any) {
           </section>
           <div v-if="activeLuminescenceEvent" id="calculation-event-summary-list" class="calculation-luminescence-summary" data-layout-field>
             <strong>事件 {{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
-            <span aria-hidden="true">·</span>
+            <ExpandToggle
+              v-if="damageEventSummary.length"
+              class="calculation-event-summary-toggle"
+              data-testid="calculation-event-summary-toggle"
+              :expanded="showAllDamageEvents"
+              aria-controls="calculation-event-summary-list"
+              label="展开"
+              expanded-label="收起"
+              @toggle="showAllDamageEvents = !showAllDamageEvents"
+            />
             <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
-            <div
-              v-if="hiddenDamageEventCount > 0"
-              class="calculation-event-summary-toggle-row"
-            >
-              <NButton
-                class="calculation-event-summary-toggle"
-                text
-                size="small"
-                data-testid="calculation-event-summary-toggle"
-                :aria-expanded="showAllDamageEvents"
-                aria-controls="calculation-event-summary-list"
-                @click="showAllDamageEvents = !showAllDamageEvents"
-              >
-                <template #icon>
-                  <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
-                  <ChevronDown v-else :size="16" aria-hidden="true" />
-                </template>
-                {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
-              </NButton>
-            </div>
           </div>
           <div v-if="!activeLuminescenceEvent" class="metric calculation-event-summary" data-layout-field>
             <div class="calculation-event-summary-heading">
               <span class="metric-title">事件摘要</span>
               <strong class="calculation-event-count">{{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
+              <!-- 默认全部收起；开关在这一行，展开后位置不变 -->
+              <ExpandToggle
+                v-if="damageEventSummary.length"
+                class="calculation-event-summary-toggle"
+                data-testid="calculation-event-summary-toggle"
+                :expanded="showAllDamageEvents"
+                aria-controls="calculation-event-summary-list"
+                label="展开"
+                expanded-label="收起"
+                @toggle="showAllDamageEvents = !showAllDamageEvents"
+              />
             </div>
-            <div id="calculation-event-summary-list" class="chip-row calculation-event-summary-tags">
-              <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
-              <div
-                v-if="hiddenDamageEventCount > 0"
-                class="calculation-event-summary-toggle-row"
-              >
-                <NButton
-                  class="calculation-event-summary-toggle"
-                  text
-                  size="small"
-                  data-testid="calculation-event-summary-toggle"
-                  :aria-expanded="showAllDamageEvents"
-                  aria-controls="calculation-event-summary-list"
-                  @click="showAllDamageEvents = !showAllDamageEvents"
-                >
-                  <template #icon>
-                    <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
-                    <ChevronDown v-else :size="16" aria-hidden="true" />
-                  </template>
-                  {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
-                </NButton>
-              </div>
-            </div>
+            <ol v-show="showAllDamageEvents" id="calculation-event-summary-list" class="workbench-inset-list calculation-event-summary-tags">
+              <li v-for="event in visibleDamageEventSummary" :key="event.id" class="workbench-inset-row calculation-event-row">
+                <span class="workbench-inset-name" :title="event.label">{{ event.name }}</span>
+                <span v-if="event.count" class="workbench-inset-value num">×{{ event.count }}</span>
+              </li>
+            </ol>
           </div>
         </div>
       </section>
@@ -1789,21 +1803,13 @@ function formatPercentValue(value: any) {
         <div class="workbench-section-body section-band">
           <div class="drive-disc-source-row" role="group" aria-label="驱动盘方案来源">
             <span class="drive-disc-source-label">方案来源</span>
-            <NRadioGroup
+            <WorkbenchSegmentedControl
               class="drive-disc-source-options"
-              :value="buildStore.discMode"
+              :model-value="buildStore.discMode"
+              :options="driveDiscModeOptions.map(option => ({ ...option, disabled: option.value === 'optimized' && !optimizerStore.resultSchemes.length }))"
               aria-label="驱动盘方案来源"
-              @update:value="buildStore.setDiscMode(String($event) as any)"
-            >
-              <NRadioButton
-                v-for="option in driveDiscModeOptions"
-                :key="option.value"
-                :value="option.value"
-                :disabled="option.value === 'optimized' && !optimizerStore.resultSchemes.length"
-              >
-                {{ option.label }}
-              </NRadioButton>
-            </NRadioGroup>
+              @update:model-value="value => buildStore.setDiscMode(value as any)"
+            />
           </div>
           <div class="toolbar drive-disc-action-toolbar">
             <NButton size="small" :disabled="!canSaveCurrentScheme" @click="openSaveCurrentLoadout">
@@ -2407,17 +2413,44 @@ function formatPercentValue(value: any) {
   margin: 0;
 }
 
+/* 计算设置：左列标签、右列内容对齐，像一张小表。 */
+.calculation-summary-grid {
+  --calculation-summary-label-width: 60px;
+  gap: 8px;
+}
+
+.calculation-summary-grid > dl.metric:not(.calculation-mode-summary--luminescence) {
+  display: grid;
+  grid-template-columns: var(--calculation-summary-label-width) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+}
+
+.calculation-summary-grid > dl.metric:not(.calculation-mode-summary--luminescence) dt {
+  margin: 0;
+}
+
+.calculation-summary-grid > dl.metric:not(.calculation-mode-summary--luminescence) dd {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .calculation-event-summary {
   grid-column: 1 / -1;
 }
 
 .calculation-event-summary-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px 10px;
+  display: grid;
+  grid-template-columns: var(--calculation-summary-label-width) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  margin-bottom: 4px;
+  min-height: 28px;
+}
+
+.calculation-event-summary-tags {
+  margin-top: 6px;
 }
 
 .calculation-event-summary-heading .metric-title {
@@ -2429,10 +2462,15 @@ function formatPercentValue(value: any) {
   line-height: 1.6;
 }
 
+/* 展开开关靠右，与“N 项”同一行。 */
+.calculation-event-summary-heading .calculation-event-summary-toggle {
+  justify-self: end;
+}
+
 .calculation-event-count {
-  flex: 0 0 auto;
   color: var(--app-text);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .calculation-mode-summary--luminescence,
@@ -2780,8 +2818,8 @@ function formatPercentValue(value: any) {
 
 .drive-disc-source-row {
   display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
   align-items: center;
   padding: 8px 10px;
   border-left: 3px solid var(--app-blue);
@@ -2789,28 +2827,14 @@ function formatPercentValue(value: any) {
 }
 
 .drive-disc-source-label {
-  color: var(--app-text);
-  font-size: 13px;
+  color: var(--app-muted);
+  font-size: var(--font-xs);
   font-weight: 700;
 }
 
 .drive-disc-source-options {
-  display: flex;
   width: 100%;
   min-width: 0;
-}
-
-.drive-disc-source-options :deep(.n-radio-button) {
-  flex: 1 1 0;
-  min-width: 0;
-  text-align: center;
-}
-
-.drive-disc-source-options :deep(.n-radio-button__label) {
-  width: 100%;
-  min-width: 0;
-  text-align: center;
-  white-space: normal;
 }
 
 .drive-disc-action-toolbar {

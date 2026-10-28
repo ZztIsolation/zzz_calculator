@@ -9,7 +9,7 @@ test.use({ launchOptions: {
 
 async function openTeammates(page: Page) {
   await page.getByTestId("open-buff-picker").click()
-  await page.locator(".n-tabs-tab").filter({ hasText: /^队友 Buff$/ }).click()
+  await page.locator(".n-tabs-tab").filter({ hasText: /^队友 Buff(?: \(\d+\))?$/ }).click()
   await expect(page.getByTestId("teammate-slot-0")).toBeVisible()
   await expect(page.locator(".calculation-modal")).toHaveCSS("transform", "none")
 }
@@ -368,10 +368,10 @@ test("opening a legacy three-teammate configuration saves its reset immediately 
   expect(reset.combat.addedBuffs).toEqual([])
   await expect(page.locator(`[data-buff-id="${selfId}"]`)).not.toHaveClass(/is-selected/)
   await expect(page.locator(`[data-buff-id="${selfCinemaId}"]`)).toHaveClass(/is-selected/)
-  await page.locator(".n-tabs-tab").filter({ hasText: /^自身音擎 Buff$/ }).click()
+  await page.locator(".n-tabs-tab").filter({ hasText: /^自身音擎 Buff(?: \(\d+\))?$/ }).click()
   await expect(page.locator(`[data-buff-id="${engineSelfId}"]`)).toHaveClass(/is-selected/)
   await expect(page.locator(`[data-buff-id="${engineTeamId}"]`)).toHaveClass(/is-selected/)
-  await page.locator(".n-tabs-tab").filter({ hasText: /^队友 Buff$/ }).click()
+  await page.locator(".n-tabs-tab").filter({ hasText: /^队友 Buff(?: \(\d+\))?$/ }).click()
   await expect(page.locator(".teammate-buff-column .buff-row")).toHaveCount(0)
   // Subsequent edits remain a cancellable draft even though the reset was immediate.
   await chooseTeammate(page, 0, "千夏")

@@ -181,10 +181,23 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).not.toContain("patch.referenceLuminescenceDamageMultiplier")
   })
 
-  it("shows every active combat buff badge instead of truncating the list", () => {
+  it("shows every active combat Buff in grouped source lists", () => {
     expect(source).toContain("activeBuffIdsForPanel")
+    expect(source).toContain("const activeBuffGroups = computed(() => groupActiveBuffs(activeBuffBadges.value))")
+    expect(source).toContain('import { groupActiveBuffs } from "@/utils/activeBuffGroups"')
     expect(source).not.toContain(".slice(0, 8).map(id =>")
     expect(source).toContain("v-if=\"!activeBuffIdsForPanel.length\"")
+  })
+
+  it("keeps the in-combat Buff section collapsed by default and persists the toggle", () => {
+    expect(source).toContain('import { readBuffSectionExpanded, writeBuffSectionExpanded } from "@/utils/workbenchPreferences"')
+    expect(source).toContain("const buffSectionExpanded = ref(false)")
+    expect(source).toContain('data-testid="toggle-workbench-buff"')
+    expect(source).toContain(':expanded="buffSectionExpanded"')
+    expect(source).toContain('aria-controls="workbench-buff-content"')
+    expect(source).toContain("buffSectionExpanded.value = readBuffSectionExpanded()")
+    expect(source).toContain("watch(buffSectionExpanded, expanded => writeBuffSectionExpanded(expanded))")
+    expect(source).toContain(':hidden="!buffSectionExpanded && !buffContextError"')
   })
 
   it("wires teammate w-engine refinement labels while counting only true custom buffs", () => {
@@ -235,13 +248,13 @@ describe("WorkbenchView optimizer progress", () => {
   it("prevents long Miyabi calculation labels from widening the left workbench column", () => {
     expect(source).toContain('class="workbench-section-body metric-grid calculation-summary-grid"')
     expect(source).toContain('class="metric calculation-event-summary"')
-    expect(source).toContain('class="chip-row calculation-event-summary-tags"')
+    expect(source).toContain('class="workbench-inset-list calculation-event-summary-tags"')
     expect(source).toContain(".workbench-left .section-band {")
     expect(source).toContain("grid-template-columns: minmax(0, 1fr);")
     expect(source).toContain(".workbench-left > *,")
-    expect(source).toContain(".calculation-event-summary-tags :deep(.n-tag__content)")
+    expect(source).toContain(".workbench-inset-name {")
     expect(source).toContain("overflow-wrap: anywhere;")
-    expect(source).toContain("white-space: normal;")
+    expect(source).toContain("text-overflow: ellipsis;")
   })
 
   it("uses compact spacing and shared label typography in the calculation summary", () => {
@@ -258,25 +271,17 @@ describe("WorkbenchView optimizer progress", () => {
 }`)
   })
 
-  it("keeps extra calculation events behind an accessible inline toggle", () => {
+  it("keeps all calculation events collapsed by default behind an accessible toggle", () => {
     expect(source).toContain("const showAllDamageEvents = ref(false)")
-    expect(source).toContain("const visibleDamageEventSummary = computed")
-    expect(source).toContain("damageEventSummary.value.slice(0, 2)")
-    expect(source).toContain("const hiddenDamageEventCount = computed")
+    expect(source).toContain("const visibleDamageEventSummary = computed(() => showAllDamageEvents.value ? damageEventSummary.value : [])")
     expect(source).toContain('data-testid="calculation-event-summary-toggle"')
-    expect(source).toContain(':aria-expanded="showAllDamageEvents"')
+    expect(source).toContain(':expanded="showAllDamageEvents"')
     expect(source).toContain('aria-controls="calculation-event-summary-list"')
-    expect(source).toContain('showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项`')
-    expect(source).toContain("<ChevronDown")
-    expect(source).toContain("<ChevronUp")
-    expect(source.match(/class="calculation-event-summary-toggle-row"/g)).toHaveLength(2)
-    expect(source.match(/<ChevronUp v-if="showAllDamageEvents" :size="16"/g)).toHaveLength(2)
-    expect(source.match(/<ChevronDown v-else :size="16"/g)).toHaveLength(2)
-    expect(source).toContain(".calculation-event-summary-toggle-row {")
-    expect(source).toContain("flex: 0 0 100%;")
-    expect(source).toContain("font-size: 14px;")
+    expect(source.match(/label="展开"\n\s*expanded-label="收起"/g)).toHaveLength(2)
+    expect(source).toContain('<ol v-show="showAllDamageEvents" id="calculation-event-summary-list"')
+    const heading = source.slice(source.indexOf('<div class="calculation-event-summary-heading">'), source.indexOf('id="calculation-event-summary-list" class="workbench-inset-list'))
+    expect(heading).toContain('data-testid="calculation-event-summary-toggle"')
     expect(source).toContain("watch(damageEventSummarySignature")
-    expect(source).toContain(".calculation-event-summary-toggle:focus-visible")
   })
 
   it("passes the rupture sheer-force flag to the panel comparison table", () => {
@@ -644,10 +649,11 @@ describe("WorkbenchView drive disc scheme source", () => {
     expect(source).toContain("const driveDiscModeOptions = [")
     expect(source).toContain('class="drive-disc-source-row"')
     expect(source).toContain('class="drive-disc-source-label"')
-    expect(source).toContain("<NRadioGroup")
-    expect(source).toContain("<NRadioButton")
-    expect(source).toContain(':value="buildStore.discMode"')
-    expect(source).toContain("@update:value=\"buildStore.setDiscMode(String($event) as any)\"")
+    expect(source).toContain("<WorkbenchSegmentedControl")
+    expect(source).toContain(':model-value="buildStore.discMode"')
+    expect(source).toContain('role="radiogroup"')
+    expect(source).toContain('role="radio"')
+    expect(source).toContain("@update:model-value=\"value => buildStore.setDiscMode(value as any)\"")
     expect(source).not.toContain("drive-disc-mode-toolbar")
     expect(source).not.toContain("drive-disc-mode-row")
   })

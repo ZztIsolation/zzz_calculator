@@ -34,6 +34,9 @@
 
 表格、图表、导航条和事件列表可在明确的局部容器滚动，但横向溢出不能传递到页面或弹窗外层。添加复杂表单时给最外层添加`data-layout-surface`，给关键字段添加`data-layout-field`。
 
+
+吸顶元素统一以 `--app-topbar-height` 为偏移；顶栏在窄屏换行时必须同步更新该变量，吸顶内容不得压住顶栏。
+
 ## 顶栏导航（2026-10-25）
 
 - 顶栏导航是单一胶囊容器；当前页用滑块标示，滑块与链接同处容器，窄屏局部滚动时随内容一起滚动。首帧或测量完成前，由链接自身的静态选中底色兜底，避免闪烁。
@@ -69,8 +72,28 @@
 - 计算页右栏（面板 → 结果条 → 伤害白盒）由 `webapp/src/components/workbench/WorkbenchResultColumn.vue` 承载，主视图只负责布局与状态；右栏的 props/emit 契约变化需同步主视图与测试。
 - “限定 4 件套 / 额外 2 件套”弹窗由 `OptimizerSetChoiceModal.vue` 承载：草稿只在点击“应用限制”时提交；打开时草稿取当前已生效选择，**不预填首套**（尊重玩家已有选择）；至少选一套时“应用限制”才可用。
 - 工作台共用区块样式（surface / section / header / body / panel-subtitle 等）集中在全局 `webapp/src/styles/workbench.css`，由 `main.ts` 引入；组件内不得再定义同名规则，避免两套样式源。
-- 验收入口：`webapp/src/views/WorkbenchView.test.ts`（结果栏顺序与弹窗接线）、`webapp/src/components/workbench/OptimizerSetChoiceModal.test.ts`（草稿/应用/至少一项）、`webapp/e2e/layout.e2e.ts`（右栏布局）。
+- 展开/收起统一用 `ExpandToggle`（`aria-expanded` + 箭头翻转 + 主题焦点框），放在被展开内容上方或标题行；左栏「局内 Buff」、事件摘要与 Buff 弹窗均使用它。
+- 左栏事件摘要与已启用 Buff 用 `.workbench-inset-list`（每行左名称、右数值），已启用数量用 `.workbench-count-badge` 小徽标。
+- 顶栏高度统一走 `--app-topbar-height`（56px），布局或吸顶计算不得再写死高度数字。
+- 验收入口：`webapp/src/views/WorkbenchView.test.ts`（结果栏顺序与弹窗接线）、`webapp/src/components/workbench/OptimizerSetChoiceModal.test.ts`（草稿/应用/至少一项）、`webapp/src/components/ExpandToggle.test.ts`（展开按钮语义）、`webapp/src/utils/workbenchPreferences.test.ts`（Buff 收起状态持久化）、`webapp/e2e/layout.e2e.ts`（右栏布局）。
 
+
+## 工作台交互（2026-10-28）
+
+- 「局内 Buff」默认收起，标题栏显示已启用数量与“选择 Buff”按钮；展开状态刷新后保留，错误提示始终可见。
+- 已启用 Buff 在展开区按来源分组（代理人 / 音擎 / 驱动盘等）；事件摘要默认收起，展开/收起开关固定在标题行，展开后位置不变。
+- 驱动盘方案来源使用主题分段控件（`radiogroup`、方向键、禁用项跳过），无优化结果时禁用对应项。
+- 展开/收起统一用 `ExpandToggle`（`aria-expanded`、箭头翻转、主题焦点框），放在内容上方或标题行。
+- 工作台仍使用普通页面滚动布局；吸顶/三栏等高/栏内滚动不属于当前契约。
+- 验收入口：`webapp/src/views/WorkbenchView.test.ts`、`webapp/src/components/workbench/WorkbenchSegmentedControl.test.ts`、`webapp/src/utils/activeBuffGroups.test.ts`、`webapp/e2e/layout.e2e.ts`。
+
+## Buff 选择弹窗（2026-10-28）
+
+- 弹窗宽度固定为 `min(1280px, calc(100vw - 16px))`，高度固定为可用高度（`100vh/100dvh - 32px`）；切换页签不改变外框尺寸，列表内部滚动，取消/应用始终可见。
+- 每行显示一个 Buff；已选默认展开、未选默认收起，可单独展开详情，摘要通过 title 保留完整效果和说明。
+- 打开弹窗或切换页签时已选项置顶；勾选时不立即改变顺序，页签显示各类已选数量。
+- 按实际效果提供筛选，队友音擎额外按特性筛选；切换页签或重新打开时重置筛选；适用技能超过三个时可折叠查看。
+- 展开、筛选和排序只改变展示；取消丢弃草稿，应用成功后才保存选择和参数。
 ## 深色模式与颜色变量
 
 核对日期：2026-10-23；基于 PR #90 与 main `23664e9` 的主题修订。
