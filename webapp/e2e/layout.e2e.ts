@@ -220,14 +220,14 @@ test("event management keeps disorder labels and controls visible", async ({ pag
   await expectStableLayout(page, "calculation-config")
 })
 
-test("calculation summary keeps extra events behind an inline toggle", async ({ page }) => {
+test("calculation summary keeps all events collapsed behind an inline toggle", async ({ page }) => {
   await openApp(page)
   await chooseWorkbenchAgent(page, "星见雅")
 
   const summary = page.locator('[data-layout-surface="calculation-summary"]')
-  const eventTags = summary.locator(".calculation-event-summary-tags .n-tag")
+  const eventTags = summary.locator(".calculation-event-summary-tags .calculation-event-row")
   const toggle = page.getByTestId("calculation-event-summary-toggle")
-  const toggleRow = summary.locator(".calculation-event-summary-toggle-row")
+  const heading = summary.locator(".calculation-event-summary-heading")
   const modeLabel = summary.locator("dt").first()
   const eventSummaryLabel = summary.locator(".calculation-event-summary-heading .metric-title")
   const sectionHeader = summary.locator("xpath=preceding-sibling::*[1]")
@@ -242,27 +242,31 @@ test("calculation summary keeps extra events behind an inline toggle", async ({ 
       lineHeight: style.lineHeight,
     }
   })
-  const expectToggleBelowLastEvent = async () => {
-    const [lastEventBox, toggleBox, toggleRowBox] = await Promise.all([
-      eventTags.last().boundingBox(),
-      toggle.boundingBox(),
-      toggleRow.boundingBox(),
-    ])
-    expect(lastEventBox).not.toBeNull()
+  // 开关在“事件摘要”这一行、事件列表之前；展开后位置不变，不用滚到底部再收起
+  const expectToggleInHeading = async () => {
+    const [toggleBox, headingBox] = await Promise.all([toggle.boundingBox(), heading.boundingBox()])
     expect(toggleBox).not.toBeNull()
-    expect(toggleRowBox).not.toBeNull()
-    expect(toggleBox!.y).toBeGreaterThanOrEqual(lastEventBox!.y + lastEventBox!.height)
-    expect(Math.abs(toggleBox!.x - toggleRowBox!.x)).toBeLessThanOrEqual(1)
+    expect(headingBox).not.toBeNull()
+    expect(toggleBox!.y).toBeGreaterThanOrEqual(headingBox!.y - 4)
+    expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(headingBox!.y + headingBox!.height + 4)
+    if (await eventTags.count()) {
+      const firstEventBox = await eventTags.first().boundingBox()
+      expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(firstEventBox!.y + 4)
+    }
+    // 返回相对标题行的位置：点击后页面可能滚动，比较绝对坐标没有意义
+    return { x: toggleBox!.x - headingBox!.x, y: toggleBox!.y - headingBox!.y }
   }
 
   await expect(summary).toContainText("事件摘要")
-  await expect(toggle).toHaveText(/其余 \d+ 项/)
+  // 默认全部收起，只显示“N 项”
+  await expect(toggle).toHaveText("展开")
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
   await expect(toggle).toHaveCSS("font-size", "14px")
-  await expect(eventTags).toHaveCount(2)
+  await expect(eventTags).toHaveCount(0)
+  await expect(heading).toContainText("8 项")
   await expect(eventSummaryLabel).toHaveText("事件摘要")
   expect(await labelStyle(eventSummaryLabel)).toEqual(await labelStyle(modeLabel))
-  await expectToggleBelowLastEvent()
+  const collapsedToggleBox = await expectToggleInHeading()
 
   const [headerBox, modeLabelBox] = await Promise.all([
     sectionHeader.boundingBox(),
@@ -276,19 +280,21 @@ test("calculation summary keeps extra events behind an inline toggle", async ({ 
   await expectStableLayout(page, "calculation-summary")
 
   await toggle.click()
-  await expect(toggle).toHaveText("收起其余")
+  await expect(toggle).toHaveText("收起")
   await expect(toggle).toHaveAttribute("aria-expanded", "true")
   await expect(eventTags).toHaveCount(8)
-  await expectToggleBelowLastEvent()
+  const expandedToggleBox = await expectToggleInHeading()
+  expect(Math.abs(expandedToggleBox.y - collapsedToggleBox.y)).toBeLessThanOrEqual(1)
   await expectStableLayout(page, "calculation-summary")
 
   await toggle.click()
-  await expect(toggle).toHaveText(/其余 \d+ 项/)
+  await expect(toggle).toHaveText("展开")
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
-  await expect(eventTags).toHaveCount(2)
+  await expect(eventTags).toHaveCount(0)
 
+  // 耀变角色的事件摘要同样默认收起
   await chooseWorkbenchAgent(page, "蕾米埃尔·丹")
-  await expect(page.getByTestId("calculation-event-summary-toggle")).toHaveCount(0)
+  await expect(page.getByTestId("calculation-event-summary-toggle")).toHaveText("展开")
   await expectStableLayout(page, "calculation-summary")
 })
 
@@ -440,8 +446,11 @@ test("optimizer and buff configuration use protected field layouts", async ({ pa
   await page.locator(".n-tabs-tab").filter({ hasText: "自定义 Buff" }).click()
   await expectStableLayout(page, "custom-buff-effect")
 
-  for (const tab of ["自身 Buff", "自身音擎 Buff", "队友 Buff", "队友音擎buff", "队友驱动盘buff", "场地 Buff", "Boss Buff"]) {
+  for (const tab of ["自身 Buff", "自身音擎 Buff", "队友 Buff", "队友音擎 Buff", "队友驱动盘 Buff", "场地 Buff", "Boss Buff"]) {
     await page.locator(".n-tabs-tab").filter({ hasText: tab }).click()
+    // 未选中的 Buff 默认收起，参数区要展开后才渲染
+    const collapsed = page.locator('.buff-expand-toggle[aria-expanded="false"]')
+    for (let index = await collapsed.count(); index > 0; index -= 1) await collapsed.first().click()
     if (await page.locator('[data-layout-surface="buff-runtime"]').count()) break
   }
   expect(await page.locator('[data-layout-surface="buff-runtime"]').count()).toBeGreaterThan(0)

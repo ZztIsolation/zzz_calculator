@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { NButton, NCheckbox, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NScrollbar, NTabPane, NTabs, NTag } from "naive-ui"
+import ExpandToggle from "@/components/ExpandToggle.vue"
+import { BUFF_EFFECT_GROUPS, effectGroupsForRules, type BuffEffectGroup } from "@/utils/buffEffectGroups"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import LayerSlider from "@/components/LayerSlider.vue"
 import TeammateSelect from "@/components/TeammateSelect.vue"
@@ -156,6 +158,31 @@ const customRow = ref<any>({
   value: 0,
   skillTargets: [],
 })
+// 记录用户手动切换过展开状态的条目：已选条目默认展开、未选默认收起，点箭头在默认值上取反。
+const expandedBuffs = ref<Set<string>>(new Set())
+// 筛选标签：效果分类、音擎特性；切换页签或重新打开弹窗时回到“全部”
+const effectFilter = ref<BuffEffectGroup | "all">("all")
+const specialtyFilter = ref<string>("all")
+// 已选置顶以打开弹窗/切换页签时的选择为准，勾选时不立刻跳位，列表不会在手下移动
+const pinnedIds = ref<Set<string>>(new Set())
+function resetListFilters() {
+  effectFilter.value = "all"
+  specialtyFilter.value = "all"
+  pinnedIds.value = new Set(draft.value)
+}
+
+function isBuffExpanded(buff: any) {
+  return draft.value.has(buff?.id) !== expandedBuffs.value.has(String(buff?.id ?? ""))
+}
+
+function toggleBuffExpanded(buff: any) {
+  const id = String(buff?.id ?? "")
+  if (!id) return
+  const next = new Set(expandedBuffs.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedBuffs.value = next
+}
 
 watch(() => props.show, value => {
   if (value) {
@@ -183,6 +210,8 @@ watch(() => props.show, value => {
     bossPeriod.value = ""
     bossName.value = ""
     activeTab.value = "self"
+    expandedBuffs.value = new Set()
+    resetListFilters()
     syncFieldFilters()
     syncBossFilters()
   }
@@ -754,6 +783,45 @@ const categoryBuffs = computed(() => {
     .filter(buff => !needle || buffText(buff).includes(needle))
 })
 
+function effectGroupsFor(buff: any): Set<BuffEffectGroup> {
+  return effectGroupsForRules(runtimeEffectRules(buff, runtimeFor(buff)))
+}
+
+function buffSpecialty(buff: any): string {
+  return String(buff?.ownerSpecialty ?? "")
+}
+
+// 当前页签里实际出现的效果分类 / 特性，只显示有内容的标签
+const effectFilterOptions = computed(() => {
+  if (activeTab.value === "custom") return []
+  const present = new Set<BuffEffectGroup>()
+  for (const buff of categoryBuffs.value) for (const group of effectGroupsFor(buff)) present.add(group)
+  return BUFF_EFFECT_GROUPS.filter(group => present.has(group.id))
+})
+const specialtyFilterOptions = computed(() => {
+  if (activeTab.value !== "teammateWEngine") return []
+  const present = [...new Set(categoryBuffs.value.map(buffSpecialty).filter(Boolean))]
+  return present.map(value => ({ value, label: specialtyLabel(value) || value }))
+})
+
+// 搜索或场地条件改变后，不让不可见的旧筛选继续隐藏所有结果。
+watch(effectFilterOptions, options => {
+  if (effectFilter.value !== "all" && !options.some(option => option.id === effectFilter.value)) effectFilter.value = "all"
+})
+watch(specialtyFilterOptions, options => {
+  if (specialtyFilter.value !== "all" && !options.some(option => option.value === specialtyFilter.value)) specialtyFilter.value = "all"
+})
+
+const filteredCategoryBuffs = computed(() => {
+  const filtered = categoryBuffs.value.filter(buff =>
+    (effectFilter.value === "all" || effectGroupsFor(buff).has(effectFilter.value))
+    && (specialtyFilter.value === "all" || buffSpecialty(buff) === specialtyFilter.value))
+  const pinned = filtered.filter(buff => pinnedIds.value.has(buff.id))
+  return pinned.length ? [...pinned, ...filtered.filter(buff => !pinnedIds.value.has(buff.id))] : filtered
+})
+
+watch(activeTab, resetListFilters)
+
 const customBuffs = computed(() => {
   const needle = query.value.trim().toLowerCase()
   return draftAddedBuffs.value
@@ -765,8 +833,13 @@ const visibleBuffs = computed(() => {
   if (activeTab.value === "custom") {
     return customBuffs.value
   }
-  return categoryBuffs.value
+  return filteredCategoryBuffs.value
 })
+
+// 置顶区后面的第一条前显示“未选”分隔
+function startsUnpinned(buffs: any[], index: number) {
+  return index > 0 && !pinnedIds.value.has(buffs[index]?.id) && pinnedIds.value.has(buffs[index - 1]?.id)
+}
 const buffSections = computed(() => activeTab.value === "teammate"
   ? draftBuffPickerState.value.teammateSlots.map((slot, index) => ({
     key: `teammate-${index}`,
@@ -780,6 +853,14 @@ const buffSections = computed(() => activeTab.value === "teammate"
   : [{ key: activeTab.value, slotIndex: 0, label: "", slot: null, buffs: visibleBuffs.value, selectedCount: 0 }])
 const selectedCount = computed(() => draft.value.size
   + draftAddedBuffs.value.filter(buff => buff?.sourceKind === "custom").length)
+function categorySelectedCount(name: BuffCategory) {
+  if (name === "custom") return draftAddedBuffs.value.filter(buff => buff?.sourceKind === "custom").length
+  return (groupedBuffs.value[name] ?? []).filter(buff => draft.value.has(buff.id)).length
+}
+function categoryTabLabel(tab: { name: BuffCategory, label: string }) {
+  const count = categorySelectedCount(tab.name)
+  return count ? `${tab.label} (${count})` : tab.label
+}
 const canBulkAddVisible = computed(() => !["custom", "field", "boss"].includes(activeTab.value))
 
 function normalizedTeamWEngineLevel(buff: any, value: unknown) {
@@ -944,17 +1025,32 @@ function effectRowsFor(buff: any) {
   }).filter((row: any) => row.text)
 }
 
-function modifierLinesFor(buff: any) {
-  return storedBuffModifierTexts(buff)
+// 摘要行只保留“属性 +数值”，适用技能、异常类型等括注留在展开区
+function effectSummaryFor(buff: any) {
+  const rows = effectRowsFor(buff).map(row => String(row.text).replace(/（[^）]*）/g, "").trim())
+  const modifiers = modifierLinesFor(buff)
+  return [...rows, ...modifiers].filter(Boolean).join(" · ") || buffSubtitle(buff)
 }
 
-function displayStatLabelForRule(rule: any) {
-  if (rule?.target?.kind === "anomaly" && rule.stat === "anomalyDamageBonus") {
-    if (rule.target.settlementType === "turbulence") return "乱流增伤"
-    const effects = Array.isArray(rule.target.anomalyEffects) ? rule.target.anomalyEffects : []
-    if (effects.length === 1 && effects[0] === "wind_corrosion") return "风化增伤"
-  }
-  return statLabel(rule?.stat, props.meta) || rule?.kind || rule?.type
+// 适用技能超过 3 个时折叠成“适用 N 个技能”，点开再看完整列表；列表仍在页面文本中，搜索不受影响
+const SKILL_TARGET_FOLD_THRESHOLD = 3
+const expandedSkillTargets = ref<Set<string>>(new Set())
+function skillTargetParts(text: string) {
+  const match = /^(.*?)（技能：([^）]*)）(.*)$/s.exec(String(text ?? ""))
+  if (!match) return null
+  const skills = match[2]!.split("；").map(item => item.trim()).filter(Boolean)
+  if (skills.length <= SKILL_TARGET_FOLD_THRESHOLD) return null
+  return { head: match[1]!, skills, tail: match[3]! }
+}
+function toggleSkillTargets(key: string) {
+  const next = new Set(expandedSkillTargets.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedSkillTargets.value = next
+}
+
+function modifierLinesFor(buff: any) {
+  return storedBuffModifierTexts(buff)
 }
 
 function updateRuntime(buff: any, runtime: any) {
@@ -1026,6 +1122,11 @@ function isTeammateOwnedBuff(buff: any): boolean {
 }
 
 function toggle(id: string, checked: boolean, recordManual = true) {
+  if (expandedBuffs.value.has(id)) {
+    const nextExpanded = new Set(expandedBuffs.value)
+    nextExpanded.delete(id)
+    expandedBuffs.value = nextExpanded
+  }
   const next = new Set(draft.value)
   const nextRuntime = { ...draftRuntimeInputs.value }
   const buff = Object.values(groupedBuffs.value).flat().find((item: any) => item?.id === id) as any
@@ -1233,9 +1334,9 @@ async function apply() {
     :mask-closable="!saving"
     :close-on-esc="!saving"
     :closable="!saving"
-    class="calculation-modal calculation-modal--list"
+    class="calculation-modal calculation-modal--list buff-picker-modal"
     :class="{ 'is-teammate-picker': activeTab === 'teammate' }"
-    :style="{ width: `min(${activeTab === 'teammate' ? 1280 : 1080}px, calc(100vw - 16px))`, maxWidth: `${activeTab === 'teammate' ? 1280 : 1080}px` }"
+    style="width: min(1280px, calc(100vw - 16px)); max-width: 1280px"
     @update:show="emit('update:show', $event)"
   >
     <div :inert="saving || undefined" class="section-band buff-picker-layout calculation-modal-body ui-layout-scope" :class="{ 'is-teammate-layout': activeTab === 'teammate' }" data-layout-surface="buff-picker">
@@ -1254,7 +1355,7 @@ async function apply() {
       </div>
 
       <NTabs v-model:value="activeTab" class="buff-category-tabs" type="segment">
-        <NTabPane v-for="tab in categoryTabs" :key="tab.name" :name="tab.name" :tab="tab.label" />
+        <NTabPane v-for="tab in categoryTabs" :key="tab.name" :name="tab.name" :tab="categoryTabLabel(tab)" />
       </NTabs>
 
       <div v-if="activeTab === 'field'" class="field-buff-filter-row ui-field-grid ui-field-grid--comfortable" data-layout-surface="field-buff-filters">
@@ -1294,6 +1395,36 @@ async function apply() {
           <span>Boss</span>
           <NSelect v-model:value="bossName" data-testid="boss-name-filter" :options="bossNameOptions" />
         </label>
+      </div>
+
+      <div v-if="effectFilterOptions.length > 1 || specialtyFilterOptions.length > 1" class="buff-filter-chips" data-testid="buff-filter-chips">
+        <div v-if="specialtyFilterOptions.length > 1" class="buff-filter-chip-row" role="group" aria-label="按特性筛选">
+          <span class="buff-filter-chip-label">特性</span>
+          <button type="button" class="buff-filter-chip" :class="{ 'is-active': specialtyFilter === 'all' }" :aria-pressed="specialtyFilter === 'all'" @click="specialtyFilter = 'all'">全部</button>
+          <button
+            v-for="option in specialtyFilterOptions"
+            :key="option.value"
+            type="button"
+            class="buff-filter-chip"
+            :class="{ 'is-active': specialtyFilter === option.value }"
+            :aria-pressed="specialtyFilter === option.value"
+            @click="specialtyFilter = option.value"
+          >{{ option.label }}</button>
+        </div>
+        <div v-if="effectFilterOptions.length > 1" class="buff-filter-chip-row" role="group" aria-label="按效果筛选">
+          <span class="buff-filter-chip-label">效果</span>
+          <button type="button" class="buff-filter-chip" :class="{ 'is-active': effectFilter === 'all' }" :aria-pressed="effectFilter === 'all'" @click="effectFilter = 'all'">全部</button>
+          <button
+            v-for="option in effectFilterOptions"
+            :key="option.id"
+            type="button"
+            class="buff-filter-chip"
+            :class="{ 'is-active': effectFilter === option.id }"
+            :aria-pressed="effectFilter === option.id"
+            :data-effect-group="option.id"
+            @click="effectFilter = option.id"
+          >{{ option.label }}</button>
+        </div>
       </div>
 
       <div class="buff-sections" :class="{ 'is-teammate': activeTab === 'teammate' }">
@@ -1416,7 +1547,8 @@ async function apply() {
             <NButton type="primary" @click="addCustomBuff">添加到本次选择</NButton>
           </div>
 
-          <template v-for="buff in section.buffs" :key="buff.id">
+          <template v-for="(buff, buffIndex) in section.buffs" :key="buff.id">
+            <div v-if="startsUnpinned(section.buffs, buffIndex)" class="buff-list-divider" role="separator">未选</div>
             <TeammateBuffCard
               v-if="activeTab === 'teammate'"
               :buff="buff"
@@ -1457,18 +1589,26 @@ async function apply() {
                 <ImageAvatar :src="thumbnailForBuff(buff)" :name="buffDisplayName(buff)" round />
                 <span class="buff-copy">
                   <strong :title="buffDisplayName(buff)">{{ buffDisplayName(buff) }}</strong>
-                  <small :title="buffSubtitle(buff)">{{ buffSubtitle(buff) }}</small>
+                  <small class="buff-effect-summary" :title="`${effectSummaryFor(buff)}
+${buffSubtitle(buff)}`">{{ effectSummaryFor(buff) }}</small>
                 </span>
               </button>
               <span v-else class="buff-row-toggle is-static">
                 <ImageAvatar :src="thumbnailForBuff(buff)" :name="buffDisplayName(buff)" round />
                 <span class="buff-copy">
                   <strong :title="buffDisplayName(buff)">{{ buffDisplayName(buff) }}</strong>
-                  <small :title="buffSubtitle(buff)">{{ buffSubtitle(buff) }}</small>
+                  <small class="buff-effect-summary" :title="`${effectSummaryFor(buff)}
+${buffSubtitle(buff)}`">{{ effectSummaryFor(buff) }}</small>
                 </span>
               </span>
+              <ExpandToggle
+                class="buff-expand-toggle"
+                :expanded="isBuffExpanded(buff)"
+                :aria-label="`${isBuffExpanded(buff) ? '收起' : '展开'}${buffDisplayName(buff)}详情`"
+                @toggle="toggleBuffExpanded(buff)"
+              />
               <NButton v-if="activeTab === 'custom'" size="small" type="error" @click="removeCustomBuff(buff.id)">移除</NButton>
-              <label v-if="buff.isTeammateWEngine && draft.has(buff.id)" class="w-engine-modification-control">
+              <label v-if="buff.isTeammateWEngine && draft.has(buff.id) && isBuffExpanded(buff)" class="w-engine-modification-control">
                 <span>精修</span>
                 <NSelect
                   aria-label="队友音擎精修"
@@ -1479,7 +1619,7 @@ async function apply() {
                 />
               </label>
             </div>
-            <div v-if="runtimeParameterDefinitions(buff).length" class="buff-runtime-parameters">
+            <div v-if="isBuffExpanded(buff) && runtimeParameterDefinitions(buff).length" class="buff-runtime-parameters">
               <label v-for="definition in runtimeParameterDefinitions(buff)" :key="definition.id" class="buff-runtime-parameter">
                 <span>{{ runtimeParameterLabel(definition) }}</span>
                 <NRadioGroup
@@ -1496,14 +1636,23 @@ async function apply() {
                 </NRadioGroup>
               </label>
             </div>
-            <div v-if="effectRowsFor(buff).length || modifierLinesFor(buff).length" class="buff-effect-lines">
+            <div v-if="isBuffExpanded(buff) && (effectRowsFor(buff).length || modifierLinesFor(buff).length)" class="buff-effect-lines">
               <div
                 v-for="row in effectRowsFor(buff)"
                 :key="row.id"
                 class="buff-effect-row"
                 :class="{ 'is-disabled': hasIndependentRuleControls(buff) && !row.enabled }"
               >
-                <span>{{ row.text }}</span>
+                <span v-if="!skillTargetParts(row.text)">{{ row.text }}</span>
+                <span v-else class="buff-effect-text">
+                  {{ skillTargetParts(row.text)!.head }}<button
+                    type="button"
+                    class="skill-target-toggle"
+                    :aria-expanded="expandedSkillTargets.has(`${buff.id}:${row.id}`)"
+                    @click="toggleSkillTargets(`${buff.id}:${row.id}`)"
+                  >适用 {{ skillTargetParts(row.text)!.skills.length }} 个技能</button>{{ skillTargetParts(row.text)!.tail }}
+                  <span v-show="expandedSkillTargets.has(`${buff.id}:${row.id}`)" class="skill-target-list">（技能：{{ skillTargetParts(row.text)!.skills.join("；") }}）</span>
+                </span>
                 <div v-if="hasIndependentRuleControls(buff)" class="rule-runtime-controls">
                   <NCheckbox
                     class="rule-enabled-control"
@@ -1541,7 +1690,10 @@ async function apply() {
               </div>
               <span v-for="(line, index) in modifierLinesFor(buff)" :key="`modifier-${index}-${line}`">{{ line }}</span>
             </div>
-            <div v-if="activeTab === 'boss'" class="boss-buff-details">
+            <div v-if="isBuffExpanded(buff)" class="buff-detail-description">
+              {{ buffSubtitle(buff) }}
+            </div>
+            <div v-if="isBuffExpanded(buff) && activeTab === 'boss'" class="boss-buff-details">
               <div class="chip-row">
                 <NTag v-for="appearance in bossAppearances(buff)" :key="bossAppearanceKey(appearance)" size="small">{{ bossAppearanceLabel(appearance) }}</NTag>
                 <NTag size="small">防御 {{ buff.target?.defense ?? '未知' }}</NTag>
@@ -1559,7 +1711,7 @@ async function apply() {
                 </div>
               </div>
             </div>
-            <div v-if="hasRuntimeControls(buff)" class="runtime-grid" data-layout-surface="buff-runtime">
+            <div v-if="isBuffExpanded(buff) && hasRuntimeControls(buff)" class="runtime-grid" data-layout-surface="buff-runtime">
               <div v-for="group in runtimeSourceGroups(buff)" :key="group.key" class="metric runtime-metric ui-field" data-layout-field>
                 <dt>{{ group.label || "来源数值" }}</dt>
                 <dd>
@@ -1585,11 +1737,6 @@ async function apply() {
                   />
                 </dd>
               </div>
-            </div>
-            <div v-if="runtimeEffectRules(buff, runtimeFor(buff)).length" class="chip-row">
-              <NTag v-for="rule in runtimeEffectRules(buff, runtimeFor(buff)).slice(0, 4)" :key="rule.id ?? rule.stat" size="small" round>
-                {{ displayStatLabelForRule(rule) }}
-              </NTag>
             </div>
             </article>
           </template>
@@ -1759,6 +1906,79 @@ async function apply() {
   }
 }
 
+/* 页签改为紧凑分段轨道，与顶部导航同一风格 */
+/* 筛选标签：参考 nanoka.cc 的分类筛选，“标签名 + 一排可点的小标签” */
+.buff-filter-chips {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.buff-filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.buff-filter-chip-label {
+  flex: 0 0 auto;
+  min-width: 32px;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.buff-filter-chip {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-panel);
+  color: var(--app-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.buff-filter-chip:hover {
+  border-color: var(--app-blue-line);
+  color: var(--app-text);
+}
+
+.buff-filter-chip.is-active {
+  border-color: var(--app-blue);
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+}
+
+.buff-filter-chip:focus-visible {
+  outline: var(--app-focus-ring);
+  outline-offset: 2px;
+}
+
+/* 已选置顶区与其余条目之间的分隔 */
+.buff-list-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.buff-list-divider::before,
+.buff-list-divider::after {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--app-border);
+  content: "";
+}
+
 .buff-category-tabs {
   padding: 5px;
   border: 1px solid var(--app-border-strong);
@@ -1780,7 +2000,7 @@ async function apply() {
 .buff-category-tabs :deep(.n-tabs-rail) {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   background: transparent;
 }
 
@@ -1907,9 +2127,10 @@ async function apply() {
 .standard-buff-row {
   display: grid;
   gap: 12px;
-  min-height: 112px;
-  padding: 14px;
+  min-height: 72px;
+  padding: 8px 12px 8px 14px;
   border: 1px solid var(--app-border-strong);
+  border-inline-start: 4px solid transparent;
   border-radius: var(--app-radius);
   background: var(--app-panel);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -1928,6 +2149,7 @@ async function apply() {
 .standard-buff-row.is-selected {
   border-color: var(--app-blue);
   background: var(--app-blue-soft);
+  border-inline-start-color: var(--app-blue);
   box-shadow:
     inset 0 0 0 1px rgba(47, 125, 246, 0.38),
     0 8px 20px rgba(47, 125, 246, 0.1);
@@ -1939,6 +2161,7 @@ async function apply() {
   align-items: center;
   min-height: 64px;
 }
+
 
 .buff-check {
   flex: 0 0 auto;
@@ -2044,6 +2267,49 @@ button.buff-row-toggle:focus-visible {
   line-height: 1.45;
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+.buff-copy small.buff-effect-summary,
+.buff-effect-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buff-detail-description {
+  padding: 8px 12px;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-panel-muted);
+  color: var(--app-muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.skill-target-toggle {
+  margin: 0 2px;
+  padding: 0 6px;
+  border: 1px solid var(--app-blue-line, #bcd4fb);
+  border-radius: 999px;
+  background: var(--app-blue-soft, #edf4ff);
+  color: var(--app-blue-strong, #1d5fd6);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.skill-target-toggle:focus-visible {
+  outline: 3px solid rgba(47, 125, 246, 0.35);
+  outline-offset: 1px;
+}
+
+.skill-target-list {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-muted);
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .buff-effect-lines {

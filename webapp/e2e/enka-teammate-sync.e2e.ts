@@ -65,7 +65,7 @@ async function seed(page: Page, origin: 'adminDefault' | 'legacyUser' = 'adminDe
 
 async function openPicker(page: Page) {
   await page.getByTestId('open-buff-picker').click()
-  await page.locator('.n-tabs-tab').filter({ hasText: /^队友 Buff$/ }).click()
+  await page.locator('.n-tabs-tab').filter({ hasText: /^队友 Buff(?: \(\d+\))?$/ }).click()
   await expect(page.locator(`[data-buff-id="${special}"]`)).toBeVisible()
 }
 

@@ -470,7 +470,7 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   }, showcaseLoadoutId)
 
   await page.goto("/")
-  await page.locator(".drive-disc-source-options .n-radio-button").filter({ hasText: "已有套装" }).click()
+  await page.locator(".drive-disc-source-options").getByRole("radio", { name: "已有套装", exact: true }).click()
   const loadoutSelect = page.locator(".drive-disc-mode-control .n-select")
   await loadoutSelect.click()
   const openLoadoutOptions = page.locator(".n-base-select-option")
@@ -485,7 +485,7 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await agentSelect.locator("input").press("ArrowDown")
   await agentSelect.locator("input").press("Enter")
   await expect(page.locator(".agent-select-display .agent-select-name")).toHaveText("爱芮")
-  await page.locator(".drive-disc-source-options .n-radio-button").filter({ hasText: "已有套装" }).click()
+  await page.locator(".drive-disc-source-options").getByRole("radio", { name: "已有套装", exact: true }).click()
   await expect(page.locator(".loadout-agent-mismatch-alert")).toContainText("当前保存的套装不属于该角色")
   await expect(page.getByTestId("open-drive-disc-analysis")).toBeDisabled()
   await loadoutSelect.click()

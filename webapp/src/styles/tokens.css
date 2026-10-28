@@ -48,6 +48,8 @@
   --app-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.03);
   /* 顶栏高度：布局与吸顶逻辑统一引用，避免魔法数字散落。 */
   --app-topbar-height: 56px;
+  /* 小号文字（标签、徽标、紧凑控件）统一字号。 */
+  --font-xs: 12px;
 }
 
 /* 深色主题：跟随系统时由媒体查询生效；手动选择时 data-theme 覆盖系统设置。 */
@@ -744,6 +746,12 @@ textarea {
 .calculation-modal > .n-card-header,
 .calculation-modal > .n-card__footer {
   flex: 0 0 auto;
+}
+
+/* Buff 弹窗高度固定为可用高度（不设上限，高屏上队友卡片能完整显示），切换页签时不再忽高忽低 */
+.calculation-modal.buff-picker-modal.n-card {
+  height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
 }
 
 .calculation-modal > .n-card-header {
