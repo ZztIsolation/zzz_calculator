@@ -84,7 +84,7 @@
 - 已启用 Buff 在展开区按来源分组（代理人 / 音擎 / 驱动盘等）；事件摘要默认收起，展开/收起开关固定在标题行，展开后位置不变。
 - 驱动盘方案来源使用主题分段控件（`radiogroup`、方向键、禁用项跳过），无优化结果时禁用对应项。
 - 展开/收起统一用 `ExpandToggle`（`aria-expanded`、箭头翻转、主题焦点框），放在内容上方或标题行。
-- 工作台仍使用普通页面滚动布局；吸顶/三栏等高/栏内滚动不属于当前契约。
+- 工作台仍使用普通页面滚动布局；三栏布局（宽度 > 1280px）下既有的右栏吸顶保持不变，其偏移必须由 `--app-topbar-height` 派生（当前为 `calc(var(--app-topbar-height) + 18px)`），不得写死像素。新增吸顶/三栏等高/栏内滚动不属于当前契约。
 - 验收入口：`webapp/src/views/WorkbenchView.test.ts`、`webapp/src/components/workbench/WorkbenchSegmentedControl.test.ts`、`webapp/src/utils/activeBuffGroups.test.ts`、`webapp/e2e/layout.e2e.ts`。
 
 ## Buff 选择弹窗（2026-10-28）

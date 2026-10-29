@@ -412,31 +412,49 @@ export function loadUserDriveDiscStoreFresh(options = {}) {
     return readAndMigratePersistedStore(options)
 }
 
+// Clearing browser data is destructive and must participate in the same global
+// inventory lock as imports and personal-data restores; otherwise it can delete
+// a pending restore journal that still holds the only pre-restore snapshot.
+// Do not call this while already holding the global inventory lock (Web Locks
+// are not reentrant).
 export async function clearAllBrowserData() {
-    inventoryWriteRevision += 1
-    if (dbPromise) {
+    return withDriveDiscImportOwnerLock("all", async () => {
+        let pendingRestore
         try {
-            const db = await dbPromise
-            db.close()
+            pendingRestore = (await loadUserDriveDiscStoreFresh())?.personalDataRestore
+        } catch {
+            // A corrupt or unreadable store must not block the explicit clear-data
+            // escape hatch; the user already cannot read this data.
+        }
+        if (pendingRestore?.before) {
+            throw new Error("存在未完成的个人数据恢复事务，请刷新页面完成恢复后再清除数据。")
+        }
+
+        inventoryWriteRevision += 1
+        if (dbPromise) {
+            try {
+                const db = await dbPromise
+                db.close()
+            } catch {
+            }
+            dbPromise = null
+        }
+        dbOpenEntry = null
+        pendingStoreLoad = null
+
+        await deleteDatabase()
+        try {
+            const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+                .filter(Boolean)
+            for (const key of keys) {
+                if (isAppStorageKey(key)) {
+                    localStorage.removeItem(key)
+                }
+            }
         } catch {
         }
-        dbPromise = null
-    }
-    dbOpenEntry = null
-    pendingStoreLoad = null
-
-    await deleteDatabase()
-    try {
-        const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-            .filter(Boolean)
-        for (const key of keys) {
-            if (isAppStorageKey(key)) {
-                localStorage.removeItem(key)
-            }
-        }
-    } catch {
-    }
-    inventoryWriteRevision += 1
+        inventoryWriteRevision += 1
+    }, { purpose: "清除网页数据" })
 }
 
 function currentOwnerView(normalizedStore) {

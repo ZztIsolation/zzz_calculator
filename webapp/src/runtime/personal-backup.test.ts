@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
 import { createPersonalBackup, previewPersonalRestore, restorePersonalBackup, recoverPersonalRestore, validatePersonalBackup } from "./personal-backup"
-import { loadUserDriveDiscStoreFresh, saveUserDriveDiscStore, saveUserDriveDiscStoreUnlocked } from "./local-store.js"
+import { loadUserDriveDiscStoreFresh, clearAllBrowserData, saveUserDriveDiscStore, saveUserDriveDiscStoreUnlocked } from "./local-store.js"
 
 const KEY = "zzz-calculator.webapp.build.v1"
 const FALLBACK = "zzz-calculator.userStore.v1"
@@ -94,6 +94,29 @@ describe("complete personal backup", () => {
     current.driveDiscs[0].level = 13
     await expect(saveUserDriveDiscStore(current)).rejects.toThrow("未完成的个人数据恢复事务")
     expect((await loadUserDriveDiscStoreFresh()).personalDataRestore?.id).toBe("pending-guard")
+  })
+
+  it("refuses to clear browser data while a recoverable restore journal is pending", async () => {
+    const before = (await createPersonalBackup()).data
+    const journal = { version: 1, id: "clear-guard", before }
+    await saveUserDriveDiscStoreUnlocked({ ...before.inventory, personalDataRestore: journal },
+      { personalDataRestoreTransactionId: "clear-guard" })
+    localStorage.setItem(KEY, '{"keep":true}')
+
+    await expect(clearAllBrowserData()).rejects.toThrow("未完成的个人数据恢复事务")
+    expect((await loadUserDriveDiscStoreFresh()).personalDataRestore?.id).toBe("clear-guard")
+    expect(localStorage.getItem(KEY)).toBe('{"keep":true}')
+    expect(localStorage.getItem("unrelated-site")).toBe("keep")
+  })
+
+  it("still clears an unreadable fallback instead of trapping the user", async () => {
+    localStorage.setItem(FALLBACK, "{broken-inventory")
+    localStorage.setItem(KEY, "{}")
+
+    await expect(clearAllBrowserData()).resolves.toBeUndefined()
+    expect(localStorage.getItem(FALLBACK)).toBeNull()
+    expect(localStorage.getItem(KEY)).toBeNull()
+    expect(localStorage.getItem("unrelated-site")).toBe("keep")
   })
 
   it("refuses a full backup while the inventory fallback is unreadable", async () => {

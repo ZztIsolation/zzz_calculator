@@ -1,6 +1,6 @@
 # 长期回归契约
 
-状态：现行行为约定。核对日期：2026-10-08；基准提交：`6355fbd310cc5836aff0e78bc3fb46e68a5356f8`。本次核对为源码与既有测试静态审查，不代表重新运行全部业务测试或线上验收。
+状态：现行行为约定。核对日期：2026-10-29；基准提交：`106959f1bad3e84a741a9d64dec893187bea0e62`。本次核对为源码与既有测试静态审查，不代表重新运行全部业务测试或线上验收。
 
 本文档记录计算、维护、持久化、优化与发布的验收不变量。通用结构见[建模说明](modeling.md)，制作顺序和历史教训见[角色指南](character-authoring-guide.md)。目录配置是当前事实；历史样例不是恢复默认值的依据。
 
@@ -331,7 +331,8 @@
 `isAppStorageKey` 判定（`zzz-calculator.`、`zzz_maintenance_vue_draft_`、`zzz_maintenance_agent_draft_`）定义，
 库存 fallback 原串与无关站点键不得进入备份，恢复也不得删除或改写无关站点键。
 恢复必须先预览并检查数据指纹，确认前下载恢复前副本；写入使用 `personalDataRestore` 事务日志，失败回滚，
-启动时恢复中断日志。存在 `personalDataRestore` 日志时，除恢复事务自身外任何库存写入必须被拒绝，刷新完成恢复后才可继续写入。
+启动时恢复中断日志。存在 `personalDataRestore` 日志时，除恢复事务自身外任何库存写入必须被拒绝，刷新完成恢复后才可继续写入；
+清除浏览器数据同属破坏性操作，在日志可恢复期间必须同样被拒绝，直到刷新完成恢复。
 坏库存 fallback 只有在显式恢复且原始字符串未变化时才可替换，恢复前副本必须保留原始字符串。
 
 普通导入撤销只允许当前账号最近一次成功 JSON / 扫描导入；记录保存反向快照与导入后状态指纹，预览和确认都检查指纹，
@@ -340,9 +341,10 @@
 
 优化结果刷新缓存使用 `zzz-calculator.webapp.optimizer-results.v1`，按账号+角色保存最近一次完整结果并限制 6 组；
 恢复必须核对目录指纹与每张盘的内容指纹，目录或盘内容变化时不得把旧结果标为可用；缓存损坏或写入失败只能丢弃缓存，
-不得影响优化设置或当前内存结果。
+不得影响优化设置或当前内存结果。没有可恢复缓存且界面仍处于“优化结果”模式时，必须回退到“自选”并提示、持久化该模式，
+不得把空方案当作可用结果展示。
 
-验证入口：[完整备份](../webapp/src/runtime/personal-backup.test.ts)、[存储兼容](../webapp/src/stores/local-store-indexeddb-compat.test.ts)、[导入事务](../tests/drive-disc-import-transaction.test.js)、[撤销](../webapp/src/runtime/drive-disc-import-transaction.test.ts)、[配装保存锁](../webapp/e2e/drive-disc-loadout-save-lock.e2e.ts)。
+验证入口：[完整备份](../webapp/src/runtime/personal-backup.test.ts)、[IndexedDB 备份](../webapp/src/runtime/personal-backup-indexeddb.test.ts)、[备份恢复浏览器流程](../webapp/e2e/personal-backup.e2e.ts)、[存储兼容](../webapp/src/stores/local-store-indexeddb-compat.test.ts)、[导入事务](../tests/drive-disc-import-transaction.test.js)、[撤销](../webapp/src/runtime/drive-disc-import-transaction.test.ts)、[配装保存锁](../webapp/e2e/drive-disc-loadout-save-lock.e2e.ts)。
 
 本地可靠性扩展（2026-10-22）：账号新建、改名、切换和删除必须防止重复提交；失败时保留名称草稿或删除确认，
 并且旧账号列表加载结果不得覆盖后发操作；陈旧账号读取返回后必须落定加载状态，不能把界面卡在加载中。
