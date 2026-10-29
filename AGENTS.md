@@ -1,6 +1,6 @@
 # 项目工作入口
 
-适用仓库：ZZZ Calculator。核对日期：2026-10-08；基准提交：`6355fbd310cc5836aff0e78bc3fb46e68a5356f8`。
+适用仓库：ZZZ Calculator。核对日期：2026-10-29；基准提交：`106959f1bad3e84a741a9d64dec893187bea0e62`。
 
 - 先读 [文档索引](docs/README.md)，再按任务读取相应现行规范；只有追溯历史时才读取 `docs/archive/`。
 - 新增或修订角色时必读 [角色制作指南](docs/character-authoring-guide.md)、[建模说明](docs/modeling.md)、[相关回归条款](docs/regression-contract.md) 和适用的角色专题。
