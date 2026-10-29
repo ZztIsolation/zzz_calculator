@@ -69,8 +69,8 @@ const catalogStore = useCatalogStore()
 <style scoped>
 .workbench-right-sticky {
   position: sticky;
-  /* 顶栏约 56px + 18px 间距；后续布局层会改用显式布局变量 */
-  top: 74px;
+  /* 顶栏高度统一走布局变量；+18px 是内容与顶栏的间距 */
+  top: calc(var(--app-topbar-height) + 18px);
 }
 
 .workbench-summary-section {
