@@ -18,7 +18,7 @@ Preserve run IDs, candidate SHA, CI run, artifact name, promotion run, timestamp
 
 ## 2. Bounded audit
 
-After the reviewed fix is merged and its exact main CI succeeds, dispatch `Audit deploy baseline` from `main` with `mode=audit`. This is read-only and retains the current `deploy` ref. The audit has a 60-second total runner budget (55 seconds plus 5 seconds termination). A timeout, unavailable lock or missing evidence is a failed audit, never evidence that production is unchanged.
+After the reviewed fix is merged and its exact main CI succeeds, dispatch `Audit deploy baseline` from `main` with `mode=audit`. This is read-only and retains the current `deploy` ref. The audit has a 125-second total runner budget (120 seconds plus 5 seconds termination), because the manager audit action allows 90 seconds plus 30 seconds cleanup on a degraded host. A timeout, unavailable lock or missing evidence is a failed audit, never evidence that production is unchanged.
 
 The audit may collect fixed diagnostic metadata: installed control-plane hashes, service PID/start time/restart counter, manager/systemd state, validation units, lock identity, transient upload/validation entries, disk/memory/I/O summary, release tree hashes, Nginx and manifest invariants. It must not collect credentials, process arguments, candidate-controlled logs, screenshots or complete user data.
 

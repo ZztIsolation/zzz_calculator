@@ -283,8 +283,11 @@ audit_diagnostics() {
 
 supervise_operation() {
     local limit grace result=0
+    # Read-only audit must tolerate a degraded/slow production host; 30s proved
+    # too tight on a systemd-degraded server (audits took 26-48s). Keep the
+    # workflow phase budget strictly larger than limit+grace.
     case "$ACTION" in
-        audit) limit=30; grace=15 ;;
+        audit) limit=90; grace=30 ;;
         dry-run) limit=600; grace=120 ;;
         deploy) limit=600; grace=180 ;;
         rollback) limit=180; grace=120 ;;

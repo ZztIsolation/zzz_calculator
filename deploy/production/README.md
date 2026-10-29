@@ -35,7 +35,7 @@ zzz-calculator-deploy rollback --previous
 
 Artifacts resolve only below `/var/lib/zzz-calculator-deploy/incoming` and must match the expected SHA. `deploy` requires both artifact and evidence, an exact 40-character candidate commit, the frozen `deploy` ref check from the caller, and the protected production environment. `audit` is read-only; `dry-run` validates and isolates a candidate without changing the public current release; `deploy` performs the one approved atomic switch; `rollback --previous` uses the server-recorded previous release.
 
-The manager applies bounded server deadlines: audit 30 seconds plus 15 seconds cleanup, dry-run 600 plus 120, deploy 600 plus 180, rollback 180 plus 120. Timeout is failure; it never proves that the previous state is unchanged. The supervisor owns the process group and terminates child processes before evidence handling.
+The manager applies bounded server deadlines: audit 90 seconds plus 30 seconds cleanup, dry-run 600 plus 120, deploy 600 plus 180, rollback 180 plus 120. Timeout is failure; it never proves that the previous state is unchanged. The supervisor owns the process group and terminates child processes before evidence handling.
 
 ## Invariants and evidence
 
