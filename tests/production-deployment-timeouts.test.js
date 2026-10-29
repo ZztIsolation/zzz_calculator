@@ -42,9 +42,10 @@ try {
     const rollback = await read(".github/workflows/rollback-production.yml")
     const phase = extract(deploy, "run_bounded_phase")
     assert.equal(phase, extract(rollback, "run_bounded_phase"))
-    // The budget includes the 5-second kill grace: audit cannot exceed 60s.
-    assert.match(deploy, /run_bounded_phase audit 55 ssh/)
-    assert.match(deploy, /run_bounded_phase control-plane-audit 55 ssh/)
+    // The budget includes the 5-second kill grace; the manager audit action
+    // allows 90s + 30s cleanup on a degraded host.
+    assert.match(deploy, /run_bounded_phase audit 120 ssh/)
+    assert.match(deploy, /run_bounded_phase control-plane-audit 120 ssh/)
     assert.ok(deploy.indexOf("grep -Fq 'supervisor=bounded-v1 action=audit'") < deploy.indexOf("run_bounded_phase upload-archive"))
 
     const hanging = await script("hang.sh", 'sleep 30')
