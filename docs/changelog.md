@@ -4,6 +4,13 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-10-31 — 防卫战 3.3 第一期场地 Buff（补齐危局强袭战同期条目）
+
+- 问题：3.3 版本第一期此前只有危局强袭战的炽陨、烁穹、极韵入库，防卫战 v5 同期没有场地 Buff；场地页签在 3.3 只能默认到危局强袭战。
+- 变化：依据用户提供的游戏内截图与 [nanoka.cc/shiyu/62060](https://zzz.nanoka.cc/shiyu/62060)（页面内嵌来源 JSON `https://static.nanoka.cc/zzz/3.4.1+19851435/zh/shiyu/62060.json`，周期 2026-10-30 04:00 至 2026-11-13 03:59），在 `data/combat_buffs.json` 新增三条 `field.defense_v5.v3_3.p1.*` 场地 Buff（`fieldBuffs` 共 51 项）：**焚韵燃竭**建模火属性伤害 +20%（仅 `[异常]` 特性）与触发式属性异常伤害加成 +30%（触发后持续 20 秒，覆盖率可调）；**刃铠裂宸**建模锐化伤害加成 +20% 与防御力 +20%（按局外防御力）；**凝能霜爆**建模以太伤害 +20%、冰属性伤害 +20% 与暴击伤害 +40%（仅 `[强攻]` 特性）。场地页签沿用既有“同版本同阶段双模式并存时优先防卫战”的排序，因此真实目录默认显示 `防卫战 v5 · 3.3版本 · 第一期`。
+- 关键边界：能量恢复、喧响值回复、敌人失衡恢复速度降低 15%（持续 15 秒）以及“每 20 秒可触发一次”的触发冷却只保留在机制描述中，未建模资源变化或自动覆盖率（[建模说明](modeling.md#scope-and-architecture)明确不模拟能量、喧响值、资源转换与自动 Buff 覆盖率）；属性异常暴击触发条件保留为描述并由手动覆盖率表达，不自动推算触发。只新增目录数据，不改变计算语义、弹窗布局、分组或交互；默认显示不等于自动勾选，旧期条目与用户勾选保持不变。
+- 验证：本次交付运行 `npm run test:field-buffs`、`npm run test:maintenance-validation`、`npm run test:percent-sanity`、`npm run test:skill-targets`，以及 `npm run build:webapp` 与 webapp 的 `BuffPickerModal.test.ts`（覆盖真实目录默认 `defense_v5|3.3|1`、三条新 Buff 的渲染顺序与切回 3.2 危局第二期）；文档职责本地运行 `npm run test:repository-integrity`，输出 `repository integrity: ok (193 catalog assets verified)`。以上均为本地检查，不代表远端 CI 或生产验收。
+
 ## 2026-10-29 — 发布前加固（清除数据保护、IndexedDB 备份测试与文档同步）
 
 - 问题：`clearAllBrowserData()` 绕过全局库存锁直接删除 IndexedDB 与本地键，可能在存在可恢复 `personalDataRestore` 日志时清掉唯一的恢复前快照；完整备份此前只有 localStorage 路径的单测，IndexedDB 后端与真实浏览器恢复流程缺少回归入口；工作台右栏吸顶偏移仍写死像素。

@@ -193,7 +193,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 48, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 51, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -1498,7 +1498,7 @@ for (const coverage of [0, 0.5, 1]) {
 console.log("field Buff regression tests passed")
 
 // 3.3 phase 1: independent numeric examples and event exclusions.
-const ca33 = allFieldBuffs.filter(buff => buff.period?.gameVersion === '3.3')
+const ca33 = allFieldBuffs.filter(buff => buff.period?.gameVersion === '3.3' && buff.period?.modeId === 'critical_assault')
 assert.deepEqual(ca33.map(buff => buff.name.zhCN), ['炽陨', '烁穹', '极韵'])
 for (const buff of ca33) {
     const check = validateMaintenanceItem('field-buffs', buff, { items: catalog.combatBuffs, currentId: buff.id, agentSkills: catalog.agentSkills })
@@ -1522,3 +1522,107 @@ for (const coverage of [0,0.5,1]) {
     }
 }
 console.log('3.3 phase 1 field numerical checks passed')
+
+// 3.3 phase 1 Defense Battle: records, descriptive-only clauses and independent numeric examples.
+const defense33 = allFieldBuffs.filter(buff =>
+    buff.period?.modeId === 'defense_v5' && buff.period?.gameVersion === '3.3' && buff.period?.phaseNo === 1,
+)
+assert.deepEqual(defense33.map(buff => buff.name.zhCN), ['焚韵燃竭', '刃铠裂宸', '凝能霜爆'])
+for (const buff of defense33) {
+    assert.equal(buff.source.zhCN, '防卫战 v5')
+    assert.equal(buff.sourcePeriod.zhCN, '3.3版本第一期')
+    assert.equal(buff.period.phaseName.zhCN, '第一期')
+    const check = validateMaintenanceItem('field-buffs', buff, {
+        items: catalog.combatBuffs, currentId: buff.id, agentSkills: catalog.agentSkills,
+    })
+    assert.equal(check.ok, true, JSON.stringify(check.errors))
+}
+const [fenyun, renkai, ningneng] = defense33
+assert.equal(fenyun.effects[0].requirement.specialty, 'anomaly', 'Fenyun Fire DMG is Anomaly-specialty only')
+assert.equal(fenyun.effects[1].condition, '代理人造成属性异常伤害并触发暴击后')
+assert.equal(fenyun.effects[1].durationSeconds, 20)
+assert.equal(renkai.effects[1].stat, 'defPct')
+assert.equal(renkai.effects[1].basis, 'outOfCombatDef')
+assert.ok(ningneng.effects.every(effect => effect.requirement?.specialty === 'attack'), 'Ningneng effects are Attack-specialty only')
+
+// Unsupported resource, daze-recovery and cooldown clauses stay descriptive only.
+assert.ok(fenyun.description.zhCN.includes('全队恢复20点能量'))
+assert.ok(fenyun.description.zhCN.includes('此效果每20秒可触发一次'))
+assert.ok(renkai.description.zhCN.includes('[击破]特性的代理人恢复30点能量'))
+assert.ok(renkai.description.zhCN.includes('全队恢复500点喧响值'))
+assert.ok(ningneng.description.zhCN.includes('失衡恢复速度降低15%，持续15秒'))
+assert.equal(fenyun.effects.length, 2)
+assert.equal(renkai.effects.length, 2)
+assert.equal(ningneng.effects.length, 3)
+
+const fenyunAnomaly = calculateAnomaly(fenyun.id, {
+    id: 'fenyun-burn', kind: 'anomaly', settlementType: 'attribute', anomalyEffect: 'burn', procCount: 1,
+})
+approx(fenyunAnomaly.inCombat.panel.fireDmg - fenyunAnomaly.outOfCombat.panel.fireDmg, 0.2,
+    'Fenyun should grant Anomaly agents 20% Fire DMG')
+approx(fenyunAnomaly.damage.multipliers.attributeAnomalyDamage, 1.3,
+    'Fenyun should grant 30% attribute-anomaly damage')
+const fenyunAttack = calculateAttackBasic(fenyun.id, {}, 'fire')
+approx(fenyunAttack.inCombat.panel.fireDmg - fenyunAttack.outOfCombat.panel.fireDmg, 0,
+    'Fenyun Fire DMG should exclude non-Anomaly agents')
+const fenyunDisorder = calculateAnomaly(fenyun.id, {
+    id: 'fenyun-disorder', kind: 'disorder', anomalyEffect: 'burn', elapsedSeconds: 0,
+})
+approx(fenyunDisorder.damage.multipliers.disorderDamage, 1, 'Fenyun anomaly damage should not increase Disorder damage')
+
+for (const coverage of [0, 0.5, 1]) {
+    const result = calculateAnomaly(fenyun.id, {
+        id: 'fenyun-coverage', kind: 'anomaly', settlementType: 'attribute', anomalyEffect: 'burn', procCount: 1,
+    }, { effects: { [fenyun.effects[1].id]: { coverage } } })
+    approx(result.damage.multipliers.attributeAnomalyDamage, 1 + 0.3 * coverage,
+        'Fenyun triggered anomaly damage should honor coverage')
+    approx(result.inCombat.panel.fireDmg - result.outOfCombat.panel.fireDmg, 0.2,
+        'Fenyun permanent Fire DMG should be independent of trigger coverage')
+}
+
+const renkaiSharp = calculateInCombatPanel(catalog, {
+    agentId: 'claret',
+    wEngineId: 'zzz_wiki_2188',
+    wEngineModificationLevel: 5,
+    coreSkillLevel: 'F',
+    driveDiscs: [],
+    combatBuffs: { activeBuffIds: [renkai.id], runtimeInputs: {} },
+    damage: {
+        selectedEventId: 'renkai-sharp',
+        events: [{
+            id: 'renkai-sharp',
+            kind: 'sharp',
+            skillRef: {
+                agentSkillId: 'claret',
+                categoryId: 'special',
+                moveId: 'special_slash_gold',
+                rowId: 'hit_1',
+            },
+            critMode: 'nonCrit',
+            count: 1,
+        }],
+        target: { defense: 953, levelCoefficient: 794 },
+    },
+})
+approx(renkaiSharp.damage.events[0].multipliers.sharpDmg, 1.2, 'Renkai should grant 20% Sharp damage')
+approx(
+    renkaiSharp.inCombat.panel.def - renkaiSharp.outOfCombat.panel.def,
+    renkaiSharp.outOfCombat.panel.def * 0.2,
+    'Renkai should grant 20% of out-of-combat DEF',
+)
+
+const ningnengAttack = calculateAttackBasic(ningneng.id, {}, 'ether')
+approx(ningnengAttack.inCombat.panel.etherDmg - ningnengAttack.outOfCombat.panel.etherDmg, 0.2,
+    'Ningneng should grant Attack agents 20% Ether DMG')
+approx(ningnengAttack.inCombat.panel.iceDmg - ningnengAttack.outOfCombat.panel.iceDmg, 0.2,
+    'Ningneng should grant Attack agents 20% Ice DMG')
+approx(ningnengAttack.inCombat.panel.critDmg - ningnengAttack.outOfCombat.panel.critDmg, 0.4,
+    'Ningneng should grant Attack agents 40% CRIT DMG')
+const ningnengAnomaly = calculateSkill(ningneng.id, miyabiSkillRefs.basic)
+approx(ningnengAnomaly.inCombat.panel.etherDmg - ningnengAnomaly.outOfCombat.panel.etherDmg, 0,
+    'Ningneng Ether DMG should exclude non-Attack agents')
+approx(ningnengAnomaly.inCombat.panel.iceDmg - ningnengAnomaly.outOfCombat.panel.iceDmg, 0,
+    'Ningneng Ice DMG should exclude non-Attack agents')
+approx(ningnengAnomaly.inCombat.panel.critDmg - ningnengAnomaly.outOfCombat.panel.critDmg, 0,
+    'Ningneng CRIT DMG should exclude non-Attack agents')
+console.log('3.3 phase 1 Defense Battle field numerical checks passed')
