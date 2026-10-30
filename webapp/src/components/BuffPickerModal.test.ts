@@ -2385,15 +2385,15 @@ describe("BuffPickerModal", () => {
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
   })
 
-  it("defaults the real catalog to Critical Assault 3.3 phase 1", async () => {
+  it("defaults the real catalog to Defense Battle 3.3 phase 1", async () => {
     const wrapper = mountModal({ buffs: combatBuffCatalog.fieldBuffs })
     await openFieldTab(wrapper)
     const selects = wrapper.findAll(".field-buff-filter-row select")
     expect((selects[0].element as HTMLSelectElement).value).toBe("3.3")
-    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault|3.3|1")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("defense_v5|3.3|1")
     const rows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(rows).toHaveLength(3)
-    for (const [index, name] of ["炽陨", "烁穹", "极韵"].entries()) {
+    for (const [index, name] of ["焚韵燃竭", "刃铠裂宸", "凝能霜爆"].entries()) {
       expect(rows[index]).toContain(name)
     }
     await selects[0].setValue("3.2")
