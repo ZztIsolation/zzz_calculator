@@ -2,7 +2,10 @@ import { mount, flushPromises } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import { nextTick } from "vue"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
+import agentsData from "../../../data/agents.json"
+import agentSkillsData from "../../../data/agent_skills.json"
 import combatBuffCatalog from "../../../data/combat_buffs.json"
+import wEnginesData from "../../../data/w_engines.json"
 
 vi.mock("naive-ui", async () => {
   const { defineComponent, h, inject, provide } = await import("vue")
@@ -3109,6 +3112,49 @@ describe("BuffPickerModal", () => {
     expect(row.text()).toContain("通用伤害提升15.04%")
     expect(row.findAll(".runtime-grid")).toHaveLength(0)
     expect(row.text()).not.toContain("来源数值")
+  })
+
+  it("renders Evelyn's Chain and Ultimate threshold as a deterministic multiplier without raw formula or coverage input", async () => {
+    const evelyn = agentsData.agents.find((agent: any) => agent.id === "evelyn_chevalier")
+    const evelynSkills = agentSkillsData.agentSkills.find((skill: any) => skill.id === "evelyn_chevalier")
+    const evelynEngine = wEnginesData.wEngines.find((engine: any) => engine.id === "zzz_wiki_1159")
+    expect(evelyn).toBeTruthy()
+    expect(evelynSkills).toBeTruthy()
+    expect(evelynEngine).toBeTruthy()
+    const evelynMeta = {
+      ...meta,
+      agents: [evelyn],
+      agentSkills: [evelynSkills],
+      wEngines: [evelynEngine],
+    }
+    const wrapper = mountModal({
+      meta: evelynMeta,
+      agentId: "evelyn_chevalier",
+      wEngineId: "zzz_wiki_1159",
+      selectedIds: ["agent:evelyn_chevalier.additionalAbility"],
+      inCombatPanel: { critRate: 0.684 },
+    })
+    await openModal(wrapper)
+
+    const row = wrapper.get('[data-buff-id="agent:evelyn_chevalier.additionalAbility"]')
+    expect(row.text()).toContain("技能目标伤害加成% +30%（技能：连携技；终结技）")
+    const thresholdEffect = row.findAll(".buff-effect-row").find(item => item.text().includes("原倍率"))
+    expect(thresholdEffect).toBeTruthy()
+    expect(thresholdEffect!.text()).toContain("局内暴击率达到80%时")
+    expect(thresholdEffect!.text()).toContain("连携技：月辉丝·绊")
+    expect(thresholdEffect!.text()).toContain("终结技：月辉丝·弦音")
+    expect(thresholdEffect!.text()).toContain("终结技：月辉丝·弦影")
+    expect(thresholdEffect!.text()).toContain("当前局内暴击率68.4%，未触发")
+    expect(thresholdEffect!.text()).not.toContain("clamp")
+    expect(thresholdEffect!.findAll(".rule-coverage-control")).toHaveLength(0)
+
+    await wrapper.setProps({ inCombatPanel: { critRate: 0.924 } })
+    await nextTick()
+    expect(row.text()).toContain("当前局内暴击率92.4%，已触发，原倍率 ×125%")
+
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.runtimeInputs["agent:evelyn_chevalier.additionalAbility"]?.effects?.["evelyn-crit-threshold-multiplier"]?.coverage).toBeUndefined()
   })
 })
 

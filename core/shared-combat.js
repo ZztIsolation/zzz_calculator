@@ -106,6 +106,7 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     etherDefIgnore: "以太伤害无视防御",
     windDefIgnore: "风属性伤害无视防御",
     skillMultiplierBonus: "技能倍率加算",
+    skillMultiplierScaleBonus: "直伤技能倍率乘算",
 }
 export const ANOMALY_EFFECT_LABELS = {
     assault: "强击",
@@ -201,6 +202,7 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["windSharpDmg", "风锐化伤害加成%", "skill", null],
     ["lacerationDmg", "锐暴伤害加成%", "skill", null],
     ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
+    ["skillMultiplierScaleBonus", "直伤技能倍率乘算%", "skill", null],
     ["enemyDefReduction", "敌方减防率%", "skill", null],
     ["enemyDefIgnore", "无视防御率%", "skill", null],
     ["enemyResReduction", "当前属性减抗%", "skill", null],
@@ -315,6 +317,7 @@ export const FALLBACK_LABELS = {
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
     stunDmgMultiplierBonusCapAlways: "捕获的失衡易伤加成上限",
     skillMultiplierBonus: "技能倍率加算",
+    skillMultiplierScaleBonus: "直伤技能倍率乘算",
 }
 
 export const ENUM_LABELS = {
@@ -420,6 +423,7 @@ export const PERCENT_KEYS = new Set([
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
 ])
 export const PERCENT_MODE_KEY = {
     hp: "hpPct",
@@ -492,6 +496,7 @@ export const STORED_PERCENT_STATS = new Set([
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
 ])
 export const STORED_STAT_LABELS = {
     hpPct: "百分比生命值%",
@@ -573,6 +578,7 @@ export const STORED_STAT_LABELS = {
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）%",
     stunDmgMultiplierBonusCapAlways: "捕获的失衡易伤加成上限%",
     skillMultiplierBonus: "技能倍率加算%",
+    skillMultiplierScaleBonus: "直伤技能倍率乘算%",
 }
 
 export function nameOf(item) {
@@ -1447,12 +1453,21 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
             const threshold = Number(parameters.threshold)
             const rate = Number(parameters.rate)
             const cap = Number(parameters.cap)
+            const thresholdSkillMultiplier = rule.stat === "skillMultiplierScaleBonus"
+                && rule.target?.kind === "skill"
+                && source.stat === "critRate"
+                && source.unit === "storedPercent"
+                && rule.formula?.valueUnit === "storedPercent"
+                && Number.isFinite(threshold)
+                && Number.isFinite(rate)
             let text
             if (compactSummary) {
                 text = `${summaryLabel}待计算`
             } else if (rule.stat === "dmgBonus" && source.stat === "critRate"
                 && Number.isFinite(threshold) && Number.isFinite(rate)) {
                 text = `局内暴击率超过${threshold}%时，每超出1%暴击率使造成的伤害提升${rate}%，${Number.isFinite(cap) ? `上限${cap}%` : "不设上限"}`
+            } else if (thresholdSkillMultiplier) {
+                text = `局内暴击率达到${threshold}%时，原倍率提升至${100 + rate}%`
             } else {
                 const parameterText = Object.entries(parameters)
                     .map(([name, value]) => `${name}=${value}`)
@@ -1470,6 +1485,9 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
                         const resultLabel = rule.stat === "dmgBonus" ? "通用伤害提升" : `${storedRuleStatLabel(rule, meta)} +`
                         if (compactSummary) {
                             text = `${summaryLabel} ${displayValue >= 0 ? "+" : ""}${Number(displayValue.toFixed(3))}${rule.formula?.valueUnit === "storedPercent" ? "%" : ""}`
+                        } else if (thresholdSkillMultiplier) {
+                            const reached = displaySourceValue >= threshold
+                            text += `；当前${sourceLabel}${displaySourceValue}%，${reached ? `已触发，原倍率 ×${100 + rate}%` : "未触发"}`
                         } else {
                             text += `；当前${sourceLabel}${displaySourceValue}${source.unit === "storedPercent" ? "%" : ""}，${resultLabel}${Number(displayValue.toFixed(3))}${rule.formula?.valueUnit === "storedPercent" ? "%" : ""}`
                         }

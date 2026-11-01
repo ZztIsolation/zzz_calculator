@@ -16,6 +16,9 @@
 | 佩洛伊斯 | [角色专题](pyrois-modeling.md) | 资料版本、四分支假设、当前技能组与默认配置 |
 | 艾莲 | [角色专题](ellen-modeling.md) | 潜能增强、风暴潮共享层数、体型霜锋与琉音＋千夏参考轴 |
 | 南宫羽 | [角色专题](nangongyu-modeling.md) | 核心成长、颤音异放与个人默认目标 |
+| 猫又 | [角色专题](nekomata-modeling.md) | 原版/潜能普攻组、爪印与固定失衡组合 |
+| 浅羽悠真 | [角色专题](harumasa-modeling.md) | 终结技本体与散华、强化技及定向增益 |
+| 伊芙琳 | [角色专题](evelyn-modeling.md) | 连携/终结技倍率门槛、强化技及候选套装 |
 | 菲欧妮 | [角色专题](fioni-modeling.md) | 灼蚀异常暴击、焚罪异放与默认单次异放 |
 | 风属性异常与维琳娜 | [风属性专题](wind-anomaly-modeling.md) | 风化、乱流、异放、来源、公式和默认配置 |
 | 蕾米埃尔·丹评分 | [评分专题](luminescence-modeling.md) | 恒定权重近似、正式输入、兼容和评分边界 |

@@ -459,6 +459,14 @@
 
 ## 发布前验收
 
+### PR81 三角色迁移（2026-11-01）
+
+- 猫又、浅羽悠真、伊芙琳的默认范围及未建模边界分别由[猫又专题](nekomata-modeling.md)、[悠真专题](harumasa-modeling.md)、[伊芙琳专题](evelyn-modeling.md)维护；迁移不能扩大招式范围或覆盖其他角色的人工目录。
+- 猫又原版/潜能末段次数和独立爪印、悠真大招本体/散华与强化技排除目标必须分别验证；如影两件套不得凭描述自动把爪印分类为追加攻击。
+- 伊芙琳暴击率门槛必须覆盖门槛两侧及精确门槛、倍率乘算与加算同时存在的独立算例；普通、白盒、compiled、indexed、dense、固定套装与 Worker 的结果保持一致。不具备证明的动态上界继续安全回退。
+- 严格搜索以独立普通计算穷举核对完整 Top 10 和不足十套情况；初次配置、潜能切换、用户手动事件与关闭 Buff 的刷新恢复、维护清洗回读均须覆盖。
+- 验证入口：`npm run test:pr81-characters`、`webapp/src/stores/pr81-characters.test.ts`、`webapp/src/components/BuffPickerModal.test.ts`。
+
 按影响范围运行聚焦检查；计算或共享逻辑变更完成根回归，UI变更验证构建及实际浏览器流程，发布遵守[当前手册](production-deployment-runbook.md)。
 
 - `npm test` 已包含 `npm run test:webapp`，不需要无变化地重复运行同一套Vue测试。

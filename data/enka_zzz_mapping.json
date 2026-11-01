@@ -5,6 +5,9 @@
     "commit": "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554"
   },
   "agents": {
+    "1321": {"id": "evelyn_chevalier", "name": "伊芙琳"},
+    "1201": {"id": "asaba_harumasa", "name": "浅羽悠真"},
+    "1021": {"id": "nekomata", "name": "猫又"},
     "1011": {
       "id": "anby_demara",
       "name": "安比"

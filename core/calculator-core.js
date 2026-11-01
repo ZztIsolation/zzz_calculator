@@ -349,7 +349,7 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 // Kept in the accepted data vocabulary for old saved effects, but this legacy
 // modifier is intentionally ignored by every calculation path.
 const IGNORED_DAMAGE_MODIFIER_KINDS = new Set(["enemyDamageTakenBonus"])
-const DAMAGE_MODIFIER_KINDS = ["imbuementDmgBonus", "enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, "lacerationDmg", "critRate", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
+const DAMAGE_MODIFIER_KINDS = ["imbuementDmgBonus", "enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, "lacerationDmg", "critRate", "skillMultiplierBonus", "skillMultiplierScaleBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "imbuementDmgBonus",
     "enemyDamageTakenBonus",
@@ -378,6 +378,7 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     "sharpDmgBonus",
     ...ELEMENT_SHARP_DMG_STATS,
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
     ...ELEMENT_CRIT_DMG_STATS,
     ...ELEMENT_DEF_IGNORE_STATS,
 ])
@@ -425,6 +426,7 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "etherSheerDmg",
     "windSheerDmg",
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
     ...ELEMENT_CRIT_DMG_STATS,
     ...ELEMENT_DEF_IGNORE_STATS,
 ])
@@ -532,6 +534,7 @@ const STORED_PERCENT_STATS = new Set([
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
+    "skillMultiplierScaleBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
@@ -4139,7 +4142,7 @@ export function damageModifierAppliesTo(modifier, event) {
         && !hasSkillTargets) {
         return false
     }
-    if (["directDamageBonus", "skillMultiplierBonus"].includes(modifier.kind) && !hasSkillTargets) {
+    if (["directDamageBonus", "skillMultiplierBonus", "skillMultiplierScaleBonus"].includes(modifier.kind) && !hasSkillTargets) {
         return false
     }
     if (Array.isArray(appliesTo.damageKinds) && appliesTo.damageKinds.length) {
@@ -4343,6 +4346,7 @@ function eventTargetTotalsForElement(bonusTotals, event) {
         turbulenceDamageBonus,
         disorderDamageBonus,
         skillMultiplierBonus: sumDamageModifiers(bonusTotals, event, "skillMultiplierBonus"),
+        skillMultiplierScaleBonus: sumDamageModifiers(bonusTotals, event, "skillMultiplierScaleBonus"),
     }
 }
 
@@ -4518,7 +4522,7 @@ function critRateBonusWhiteBoxText(skillTargetedCritRateBonus) {
         : ""
 }
 
-function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritRateBonus = 0, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, directDamageBonus, dmgMultiplier, imbuementMultiplier = 1, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, finalDamage, singleDamage }) {
+function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritRateBonus = 0, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, directDamageBonus, dmgMultiplier, imbuementMultiplier = 1, targetBreakdown, skillMultiplierBonus, skillMultiplierScaleBonus = 0, effectiveSkillMultiplier, finalDamage, singleDamage }) {
     const critModeLabel = {
         expected: "期望",
         crit: "暴击",
@@ -4536,7 +4540,9 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
         },
         {
             label: "技能倍率",
-            formula: event.skillSource
+            formula: skillMultiplierScaleBonus
+                ? `${event.skillSource?.label ?? event.label ?? "本次直伤倍率"}：${formatDamagePercent(event.skillMultiplier)} × (1 + 倍率乘算 ${formatDamagePercent(skillMultiplierScaleBonus)})${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
+                : event.skillSource
                 ? `${event.skillSource.label} ${event.skillSource.levelLabel ?? `LV${event.skillSource.level}`}${skillMultiplierBonus ? `：基础倍率 ${formatDamagePercent(event.skillMultiplier)} + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
                 : `${event.label ?? "本次直伤倍率"}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
             value: effectiveSkillMultiplier,
@@ -4911,7 +4917,8 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
         + Number(eventTotals[elementDmgKey] ?? 0)
     const dmgMultiplier = 1 + selectedDmgBonus + directDamageBonus
     const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
-    const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
+    const skillMultiplierScaleBonus = Number(eventTotals.skillMultiplierScaleBonus ?? 0)
+    const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) * (1 + skillMultiplierScaleBonus) + skillMultiplierBonus)
     const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
     const baseSingleDamage = damageBasisValue
         * effectiveSkillMultiplier
@@ -4986,6 +4993,7 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
                 ? { skillMultiplierFactor: Number(event.skillSource.skillMultiplierFactor) }
                 : {}),
             skillMultiplierBonus,
+            ...(skillMultiplierScaleBonus ? { skillMultiplierScaleBonus } : {}),
             crit: critMultiplier,
             critRate: critRateForDamage,
             rawCritRate,
@@ -5014,6 +5022,7 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
                 imbuementMultiplier,
                 targetBreakdown,
                 skillMultiplierBonus,
+                skillMultiplierScaleBonus,
                 effectiveSkillMultiplier,
                 finalDamage,
                 singleDamage,
@@ -6416,7 +6425,7 @@ function calculateDirectDamageFinalValueCore(event, panel, bonusTotals, target) 
         + Number(eventTotals.dmgBonus ?? 0)
         + Number(eventTotals[elementDmgKey] ?? 0)
     const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
-    const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
+    const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) * (1 + Number(eventTotals.skillMultiplierScaleBonus ?? 0)) + skillMultiplierBonus)
     return directDamageBasisValue(panel, event)
         * effectiveSkillMultiplier
         * (1 + Number(eventTotals.imbuementDmgBonus ?? 0))
@@ -6813,7 +6822,7 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
         if (compiledEvent.kind === "direct") {
             const effectiveSkillMultiplier = Math.max(
                 0,
-                compiledEvent.skillMultiplier + compiledModifierSum(sums, "skillMultiplierBonus"),
+                compiledEvent.skillMultiplier * (1 + compiledModifierSum(sums, "skillMultiplierScaleBonus")) + compiledModifierSum(sums, "skillMultiplierBonus"),
             )
             const directDamageBonus = compiledModifierSum(sums, "directDamageBonus") + skillDamageBonus
             total += directDamageBasisValue(panel, compiledEvent)
@@ -7177,7 +7186,7 @@ function calculateCompiledDamageScoreValueDense({
         if (compiledEvent.kind === "direct") {
             const effectiveSkillMultiplier = Math.max(
                 0,
-                compiledEvent.skillMultiplier + denseModifierSum(modifierSums, "skillMultiplierBonus"),
+                compiledEvent.skillMultiplier * (1 + denseModifierSum(modifierSums, "skillMultiplierScaleBonus")) + denseModifierSum(modifierSums, "skillMultiplierBonus"),
             )
             const directDamageBonus = denseModifierSum(modifierSums, "directDamageBonus") + skillDamageBonus
             total += densePanelValue(panelValues, compiledEvent.damageBasis === "anomalyProficiency" ? "anomalyProficiency" : "atk")
@@ -9178,7 +9187,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     resistanceFixedOne: event.resistanceFixedOne,
                     damageIndex: PANEL_KEY_LOOKUP[`${event.damageElement}Dmg`],
                     resIgnoreIndex: PANEL_KEY_LOOKUP[event.resIgnoreKey],
-                    effectiveSkillMultiplier: Math.max(0, event.skillMultiplier + denseModifierSum(sums, "skillMultiplierBonus")),
+                    effectiveSkillMultiplier: Math.max(0, event.skillMultiplier * (1 + denseModifierSum(sums, "skillMultiplierScaleBonus")) + denseModifierSum(sums, "skillMultiplierBonus")),
                     imbuementMultiplier: 1 + denseModifierSum(sums, "imbuementDmgBonus"),
                     directDamageBonus: denseModifierSum(sums, "directDamageBonus")
                         + denseModifierSum(sums, "dmgBonus")
@@ -9494,7 +9503,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     damageKey: `${event.damageElement}Dmg`,
                     sharpDamageKey: event.elementSharpDmgKey,
                     resIgnoreKey: event.resIgnoreKey,
-                    effectiveSkillMultiplier: Math.max(0, event.skillMultiplier + denseModifierSum(sums, "skillMultiplierBonus")),
+                    effectiveSkillMultiplier: Math.max(0, event.skillMultiplier * (1 + (event.kind === "direct" ? denseModifierSum(sums, "skillMultiplierScaleBonus") : 0)) + denseModifierSum(sums, "skillMultiplierBonus")),
                     imbuementMultiplier: 1 + denseModifierSum(sums, "imbuementDmgBonus"),
                     directDamageBonus: denseModifierSum(sums, "directDamageBonus") + skillDamageBonus,
                     skillDamageBonus,

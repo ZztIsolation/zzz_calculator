@@ -4780,7 +4780,13 @@
                   50
                 ]
               },
-              "condition": "从背后攻击命中"
+              "condition": "从背后攻击命中",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -4796,7 +4802,8 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
+      },
+      "relatedAgentId": "nekomata"
     },
     {
       "id": "zzz_wiki_225",
@@ -5397,7 +5404,13 @@
                 ]
               },
               "condition": "队伍任意角色施加属性异常或造成失衡",
-              "durationSeconds": 15
+              "durationSeconds": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -5413,7 +5426,8 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
+      },
+      "relatedAgentId": "asaba_harumasa"
     },
     {
       "id": "zzz_wiki_995",
@@ -5613,7 +5627,13 @@
               "stackLabel": {
                 "zhCN": "心弦层数"
               },
-              "durationSeconds": 30
+              "durationSeconds": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -5629,7 +5649,8 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
+      },
+      "relatedAgentId": "evelyn_chevalier"
     },
     {
       "id": "zzz_wiki_1197",

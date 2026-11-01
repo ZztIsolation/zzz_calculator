@@ -134,6 +134,24 @@ available. See [Jane's model](jane-modeling.md) for the character-specific rules
 
 ## Events, groups and defaults
 
+### Direct skill multiplier scaling
+
+Skill-targeted `skillMultiplierScaleBonus` uses stored percentage points and
+applies only to direct damage. For authored multiplier M, scale bonus s (converted
+to decimal), and additive multiplier b, the result is `max(0, M * (1 + s) + b)`.
+It does not multiply b or enter the ordinary damage-bonus zone.
+
+Self in-combat formulas may produce this skill-targeted modifier from final
+ordinary panel CRIT Rate, with both source and result using `storedPercent`.
+Event-targeted CRIT does not feed the source. Candidate scoring reevaluates the
+formula; unsupported scalar kernels use dense scoring, and unproven dynamic
+formulas disable monotonic pruning. See [Evelyn](evelyn-modeling.md) and
+[character regressions](../tests/pr81-characters.test.js).
+
+The explicit `followUp` skill tag denotes authored follow-up attacks. Skill-tag
+targets use OR matching; damage descriptions alone do not establish this tag.
+See [Nekomata's classification boundary](nekomata-modeling.md#驱动盘与分类边界).
+
 A skill-backed event selects an authored row. This Pyrois Ultimate event contains
 the body only, without an implicit Assault Directive:
 

@@ -1,0 +1,2434 @@
+{
+  "source": {
+    "site": "Nanoka",
+    "version": "3.3.12+19520738",
+    "url": "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1021.json",
+    "fetchedAt": "2026-10-13T05:29:56.251Z"
+  },
+  "data": {
+    "id": 1021,
+    "icon": "IconRole11",
+    "name": "猫又",
+    "code_name": "Nekomata",
+    "rarity": 4,
+    "weapon_type": {
+      "1": "强攻"
+    },
+    "element_type": {
+      "200": "物理"
+    },
+    "special_element_type": {},
+    "hit_type": {
+      "101": "斩击"
+    },
+    "camp": {
+      "1": "狡兔屋"
+    },
+    "gender": 2,
+    "partner_info": {
+      "birthday": "07/30",
+      "full_name": "猫宫又奈",
+      "gender": "女",
+      "icon_path": "UI/Sprite/A1DynamicLoad/IconRoleCircle/UnPacker/IconRoleCircle11.png",
+      "inter_knot_icon": "UI/Sprite/A1DynamicLoad/InterKnot/UnPacker/IconInterknotAvatar/IconInterKnotRole0011.png",
+      "impression_f": "猫猫！谁会不喜欢猫猫！\n呜呜呜好想摸摸猫又的尾巴！她还有两条，双倍的快乐！",
+      "impression_m": "冷静一点…这可不是新艾利都街头可爱又无害的小猫…\n不过在面对猫又的时候，最重要的事应该是守护好自己的钱包吧…",
+      "impressions": [
+        "对猫又的印象：\n · 猫的报恩永远让人动容，送「死去的老鼠」除外",
+        " · 虽然已离开赤牙帮很久，但猫又依然饱受帮众的尊敬",
+        " · 野猫终于也有了可以回去的地方，那里通常被叫做「家」"
+      ],
+      "profile_desc": "猫宫又奈，通常自称「猫又」。\n猫希人，拥有猫科动物的相关特性，在狩猎状态时具有强大的机动性，同时对外界怀有过剩的好奇心。\n偶尔会耍些小坏，做一些无伤大雅的恶作剧。但当她盯准了猎物之后，那种猫科动物与生俱来的行动力与专注度，也总会让人感到心惊。\n目前最感兴趣的东西是「别人的钱包」。\n建议：在与猫又相处时，时刻关注自己钱包的去向。\n\n猫又曾隶属于新艾利都老牌组织「赤牙帮」，自小受到赤牙帮老大「白佬」米格尔的照顾，与其情同父女。后因与赤牙帮产生理念分歧，离开了组织，独自在外漂泊。\n在与妮可等人共同经历某些事件后，决意加入狡兔屋，成为狡兔屋的第三位雇员。",
+      "role_icon": "IconRole/UnPacker/IconRole11",
+      "stature": "148",
+      "unlock_condition": [
+        "获得代理人",
+        "完成委托「安比的困扰」",
+        "完成代理人秘闻「贼猫御鼠」"
+      ],
+      "trust_lv": {
+        "1": "猫宫又奈，通常自称「猫又」。\n猫希人，拥有猫科动物的相关特性，在狩猎状态时具有强大的机动性，同时对外界怀有过剩的好奇心。\n偶尔会耍些小坏，做一些无伤大雅的恶作剧。但当她盯准了猎物之后，那种猫科动物与生俱来的行动力与专注度，也总会让人感到心惊。\n目前最感兴趣的东西是「别人的钱包」。\n建议：在与猫又相处时，时刻关注自己钱包的去向。\n\n猫又曾隶属于新艾利都老牌组织「赤牙帮」，自小受到赤牙帮老大「白佬」米格尔的照顾，与其情同父女。后因与赤牙帮产生理念分歧，离开了组织，独自在外漂泊。\n在与妮可等人共同经历某些事件后，决意加入狡兔屋，成为狡兔屋的第三位雇员。",
+        "2": "",
+        "3": "额外信息：在狡兔屋中，猫又似乎对妮可怀有相当的兴趣，但却因此招来安比的不满。\n推测原因可能为：「明明是我先来的…」。",
+        "4": ""
+      }
+    },
+    "skin": {
+      "3110210": {
+        "name": "猫又·猫的报恩",
+        "desc": "迷路的猫不知道要去哪里，只是需要离开。\n在偌大的新艾利都流浪，单薄的衣衫不足以遮风挡雨，直到她被一间小小的万事屋截获。",
+        "obtain_desc": "",
+        "image": "IconRole11"
+      }
+    },
+    "stats": {
+      "armor": 0,
+      "armor_growth": 0,
+      "attack": 131,
+      "attack_growth": 79762,
+      "avatar_piece_id": 5021,
+      "break_stun": 92,
+      "crit": 500,
+      "crit_damage": 5000,
+      "crit_dmg_res": 0,
+      "crit_res": 0,
+      "defence": 47,
+      "defence_growth": 64166,
+      "element_abnormal_power": 97,
+      "element_mystery": 96,
+      "endurance": 0,
+      "hp_growth": 824778,
+      "hp_max": 608,
+      "pen_delta": 0,
+      "pen_rate": 0,
+      "rbl": 1,
+      "rbl_correction_factor": 10000,
+      "rbl_probability": 0,
+      "shield": 0,
+      "shield_growth": 0,
+      "sp_bar_point": 120,
+      "sp_recover": 120,
+      "stun": 0,
+      "tags": [
+        "Tsubaki",
+        "Cut",
+        "Physics",
+        "Female",
+        "Camp1",
+        "Size1",
+        "AidTypeParry",
+        "Nekomata",
+        "EtherEyesSize1"
+      ],
+      "rp_max": 0,
+      "rp_recover": 0,
+      "ep_max": 0,
+      "ep_recover": 0,
+      "sharp_critical_damage": 0
+    },
+    "level": {
+      "1": {
+        "hp_max": 0,
+        "attack": 0,
+        "defence": 0,
+        "level_max": 10,
+        "level_min": 0,
+        "materials": {
+          "10": 24000,
+          "100211": 4
+        }
+      },
+      "2": {
+        "hp_max": 417,
+        "attack": 47,
+        "defence": 32,
+        "level_max": 20,
+        "level_min": 10,
+        "materials": {
+          "10": 56000,
+          "100221": 12
+        }
+      },
+      "3": {
+        "hp_max": 834,
+        "attack": 94,
+        "defence": 65,
+        "level_max": 30,
+        "level_min": 20,
+        "materials": {
+          "10": 120000,
+          "100221": 20
+        }
+      },
+      "4": {
+        "hp_max": 1251,
+        "attack": 140,
+        "defence": 97,
+        "level_max": 40,
+        "level_min": 30,
+        "materials": {
+          "10": 200000,
+          "100231": 10
+        }
+      },
+      "5": {
+        "hp_max": 1668,
+        "attack": 187,
+        "defence": 130,
+        "level_max": 50,
+        "level_min": 40,
+        "materials": {
+          "10": 400000,
+          "100231": 20
+        }
+      },
+      "6": {
+        "hp_max": 2086,
+        "attack": 234,
+        "defence": 162,
+        "level_max": 60,
+        "level_min": 50,
+        "materials": {}
+      }
+    },
+    "extra_level": {
+      "1": {
+        "max_level": 15,
+        "extra": {
+          "12101": {
+            "prop": 12101,
+            "name": "基础攻击力",
+            "format": "{0:0.#}",
+            "value": 0
+          },
+          "20101": {
+            "prop": 20101,
+            "name": "暴击率",
+            "format": "{0:0.#%}",
+            "value": 480
+          }
+        }
+      },
+      "2": {
+        "max_level": 25,
+        "extra": {
+          "12101": {
+            "prop": 12101,
+            "name": "基础攻击力",
+            "format": "{0:0.#}",
+            "value": 25
+          },
+          "20101": {
+            "prop": 20101,
+            "name": "暴击率",
+            "format": "{0:0.#%}",
+            "value": 480
+          }
+        }
+      },
+      "3": {
+        "max_level": 35,
+        "extra": {
+          "12101": {
+            "prop": 12101,
+            "name": "基础攻击力",
+            "format": "{0:0.#}",
+            "value": 25
+          },
+          "20101": {
+            "prop": 20101,
+            "name": "暴击率",
+            "format": "{0:0.#%}",
+            "value": 960
+          }
+        }
+      },
+      "4": {
+        "max_level": 45,
+        "extra": {
+          "12101": {
+            "prop": 12101,
+            "name": "基础攻击力",
+            "format": "{0:0.#}",
+            "value": 50
+          },
+          "20101": {
+            "prop": 20101,
+            "name": "暴击率",
+            "format": "{0:0.#%}",
+            "value": 960
+          }
+        }
+      },
+      "5": {
+        "max_level": 55,
+        "extra": {
+          "12101": {
+            "prop": 12101,
+            "name": "基础攻击力",
+            "format": "{0:0.#}",
+            "value": 50
+          },
+          "20101": {
+            "prop": 20101,
+            "name": "暴击率",
+            "format": "{0:0.#%}",
+            "value": 1440
+          }
+        }
+      },
+      "6": {
+        "max_level": 60,
+        "extra": {
+          "12101": {
+            "prop": 12101,
+            "name": "基础攻击力",
+            "format": "{0:0.#}",
+            "value": 75
+          },
+          "20101": {
+            "prop": 20101,
+            "name": "暴击率",
+            "format": "{0:0.#%}",
+            "value": 1440
+          }
+        }
+      }
+    },
+    "level_exp": [
+      50,
+      150,
+      250,
+      400,
+      600,
+      800,
+      1000,
+      1250,
+      1500,
+      1800,
+      1935,
+      2065,
+      2200,
+      2335,
+      2465,
+      2600,
+      2735,
+      2865,
+      3000,
+      4680,
+      4975,
+      5265,
+      5560,
+      5855,
+      6145,
+      6440,
+      6735,
+      7025,
+      7320,
+      10800,
+      11400,
+      12000,
+      12600,
+      13200,
+      13800,
+      14400,
+      15000,
+      15600,
+      16200,
+      17100,
+      18300,
+      19500,
+      20700,
+      21900,
+      23100,
+      24300,
+      25500,
+      26700,
+      27900,
+      34200,
+      36600,
+      39000,
+      41400,
+      43800,
+      46200,
+      48600,
+      51000,
+      53400,
+      55800,
+      0
+    ],
+    "skill": {
+      "basic": {
+        "description": [
+          {
+            "name": "普通攻击：猫猫爪刺",
+            "desc": "点按 <IconMap:Icon_Normal> 发动：\n向前方进行至多五段的斩击，造成<color=#F0D12B>物理伤害</color>；\n发动最后一段斩击时，有33.33%的概率重复攻击三次。",
+            "potential": [
+              0
+            ]
+          },
+          {
+            "name": "普通攻击：猫猫爪刺",
+            "desc": "点按 <IconMap:Icon_Normal> 发动：\n向前方进行至多五段的斩击，造成<color=#F0D12B>物理伤害</color>；\n发动最后一段斩击时，若命中处于失衡状态下的敌人，则会重复攻击三次。",
+            "potential": [
+              102100,
+              102101,
+              102102,
+              102103,
+              102104,
+              102105
+            ]
+          },
+          {
+            "name": "普通攻击：赤色之刃",
+            "desc": "在<color=#FFFFFF>[普通攻击]</color>前三段中，长按 <IconMap:Icon_Normal> 发动：\n向前方进行斩击，可穿过前方敌人，并对其造成<color=#F0D12B>物理伤害</color>；\n招式发动时，有33.33%的概率重复攻击三次。",
+            "potential": [
+              0
+            ]
+          },
+          {
+            "name": "普通攻击：赤色之刃",
+            "desc": "在<color=#FFFFFF>[普通攻击]</color>前三段中，长按 <IconMap:Icon_Normal> 发动：\n向前方进行斩击，可穿过前方敌人，并对其造成<color=#F0D12B>物理伤害</color>；\n招式发动时，若命中处于失衡状态下的敌人，则会重复攻击三次。",
+            "potential": [
+              102100,
+              102101,
+              102102,
+              102103,
+              102104,
+              102105
+            ]
+          },
+          {
+            "name": "普通攻击：猫猫爪刺",
+            "param": [
+              {
+                "name": "一段伤害倍率",
+                "desc": "{Skill:1021001, Prop:1001}",
+                "param": {
+                  "1021001": {
+                    "main": 5520,
+                    "growth": 510,
+                    "format": "%",
+                    "damage_percentage": 5520,
+                    "damage_percentage_growth": 510,
+                    "stun_ratio": 1800,
+                    "stun_ratio_growth": 90,
+                    "sp_recovery": 6160,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 47025,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 1708,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      5981
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 1709
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "二段伤害倍率",
+                "desc": "{Skill:1021002, Prop:1001}",
+                "param": {
+                  "1021002": {
+                    "main": 6260,
+                    "growth": 570,
+                    "format": "%",
+                    "damage_percentage": 6260,
+                    "damage_percentage_growth": 570,
+                    "stun_ratio": 3710,
+                    "stun_ratio_growth": 170,
+                    "sp_recovery": 12690,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 97075,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 3524,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      6231
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 3525
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "三段伤害倍率",
+                "desc": "{Skill:1021003, Prop:1001}",
+                "param": {
+                  "1021003": {
+                    "main": 7270,
+                    "growth": 670,
+                    "format": "%",
+                    "damage_percentage": 7270,
+                    "damage_percentage_growth": 670,
+                    "stun_ratio": 4670,
+                    "stun_ratio_growth": 220,
+                    "sp_recovery": 15990,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 122375,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 4440,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      6600
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 4441
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "四段伤害倍率",
+                "desc": "{Skill:1021004, Prop:1001}",
+                "param": {
+                  "1021004": {
+                    "main": 17020,
+                    "growth": 1550,
+                    "format": "%",
+                    "damage_percentage": 17020,
+                    "damage_percentage_growth": 1550,
+                    "stun_ratio": 10370,
+                    "stun_ratio_growth": 480,
+                    "sp_recovery": 35550,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 271700,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 9873,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      15398
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 9874
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "五段伤害倍率",
+                "desc": "{Skill:1021005, Prop:1001}",
+                "param": {
+                  "1021005": {
+                    "main": 12360,
+                    "growth": 1130,
+                    "format": "%",
+                    "damage_percentage": 12360,
+                    "damage_percentage_growth": 1130,
+                    "stun_ratio": 5890,
+                    "stun_ratio_growth": 270,
+                    "sp_recovery": 20170,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 154275,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 5602,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      10321
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 5898
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "一段失衡倍率",
+                "desc": "{Skill:1021001, Prop:1002}",
+                "param": {
+                  "1021001": {
+                    "main": 1800,
+                    "growth": 90,
+                    "format": "%",
+                    "damage_percentage": 5520,
+                    "damage_percentage_growth": 510,
+                    "stun_ratio": 1800,
+                    "stun_ratio_growth": 90,
+                    "sp_recovery": 6160,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 47025,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 1708,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      5981
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 1709
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "二段失衡倍率",
+                "desc": "{Skill:1021002, Prop:1002}",
+                "param": {
+                  "1021002": {
+                    "main": 3710,
+                    "growth": 170,
+                    "format": "%",
+                    "damage_percentage": 6260,
+                    "damage_percentage_growth": 570,
+                    "stun_ratio": 3710,
+                    "stun_ratio_growth": 170,
+                    "sp_recovery": 12690,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 97075,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 3524,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      6231
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 3525
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "三段失衡倍率",
+                "desc": "{Skill:1021003, Prop:1002}",
+                "param": {
+                  "1021003": {
+                    "main": 4670,
+                    "growth": 220,
+                    "format": "%",
+                    "damage_percentage": 7270,
+                    "damage_percentage_growth": 670,
+                    "stun_ratio": 4670,
+                    "stun_ratio_growth": 220,
+                    "sp_recovery": 15990,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 122375,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 4440,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      6600
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 4441
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "四段失衡倍率",
+                "desc": "{Skill:1021004, Prop:1002}",
+                "param": {
+                  "1021004": {
+                    "main": 10370,
+                    "growth": 480,
+                    "format": "%",
+                    "damage_percentage": 17020,
+                    "damage_percentage_growth": 1550,
+                    "stun_ratio": 10370,
+                    "stun_ratio_growth": 480,
+                    "sp_recovery": 35550,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 271700,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 9873,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      15398
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 9874
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "五段失衡倍率",
+                "desc": "{Skill:1021005, Prop:1002}",
+                "param": {
+                  "1021005": {
+                    "main": 5890,
+                    "growth": 270,
+                    "format": "%",
+                    "damage_percentage": 12360,
+                    "damage_percentage_growth": 1130,
+                    "stun_ratio": 5890,
+                    "stun_ratio_growth": 270,
+                    "sp_recovery": 20170,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 154275,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 5602,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      10321
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 5898
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          },
+          {
+            "name": "普通攻击：赤色之刃",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021006, Prop:1001}",
+                "param": {
+                  "1021006": {
+                    "main": 7180,
+                    "growth": 660,
+                    "format": "%",
+                    "damage_percentage": 7180,
+                    "damage_percentage_growth": 660,
+                    "stun_ratio": 5890,
+                    "stun_ratio_growth": 270,
+                    "sp_recovery": 20170,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 154275,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 5602,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      10321
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 5898
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021006, Prop:1002}",
+                "param": {
+                  "1021006": {
+                    "main": 5890,
+                    "growth": 270,
+                    "format": "%",
+                    "damage_percentage": 7180,
+                    "damage_percentage_growth": 660,
+                    "stun_ratio": 5890,
+                    "stun_ratio_growth": 270,
+                    "sp_recovery": 20170,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 154275,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 5602,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      10321
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 5898
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          }
+        ],
+        "material": {
+          "1": {
+            "10": 2000,
+            "100110": 2
+          },
+          "2": {
+            "10": 3000,
+            "100110": 3
+          },
+          "3": {
+            "10": 6000,
+            "100120": 2
+          },
+          "4": {
+            "10": 9000,
+            "100120": 3
+          },
+          "5": {
+            "10": 12000,
+            "100120": 4
+          },
+          "6": {
+            "10": 18000,
+            "100120": 6
+          },
+          "7": {
+            "10": 45000,
+            "100130": 5
+          },
+          "8": {
+            "10": 67500,
+            "100130": 8
+          },
+          "9": {
+            "10": 90000,
+            "100130": 10
+          },
+          "10": {
+            "10": 112500,
+            "100130": 12
+          },
+          "11": {
+            "10": 135000,
+            "100130": 15,
+            "100941": 1
+          },
+          "12": {}
+        }
+      },
+      "dodge": {
+        "description": [
+          {
+            "name": "闪避：打不着喵~",
+            "desc": "点按 <IconMap:Icon_Evade> 发动：\n快速的冲刺闪避；\n招式发动期间拥有无敌效果。",
+            "potential": []
+          },
+          {
+            "name": "闪避：尾巴失踪术",
+            "desc": "当猫又拥有大于等于40点<Term:1000024></Term>时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 消耗30点[呼噜能量]发动：\n猫又进入极限视域，并快速闪身至敌人的身后；\n招式发动期间拥有无敌效果，该招式不消耗闪避次数。",
+            "potential": [
+              102100,
+              102101,
+              102102,
+              102103,
+              102104,
+              102105
+            ]
+          },
+          {
+            "name": "冲刺攻击：你在看哪边？",
+            "desc": "闪避时，点按 <IconMap:Icon_Normal> 发动：\n向前方进行斩击，造成<color=#F0D12B>物理伤害</color>。",
+            "potential": []
+          },
+          {
+            "name": "闪避反击：虚影双刺",
+            "desc": "触发<color=#FFFFFF>[极限闪避]</color>后，点按 <IconMap:Icon_Normal> 发动：\n对前方敌人发动斩击，造成<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果。",
+            "potential": []
+          },
+          {
+            "name": "闪避反击：绒爪穿刺",
+            "desc": "发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>后点按 <IconMap:Icon_Normal> 或拥有大于等于40点<Term:1000024></Term>时长按 <IconMap:Icon_Normal> 发动：\n对前方大范围敌人发动强力斩击，造成大量<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果。",
+            "potential": [
+              102100,
+              102101,
+              102102,
+              102103,
+              102104,
+              102105
+            ]
+          },
+          {
+            "name": "冲刺攻击：你在看哪边？",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021009, Prop:1001}",
+                "param": {
+                  "1021009": {
+                    "main": 3510,
+                    "growth": 320,
+                    "format": "%",
+                    "damage_percentage": 3510,
+                    "damage_percentage_growth": 320,
+                    "stun_ratio": 1760,
+                    "stun_ratio_growth": 80,
+                    "sp_recovery": 6010,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 160600,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 1668,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      2920
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 1669
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021009, Prop:1002}",
+                "param": {
+                  "1021009": {
+                    "main": 1760,
+                    "growth": 80,
+                    "format": "%",
+                    "damage_percentage": 3510,
+                    "damage_percentage_growth": 320,
+                    "stun_ratio": 1760,
+                    "stun_ratio_growth": 80,
+                    "sp_recovery": 6010,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 160600,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 1668,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      2920
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 1669
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          },
+          {
+            "name": "闪避反击：虚影双刺",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021010, Prop:1001}",
+                "param": {
+                  "1021010": {
+                    "main": 22790,
+                    "growth": 2080,
+                    "format": "%",
+                    "damage_percentage": 22790,
+                    "damage_percentage_growth": 2080,
+                    "stun_ratio": 19950,
+                    "stun_ratio_growth": 910,
+                    "sp_recovery": 32390,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 247500,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 8996,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      15745
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 23997
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021010, Prop:1002}",
+                "param": {
+                  "1021010": {
+                    "main": 19950,
+                    "growth": 910,
+                    "format": "%",
+                    "damage_percentage": 22790,
+                    "damage_percentage_growth": 2080,
+                    "stun_ratio": 19950,
+                    "stun_ratio_growth": 910,
+                    "sp_recovery": 32390,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 247500,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 8996,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      15745
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 23997
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          },
+          {
+            "name": "闪避反击：绒爪穿刺",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021019, Prop:1001}",
+                "param": {
+                  "1021019": {
+                    "main": 126390,
+                    "growth": 11490,
+                    "format": "%",
+                    "damage_percentage": 126390,
+                    "damage_percentage_growth": 11490,
+                    "stun_ratio": 16460,
+                    "stun_ratio_growth": 750,
+                    "sp_recovery": 26410,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 430925,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 15666,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 15667
+                  }
+                },
+                "potential": [
+                  102100,
+                  102101,
+                  102102,
+                  102103,
+                  102104,
+                  102105
+                ]
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021019, Prop:1002}",
+                "param": {
+                  "1021019": {
+                    "main": 16460,
+                    "growth": 750,
+                    "format": "%",
+                    "damage_percentage": 126390,
+                    "damage_percentage_growth": 11490,
+                    "stun_ratio": 16460,
+                    "stun_ratio_growth": 750,
+                    "sp_recovery": 26410,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 430925,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 15666,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 15667
+                  }
+                },
+                "potential": [
+                  102100,
+                  102101,
+                  102102,
+                  102103,
+                  102104,
+                  102105
+                ]
+              },
+              {
+                "name": "[呼噜能量]消耗",
+                "desc": "40点",
+                "potential": [
+                  102100,
+                  102101,
+                  102102,
+                  102103,
+                  102104,
+                  102105
+                ]
+              }
+            ],
+            "potential": [
+              102100,
+              102101,
+              102102,
+              102103,
+              102104,
+              102105
+            ]
+          }
+        ],
+        "material": {
+          "1": {
+            "10": 2000,
+            "100110": 2
+          },
+          "2": {
+            "10": 3000,
+            "100110": 3
+          },
+          "3": {
+            "10": 6000,
+            "100120": 2
+          },
+          "4": {
+            "10": 9000,
+            "100120": 3
+          },
+          "5": {
+            "10": 12000,
+            "100120": 4
+          },
+          "6": {
+            "10": 18000,
+            "100120": 6
+          },
+          "7": {
+            "10": 45000,
+            "100130": 5
+          },
+          "8": {
+            "10": 67500,
+            "100130": 8
+          },
+          "9": {
+            "10": 90000,
+            "100130": 10
+          },
+          "10": {
+            "10": 112500,
+            "100130": 12
+          },
+          "11": {
+            "10": 135000,
+            "100130": 15,
+            "100941": 1
+          },
+          "12": {}
+        }
+      },
+      "special": {
+        "description": [
+          {
+            "name": "特殊技：奇袭",
+            "desc": "点按 <IconMap:Icon_Special> 发动：\n向前方进行下落打击，造成<color=#F0D12B>物理伤害</color>；\n招式发动期间抗打断等级提升。",
+            "potential": [
+              0
+            ]
+          },
+          {
+            "name": "特殊技：奇袭",
+            "desc": "点按 <IconMap:Icon_Special> 发动：\n向前方进行下落打击，造成<color=#F0D12B>物理伤害</color>；\n招式发动期间抗打断等级提升；\n招式的追击效果增强。",
+            "potential": [
+              102100,
+              102101,
+              102102,
+              102103,
+              102104,
+              102105
+            ]
+          },
+          {
+            "name": "强化特殊技：超~凶奇袭！",
+            "desc": "能量足够时，点按 <IconMap:Icon_SpecialReady> 发动：\n向前方进行强力下落斩击，造成大量<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果。",
+            "potential": [
+              0
+            ]
+          },
+          {
+            "name": "强化特殊技：超~凶奇袭！",
+            "desc": "能量足够时，点按 <IconMap:Icon_SpecialReady> 发动：\n向前方进行强力下落斩击，造成大量<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果；\n招式的追击效果增强。",
+            "potential": [
+              102100,
+              102101,
+              102102,
+              102103,
+              102104,
+              102105
+            ]
+          },
+          {
+            "name": "特殊技：奇袭",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021007, Prop:1001}",
+                "param": {
+                  "1021007": {
+                    "main": 4730,
+                    "growth": 430,
+                    "format": "%",
+                    "damage_percentage": 4730,
+                    "damage_percentage_growth": 430,
+                    "stun_ratio": 4730,
+                    "stun_ratio_growth": 220,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 124025,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 4501,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      7878
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 4502
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021007, Prop:1002}",
+                "param": {
+                  "1021007": {
+                    "main": 4730,
+                    "growth": 220,
+                    "format": "%",
+                    "damage_percentage": 4730,
+                    "damage_percentage_growth": 430,
+                    "stun_ratio": 4730,
+                    "stun_ratio_growth": 220,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 124025,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 4501,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      7878
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 4502
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          },
+          {
+            "name": "强化特殊技：超~凶奇袭！",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021008, Prop:1001}",
+                "param": {
+                  "1021008": {
+                    "main": 53970,
+                    "growth": 4910,
+                    "format": "%",
+                    "damage_percentage": 53970,
+                    "damage_percentage_growth": 4910,
+                    "stun_ratio": 45540,
+                    "stun_ratio_growth": 2070,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 1486100,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 43073,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 17504
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021008, Prop:1002}",
+                "param": {
+                  "1021008": {
+                    "main": 45540,
+                    "growth": 2070,
+                    "format": "%",
+                    "damage_percentage": 53970,
+                    "damage_percentage_growth": 4910,
+                    "stun_ratio": 45540,
+                    "stun_ratio_growth": 2070,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 1486100,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 43073,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 17504
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "能量消耗",
+                "desc": "40点",
+                "potential": []
+              }
+            ],
+            "potential": []
+          }
+        ],
+        "material": {
+          "1": {
+            "10": 2000,
+            "100110": 2
+          },
+          "2": {
+            "10": 3000,
+            "100110": 3
+          },
+          "3": {
+            "10": 6000,
+            "100120": 2
+          },
+          "4": {
+            "10": 9000,
+            "100120": 3
+          },
+          "5": {
+            "10": 12000,
+            "100120": 4
+          },
+          "6": {
+            "10": 18000,
+            "100120": 6
+          },
+          "7": {
+            "10": 45000,
+            "100130": 5
+          },
+          "8": {
+            "10": 67500,
+            "100130": 8
+          },
+          "9": {
+            "10": 90000,
+            "100130": 10
+          },
+          "10": {
+            "10": 112500,
+            "100130": 12
+          },
+          "11": {
+            "10": 135000,
+            "100130": 15,
+            "100941": 1
+          },
+          "12": {}
+        }
+      },
+      "chain": {
+        "description": [
+          {
+            "name": "连携技：刃爪挥击",
+            "desc": "触发<color=#FFFFFF>[连携技]</color>时，选择对应角色发动：\n对前方大范围敌人发动强力斩击，造成大量<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果。",
+            "potential": []
+          },
+          {
+            "name": "终结技：刃爪强袭",
+            "desc": "喧响等级达到<color=#FFFFFF>[极]</color>时，点按 <IconMap:Icon_UltimateReady> 发动：\n对前方大范围敌人发动强力斩击，造成大量<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果。",
+            "potential": []
+          },
+          {
+            "name": "连携技：刃爪挥击",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021011, Prop:1001}",
+                "param": {
+                  "1021011": {
+                    "main": 53620,
+                    "growth": 4880,
+                    "format": "%",
+                    "damage_percentage": 53620,
+                    "damage_percentage_growth": 4880,
+                    "stun_ratio": 15920,
+                    "stun_ratio_growth": 730,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 2291850,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 36786,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      9465
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 16837
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021011, Prop:1002}",
+                "param": {
+                  "1021011": {
+                    "main": 15920,
+                    "growth": 730,
+                    "format": "%",
+                    "damage_percentage": 53620,
+                    "damage_percentage_growth": 4880,
+                    "stun_ratio": 15920,
+                    "stun_ratio_growth": 730,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 2291850,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 36786,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      9465
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 16837
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          },
+          {
+            "name": "终结技：刃爪强袭",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021012, Prop:1001}",
+                "param": {
+                  "1021012": {
+                    "main": 157110,
+                    "growth": 14290,
+                    "format": "%",
+                    "damage_percentage": 157110,
+                    "damage_percentage_growth": 14290,
+                    "stun_ratio": 11810,
+                    "stun_ratio_growth": 540,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 0,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 12496,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 62497
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021012, Prop:1002}",
+                "param": {
+                  "1021012": {
+                    "main": 11810,
+                    "growth": 540,
+                    "format": "%",
+                    "damage_percentage": 157110,
+                    "damage_percentage_growth": 14290,
+                    "stun_ratio": 11810,
+                    "stun_ratio_growth": 540,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 0,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 12496,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 62497
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          }
+        ],
+        "material": {
+          "1": {
+            "10": 2000,
+            "100110": 2
+          },
+          "2": {
+            "10": 3000,
+            "100110": 3
+          },
+          "3": {
+            "10": 6000,
+            "100120": 2
+          },
+          "4": {
+            "10": 9000,
+            "100120": 3
+          },
+          "5": {
+            "10": 12000,
+            "100120": 4
+          },
+          "6": {
+            "10": 18000,
+            "100120": 6
+          },
+          "7": {
+            "10": 45000,
+            "100130": 5
+          },
+          "8": {
+            "10": 67500,
+            "100130": 8
+          },
+          "9": {
+            "10": 90000,
+            "100130": 10
+          },
+          "10": {
+            "10": 112500,
+            "100130": 12
+          },
+          "11": {
+            "10": 135000,
+            "100130": 15,
+            "100941": 1
+          },
+          "12": {}
+        }
+      },
+      "assist": {
+        "description": [
+          {
+            "name": "快速支援：借用猫爪",
+            "desc": "当前操作中的角色被击飞时，点按 <IconMap:Icon_Switch> 发动：\n对前方敌人发动斩击，造成<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果。",
+            "potential": []
+          },
+          {
+            "name": "招架支援：应激防御",
+            "desc": "前场角色即将被攻击时，点按 <IconMap:Icon_Switch> 发动：\n招架敌人的攻击，累积大量失衡值；\n招式发动期间拥有无敌效果。",
+            "potential": []
+          },
+          {
+            "name": "支援突击：迅影",
+            "desc": "发动<color=#FFFFFF>[招架支援]</color>后，点按 <IconMap:Icon_Normal> 发动：\n对前方敌人发动突进斩击，造成<color=#F0D12B>物理伤害</color>；\n招式发动期间拥有无敌效果。",
+            "potential": []
+          },
+          {
+            "name": "快速支援：借用猫爪",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021013, Prop:1001}",
+                "param": {
+                  "1021013": {
+                    "main": 9450,
+                    "growth": 860,
+                    "format": "%",
+                    "damage_percentage": 9450,
+                    "damage_percentage_growth": 860,
+                    "stun_ratio": 9450,
+                    "stun_ratio_growth": 430,
+                    "sp_recovery": 32390,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 247500,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 8996,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      7873
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 4499
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021013, Prop:1002}",
+                "param": {
+                  "1021013": {
+                    "main": 9450,
+                    "growth": 430,
+                    "format": "%",
+                    "damage_percentage": 9450,
+                    "damage_percentage_growth": 860,
+                    "stun_ratio": 9450,
+                    "stun_ratio_growth": 430,
+                    "sp_recovery": 32390,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 247500,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 8996,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      7873
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 4499
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          },
+          {
+            "name": "招架支援：应激防御",
+            "param": [
+              {
+                "name": "轻招架失衡倍率",
+                "desc": "{Skill:1021014, Prop:1002}",
+                "param": {
+                  "1021014": {
+                    "main": 25900,
+                    "growth": 1180,
+                    "format": "%",
+                    "damage_percentage": 0,
+                    "damage_percentage_growth": 0,
+                    "stun_ratio": 25900,
+                    "stun_ratio_growth": 1180,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 0,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 0,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 36664
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "重招架失衡倍率",
+                "desc": "{Skill:1021015, Prop:1002}",
+                "param": {
+                  "1021015": {
+                    "main": 32730,
+                    "growth": 1490,
+                    "format": "%",
+                    "damage_percentage": 0,
+                    "damage_percentage_growth": 0,
+                    "stun_ratio": 32730,
+                    "stun_ratio_growth": 1490,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 0,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 0,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 41664
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "连续招架失衡倍率",
+                "desc": "{Skill:1021016, Prop:1002}",
+                "param": {
+                  "1021016": {
+                    "main": 15930,
+                    "growth": 730,
+                    "format": "%",
+                    "damage_percentage": 0,
+                    "damage_percentage_growth": 0,
+                    "stun_ratio": 15930,
+                    "stun_ratio_growth": 730,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 0,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 0,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      0
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 11664
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          },
+          {
+            "name": "支援突击：迅影",
+            "param": [
+              {
+                "name": "伤害倍率",
+                "desc": "{Skill:1021017, Prop:1001}",
+                "param": {
+                  "1021017": {
+                    "main": 30040,
+                    "growth": 2740,
+                    "format": "%",
+                    "damage_percentage": 30040,
+                    "damage_percentage_growth": 2740,
+                    "stun_ratio": 25810,
+                    "stun_ratio_growth": 1180,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 897600,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 26592,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      21870
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 12497
+                  }
+                },
+                "potential": []
+              },
+              {
+                "name": "失衡倍率",
+                "desc": "{Skill:1021017, Prop:1002}",
+                "param": {
+                  "1021017": {
+                    "main": 25810,
+                    "growth": 1180,
+                    "format": "%",
+                    "damage_percentage": 30040,
+                    "damage_percentage_growth": 2740,
+                    "stun_ratio": 25810,
+                    "stun_ratio_growth": 1180,
+                    "sp_recovery": 0,
+                    "sp_recovery_growth": 0,
+                    "fever_recovery": 897600,
+                    "fever_recovery_growth": 0,
+                    "attribute_infliction": 26592,
+                    "sp_consume": 0,
+                    "attack_data": [
+                      21870
+                    ],
+                    "rp_recovery": 0,
+                    "rp_recovery_growth": 0,
+                    "ether_purify": 12497
+                  }
+                },
+                "potential": []
+              }
+            ],
+            "potential": []
+          }
+        ],
+        "material": {
+          "1": {
+            "10": 2000,
+            "100110": 2
+          },
+          "2": {
+            "10": 3000,
+            "100110": 3
+          },
+          "3": {
+            "10": 6000,
+            "100120": 2
+          },
+          "4": {
+            "10": 9000,
+            "100120": 3
+          },
+          "5": {
+            "10": 12000,
+            "100120": 4
+          },
+          "6": {
+            "10": 18000,
+            "100120": 6
+          },
+          "7": {
+            "10": 45000,
+            "100130": 5
+          },
+          "8": {
+            "10": 67500,
+            "100130": 8
+          },
+          "9": {
+            "10": 90000,
+            "100130": 10
+          },
+          "10": {
+            "10": 112500,
+            "100130": 12
+          },
+          "11": {
+            "10": 135000,
+            "100130": 15,
+            "100941": 1
+          },
+          "12": {}
+        }
+      }
+    },
+    "skill_priority": [
+      {
+        "id": 1021001,
+        "avatar_id": 1021,
+        "first_priority": [
+          5,
+          1,
+          0
+        ],
+        "second_priority": [
+          3,
+          2
+        ],
+        "third_priority": [
+          6
+        ],
+        "potential_levels": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    ],
+    "skill_list": {
+      "1021001": {
+        "name": "普通攻击：猫猫爪刺",
+        "desc": "<IconMap:Icon_Normal>",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021002": {
+        "name": "普通攻击：赤色之刃",
+        "desc": "<IconMap:Icon_Normal>（长按）",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021003": {
+        "name": "特殊技：奇袭",
+        "desc": "<IconMap:Icon_Special>",
+        "element_type": 200,
+        "hit_type": 102,
+        "potential": []
+      },
+      "1021004": {
+        "name": "强化特殊技：超~凶奇袭！",
+        "desc": "<IconMap:Icon_SpecialReady>",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021005": {
+        "name": "冲刺攻击：你在看哪边？",
+        "desc": "<IconMap:Icon_Evade> ; <IconMap:Icon_Normal>",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021006": {
+        "name": "闪避反击：虚影双刺",
+        "desc": "<IconMap:Icon_Evade>（极限） ; <IconMap:Icon_Normal>",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021007": {
+        "name": "连携技：刃爪挥击",
+        "desc": "<IconMap:Icon_QTE>",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021008": {
+        "name": "终结技：刃爪强袭",
+        "desc": "<IconMap:Icon_UltimateReady>",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021009": {
+        "name": "快速支援：借用猫爪",
+        "desc": "<IconMap:Icon_Switch>（触发快速支援时）",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021010": {
+        "name": "招架支援：应激防御",
+        "desc": "<IconMap:Icon_Switch>（触发招架支援时）",
+        "element_type": 0,
+        "hit_type": 0,
+        "potential": []
+      },
+      "1021011": {
+        "name": "支援突击：迅影",
+        "desc": "<IconMap:Icon_Normal>（发动招架支援后）",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": []
+      },
+      "1021012": {
+        "name": "闪避：尾巴失踪术",
+        "desc": "<IconMap:Icon_Evade>（极限） ; <IconMap:Icon_Evade>",
+        "element_type": 0,
+        "hit_type": 0,
+        "potential": [
+          102100,
+          102101,
+          102102,
+          102103,
+          102104,
+          102105
+        ]
+      },
+      "1021013": {
+        "name": "闪避反击：绒爪穿刺",
+        "desc": "<IconMap:Icon_Normal> （发动[闪避：尾巴失踪术]后）或 <IconMap:Icon_Normal> （长按）（拥有足够[呼噜能量]时）",
+        "element_type": 200,
+        "hit_type": 101,
+        "potential": [
+          102100,
+          102101,
+          102102,
+          102103,
+          102104,
+          102105
+        ]
+      }
+    },
+    "passive": {
+      "level": {
+        "1021501": {
+          "level": 1,
+          "id": 1021501,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>30%</color>，持续6秒。",
+            "队伍中存在与自身属性或阵营相同的角色时触发：\n队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又下一次发动<color=#FFFFFF>[强化特殊技]</color>时，招式造成的伤害提升35%，最多叠加2层。"
+          ],
+          "extra_property": {},
+          "potential": [
+            0
+          ]
+        },
+        "1021502": {
+          "level": 2,
+          "id": 1021502,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>35%</color>，持续6秒。",
+            "队伍中存在与自身属性或阵营相同的角色时触发：\n队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又下一次发动<color=#FFFFFF>[强化特殊技]</color>时，招式造成的伤害提升35%，最多叠加2层。"
+          ],
+          "extra_property": {},
+          "potential": [
+            0
+          ]
+        },
+        "1021503": {
+          "level": 3,
+          "id": 1021503,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>40%</color>，持续6秒。",
+            "队伍中存在与自身属性或阵营相同的角色时触发：\n队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又下一次发动<color=#FFFFFF>[强化特殊技]</color>时，招式造成的伤害提升35%，最多叠加2层。"
+          ],
+          "extra_property": {},
+          "potential": [
+            0
+          ]
+        },
+        "1021504": {
+          "level": 4,
+          "id": 1021504,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>45%</color>，持续6秒。",
+            "队伍中存在与自身属性或阵营相同的角色时触发：\n队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又下一次发动<color=#FFFFFF>[强化特殊技]</color>时，招式造成的伤害提升35%，最多叠加2层。"
+          ],
+          "extra_property": {},
+          "potential": [
+            0
+          ]
+        },
+        "1021505": {
+          "level": 5,
+          "id": 1021505,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>50%</color>，持续6秒。",
+            "队伍中存在与自身属性或阵营相同的角色时触发：\n队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又下一次发动<color=#FFFFFF>[强化特殊技]</color>时，招式造成的伤害提升35%，最多叠加2层。"
+          ],
+          "extra_property": {},
+          "potential": [
+            0
+          ]
+        },
+        "1021506": {
+          "level": 6,
+          "id": 1021506,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>55%</color>，持续6秒。",
+            "队伍中存在与自身属性或阵营相同的角色时触发：\n队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又下一次发动<color=#FFFFFF>[强化特殊技]</color>时，招式造成的伤害提升35%，最多叠加2层。"
+          ],
+          "extra_property": {},
+          "potential": [
+            0
+          ]
+        },
+        "1021507": {
+          "level": 7,
+          "id": 1021507,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>60%</color>，持续6秒。",
+            "队伍中存在与自身属性或阵营相同的角色时触发：\n队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又下一次发动<color=#FFFFFF>[强化特殊技]</color>时，招式造成的伤害提升35%，最多叠加2层。"
+          ],
+          "extra_property": {},
+          "potential": [
+            0
+          ]
+        },
+        "1021508": {
+          "level": 1,
+          "id": 1021508,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>30%</color>，持续40秒，重复触发时刷新持续时间；\n猫又进入战场会获得40点<Term:1000024></Term>，该效果在勘域模式中每180秒最多触发一次；\n当猫又处于接战状态时，每秒获得1点[呼噜能量]，最多积累60点，猫又不同招式命中敌人可以回复不同量的[呼噜能量]；\n猫又拥有大于等于40点[呼噜能量]时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 可以消耗30点[呼噜能量]发动[闪避：尾巴失踪术]，随后点按 <IconMap:Icon_Normal> 可以发动一次不消耗[呼噜能量]的[闪避反击：绒爪穿刺]；\n猫又拥有大于等于40点[呼噜能量]时，长按 <IconMap:Icon_Normal> 消耗40点[呼噜能量]可以发动[闪避反击：绒爪穿刺]；\n猫又发动[闪避反击：绒爪穿刺]会进入<Term:1000025></Term>状态，持续40秒，重复触发时刷新持续时间，[肉球突袭]状态下猫又自身的攻击命中时均视为从背后命中；\n处于[肉球突袭]状态时，猫又自身的攻击命中时会触发[超凶爪印]效果，造成一次等同于自身30%攻击力的<color=#F0D12B>物理伤害</color>，该效果每1秒最多触发一次；\n猫又发动[终结技]额外回复20点[呼噜能量]，发动[连携技]额外回复10点[呼噜能量]，发动[强化特殊技]额外回复5点[呼噜能量]。",
+            "队伍中存在[支援]角色或与自身属性或阵营相同的角色时触发：\n猫又发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>或队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又<color=#FFFFFF>[强化特殊技]</color>或<color=#FFFFFF>[闪避反击]</color>命中时造成的伤害提升35%，该效果最多可叠加2层，持续30秒，重复触发时刷新持续时间。"
+          ],
+          "extra_property": {},
+          "potential": [
+            102100,
+            102101,
+            102102,
+            102103,
+            102104,
+            102105
+          ]
+        },
+        "1021509": {
+          "level": 2,
+          "id": 1021509,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>35%</color>，持续40秒，重复触发时刷新持续时间；\n猫又进入战场会获得40点<Term:1000024></Term>，该效果在勘域模式中每180秒最多触发一次；\n当猫又处于接战状态时，每秒获得1点[呼噜能量]，最多积累60点，猫又不同招式命中敌人可以回复不同量的[呼噜能量]；\n猫又拥有大于等于40点[呼噜能量]时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 可以消耗30点[呼噜能量]发动[闪避：尾巴失踪术]，随后点按 <IconMap:Icon_Normal> 可以发动一次不消耗[呼噜能量]的[闪避反击：绒爪穿刺]；\n猫又拥有大于等于40点[呼噜能量]时，长按 <IconMap:Icon_Normal> 消耗40点[呼噜能量]可以发动[闪避反击：绒爪穿刺]；\n猫又发动[闪避反击：绒爪穿刺]会进入<Term:1000025></Term>状态，持续40秒，重复触发时刷新持续时间，[肉球突袭]状态下猫又自身的攻击命中时均视为从背后命中；\n处于[肉球突袭]状态时，猫又自身的攻击命中时会触发[超凶爪印]效果，造成一次等同于自身30%攻击力的<color=#F0D12B>物理伤害</color>，该效果每1秒最多触发一次；\n猫又发动[终结技]额外回复20点[呼噜能量]，发动[连携技]额外回复10点[呼噜能量]，发动[强化特殊技]额外回复5点[呼噜能量]。",
+            "队伍中存在[支援]角色或与自身属性或阵营相同的角色时触发：\n猫又发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>或队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又<color=#FFFFFF>[强化特殊技]</color>或<color=#FFFFFF>[闪避反击]</color>命中时造成的伤害提升35%，该效果最多可叠加2层，持续30秒，重复触发时刷新持续时间。"
+          ],
+          "extra_property": {},
+          "potential": [
+            102100,
+            102101,
+            102102,
+            102103,
+            102104,
+            102105
+          ]
+        },
+        "1021510": {
+          "level": 3,
+          "id": 1021510,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>40%</color>，持续40秒，重复触发时刷新持续时间；\n猫又进入战场会获得40点<Term:1000024></Term>，该效果在勘域模式中每180秒最多触发一次；\n当猫又处于接战状态时，每秒获得1点[呼噜能量]，最多积累60点，猫又不同招式命中敌人可以回复不同量的[呼噜能量]；\n猫又拥有大于等于40点[呼噜能量]时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 可以消耗30点[呼噜能量]发动[闪避：尾巴失踪术]，随后点按 <IconMap:Icon_Normal> 可以发动一次不消耗[呼噜能量]的[闪避反击：绒爪穿刺]；\n猫又拥有大于等于40点[呼噜能量]时，长按 <IconMap:Icon_Normal> 消耗40点[呼噜能量]可以发动[闪避反击：绒爪穿刺]；\n猫又发动[闪避反击：绒爪穿刺]会进入<Term:1000025></Term>状态，持续40秒，重复触发时刷新持续时间，[肉球突袭]状态下猫又自身的攻击命中时均视为从背后命中；\n处于[肉球突袭]状态时，猫又自身的攻击命中时会触发[超凶爪印]效果，造成一次等同于自身30%攻击力的<color=#F0D12B>物理伤害</color>，该效果每1秒最多触发一次；\n猫又发动[终结技]额外回复20点[呼噜能量]，发动[连携技]额外回复10点[呼噜能量]，发动[强化特殊技]额外回复5点[呼噜能量]。",
+            "队伍中存在[支援]角色或与自身属性或阵营相同的角色时触发：\n猫又发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>或队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又<color=#FFFFFF>[强化特殊技]</color>或<color=#FFFFFF>[闪避反击]</color>命中时造成的伤害提升35%，该效果最多可叠加2层，持续30秒，重复触发时刷新持续时间。"
+          ],
+          "extra_property": {},
+          "potential": [
+            102100,
+            102101,
+            102102,
+            102103,
+            102104,
+            102105
+          ]
+        },
+        "1021511": {
+          "level": 4,
+          "id": 1021511,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>45%</color>，持续40秒，重复触发时刷新持续时间；\n猫又进入战场会获得40点<Term:1000024></Term>，该效果在勘域模式中每180秒最多触发一次；\n当猫又处于接战状态时，每秒获得1点[呼噜能量]，最多积累60点，猫又不同招式命中敌人可以回复不同量的[呼噜能量]；\n猫又拥有大于等于40点[呼噜能量]时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 可以消耗30点[呼噜能量]发动[闪避：尾巴失踪术]，随后点按 <IconMap:Icon_Normal> 可以发动一次不消耗[呼噜能量]的[闪避反击：绒爪穿刺]；\n猫又拥有大于等于40点[呼噜能量]时，长按 <IconMap:Icon_Normal> 消耗40点[呼噜能量]可以发动[闪避反击：绒爪穿刺]；\n猫又发动[闪避反击：绒爪穿刺]会进入<Term:1000025></Term>状态，持续40秒，重复触发时刷新持续时间，[肉球突袭]状态下猫又自身的攻击命中时均视为从背后命中；\n处于[肉球突袭]状态时，猫又自身的攻击命中时会触发[超凶爪印]效果，造成一次等同于自身30%攻击力的<color=#F0D12B>物理伤害</color>，该效果每1秒最多触发一次；\n猫又发动[终结技]额外回复20点[呼噜能量]，发动[连携技]额外回复10点[呼噜能量]，发动[强化特殊技]额外回复5点[呼噜能量]。",
+            "队伍中存在[支援]角色或与自身属性或阵营相同的角色时触发：\n猫又发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>或队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又<color=#FFFFFF>[强化特殊技]</color>或<color=#FFFFFF>[闪避反击]</color>命中时造成的伤害提升35%，该效果最多可叠加2层，持续30秒，重复触发时刷新持续时间。"
+          ],
+          "extra_property": {},
+          "potential": [
+            102100,
+            102101,
+            102102,
+            102103,
+            102104,
+            102105
+          ]
+        },
+        "1021512": {
+          "level": 5,
+          "id": 1021512,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>50%</color>，持续40秒，重复触发时刷新持续时间；\n猫又进入战场会获得40点<Term:1000024></Term>，该效果在勘域模式中每180秒最多触发一次；\n当猫又处于接战状态时，每秒获得1点[呼噜能量]，最多积累60点，猫又不同招式命中敌人可以回复不同量的[呼噜能量]；\n猫又拥有大于等于40点[呼噜能量]时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 可以消耗30点[呼噜能量]发动[闪避：尾巴失踪术]，随后点按 <IconMap:Icon_Normal> 可以发动一次不消耗[呼噜能量]的[闪避反击：绒爪穿刺]；\n猫又拥有大于等于40点[呼噜能量]时，长按 <IconMap:Icon_Normal> 消耗40点[呼噜能量]可以发动[闪避反击：绒爪穿刺]；\n猫又发动[闪避反击：绒爪穿刺]会进入<Term:1000025></Term>状态，持续40秒，重复触发时刷新持续时间，[肉球突袭]状态下猫又自身的攻击命中时均视为从背后命中；\n处于[肉球突袭]状态时，猫又自身的攻击命中时会触发[超凶爪印]效果，造成一次等同于自身30%攻击力的<color=#F0D12B>物理伤害</color>，该效果每1秒最多触发一次；\n猫又发动[终结技]额外回复20点[呼噜能量]，发动[连携技]额外回复10点[呼噜能量]，发动[强化特殊技]额外回复5点[呼噜能量]。",
+            "队伍中存在[支援]角色或与自身属性或阵营相同的角色时触发：\n猫又发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>或队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又<color=#FFFFFF>[强化特殊技]</color>或<color=#FFFFFF>[闪避反击]</color>命中时造成的伤害提升35%，该效果最多可叠加2层，持续30秒，重复触发时刷新持续时间。"
+          ],
+          "extra_property": {},
+          "potential": [
+            102100,
+            102101,
+            102102,
+            102103,
+            102104,
+            102105
+          ]
+        },
+        "1021513": {
+          "level": 6,
+          "id": 1021513,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>55%</color>，持续40秒，重复触发时刷新持续时间；\n猫又进入战场会获得40点<Term:1000024></Term>，该效果在勘域模式中每180秒最多触发一次；\n当猫又处于接战状态时，每秒获得1点[呼噜能量]，最多积累60点，猫又不同招式命中敌人可以回复不同量的[呼噜能量]；\n猫又拥有大于等于40点[呼噜能量]时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 可以消耗30点[呼噜能量]发动[闪避：尾巴失踪术]，随后点按 <IconMap:Icon_Normal> 可以发动一次不消耗[呼噜能量]的[闪避反击：绒爪穿刺]；\n猫又拥有大于等于40点[呼噜能量]时，长按 <IconMap:Icon_Normal> 消耗40点[呼噜能量]可以发动[闪避反击：绒爪穿刺]；\n猫又发动[闪避反击：绒爪穿刺]会进入<Term:1000025></Term>状态，持续40秒，重复触发时刷新持续时间，[肉球突袭]状态下猫又自身的攻击命中时均视为从背后命中；\n处于[肉球突袭]状态时，猫又自身的攻击命中时会触发[超凶爪印]效果，造成一次等同于自身30%攻击力的<color=#F0D12B>物理伤害</color>，该效果每1秒最多触发一次；\n猫又发动[终结技]额外回复20点[呼噜能量]，发动[连携技]额外回复10点[呼噜能量]，发动[强化特殊技]额外回复5点[呼噜能量]。",
+            "队伍中存在[支援]角色或与自身属性或阵营相同的角色时触发：\n猫又发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>或队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又<color=#FFFFFF>[强化特殊技]</color>或<color=#FFFFFF>[闪避反击]</color>命中时造成的伤害提升35%，该效果最多可叠加2层，持续30秒，重复触发时刷新持续时间。"
+          ],
+          "extra_property": {},
+          "potential": [
+            102100,
+            102101,
+            102102,
+            102103,
+            102104,
+            102105
+          ]
+        },
+        "1021514": {
+          "level": 7,
+          "id": 1021514,
+          "name": [
+            "核心被动：猫步诡影",
+            "额外能力：猫步秀"
+          ],
+          "desc": [
+            "猫又<color=#FFFFFF>[闪避反击]</color>或<color=#FFFFFF>[快速支援]</color>命中敌人时，自身造成的伤害提升<color=#2BAD00>60%</color>，持续40秒，重复触发时刷新持续时间；\n猫又进入战场会获得40点<Term:1000024></Term>，该效果在勘域模式中每180秒最多触发一次；\n当猫又处于接战状态时，每秒获得1点[呼噜能量]，最多积累60点，猫又不同招式命中敌人可以回复不同量的[呼噜能量]；\n猫又拥有大于等于40点[呼噜能量]时，触发<color=#FFFFFF>[极限闪避]</color>后点按 <IconMap:Icon_Evade> 可以消耗30点[呼噜能量]发动[闪避：尾巴失踪术]，随后点按 <IconMap:Icon_Normal> 可以发动一次不消耗[呼噜能量]的[闪避反击：绒爪穿刺]；\n猫又拥有大于等于40点[呼噜能量]时，长按 <IconMap:Icon_Normal> 消耗40点[呼噜能量]可以发动[闪避反击：绒爪穿刺]；\n猫又发动[闪避反击：绒爪穿刺]会进入<Term:1000025></Term>状态，持续40秒，重复触发时刷新持续时间，[肉球突袭]状态下猫又自身的攻击命中时均视为从背后命中；\n处于[肉球突袭]状态时，猫又自身的攻击命中时会触发[超凶爪印]效果，造成一次等同于自身30%攻击力的<color=#F0D12B>物理伤害</color>，该效果每1秒最多触发一次；\n猫又发动[终结技]额外回复20点[呼噜能量]，发动[连携技]额外回复10点[呼噜能量]，发动[强化特殊技]额外回复5点[呼噜能量]。",
+            "队伍中存在[支援]角色或与自身属性或阵营相同的角色时触发：\n猫又发动<color=#FFFFFF>[闪避：尾巴失踪术]</color>或队伍中任意角色对敌人施加<color=#F0D12B>[强击]</color>效果后，猫又<color=#FFFFFF>[强化特殊技]</color>或<color=#FFFFFF>[闪避反击]</color>命中时造成的伤害提升35%，该效果最多可叠加2层，持续30秒，重复触发时刷新持续时间。"
+          ],
+          "extra_property": {},
+          "potential": [
+            102100,
+            102101,
+            102102,
+            102103,
+            102104,
+            102105
+          ]
+        }
+      },
+      "materials": {
+        "1": {
+          "10": 5000
+        },
+        "2": {
+          "10": 12000,
+          "110502": 2
+        },
+        "3": {
+          "10": 28000,
+          "110502": 4
+        },
+        "4": {
+          "10": 60000,
+          "110001": 2,
+          "110502": 9
+        },
+        "5": {
+          "10": 100000,
+          "110001": 3,
+          "110502": 15
+        },
+        "6": {
+          "10": 200000,
+          "110001": 4,
+          "110502": 30
+        }
+      }
+    },
+    "talent": {
+      "1": {
+        "level": 1,
+        "name": "猎鸟技巧",
+        "desc": "从背后攻击命中敌人时，猫又无视目标16%<color=#F0D12B>物理伤害抗性</color>；敌方处于失衡状态时，猫又对其的所有攻击均被视为背后攻击。",
+        "desc2": "娇小的猫又并没有强大的膂力，取而代之的是捕捉对手弱点的眼光，和准确攻击弱点的迅敏。"
+      },
+      "2": {
+        "level": 2,
+        "name": "猫鼠游戏",
+        "desc": "当场上只有一名敌人且自身位于前场时，猫又的能量获得效率提升25%。",
+        "desc2": "猫咪们总是更喜欢玩弄猎物。\n当场上的「老鼠」只剩一只时，就是独属于她的玩乐时光了。"
+      },
+      "3": {
+        "level": 3,
+        "name": "好奇的左尾",
+        "desc": "<color=#FFFFFF>[普通攻击]</color>、<color=#FFFFFF>[闪避]</color>、<color=#FFFFFF>[支援技]</color>、<color=#FFFFFF>[特殊技]</color>、<color=#FFFFFF>[连携技]</color> 技能等级+2",
+        "desc2": "在旧文明的传说里，一根尾巴代表猫的一条命，里面寄宿着多年的生存智慧…\n这话是假的，但猫又积累的街头生存经验确实是真的。"
+      },
+      "4": {
+        "level": 4,
+        "name": "磨爪",
+        "desc": "发动<color=#FFFFFF>[强化特殊技]</color>时，猫又的暴击率提升7%，最多叠加2层，持续15秒，每层效果单独结算持续时间。",
+        "desc2": "「多来点多来点！我全~部都能消化掉哟！」\n猫希人舔了舔爪子，眼睛亮晶晶的。"
+      },
+      "5": {
+        "level": 5,
+        "name": "幸运的右尾",
+        "desc": "<color=#FFFFFF>[普通攻击]</color>、<color=#FFFFFF>[闪避]</color>、<color=#FFFFFF>[支援技]</color>、<color=#FFFFFF>[特殊技]</color>、<color=#FFFFFF>[连携技]</color> 技能等级+2",
+        "desc2": "在旧文明的传说里，一根尾巴代表猫的一条命，里面寄宿着多年的生存智慧…\n有时候猫又也会好奇，如果自己能继续幸运地活下去，是不是还会长出新尾巴？"
+      },
+      "6": {
+        "level": 6,
+        "name": "捕食者血统",
+        "desc": "发动<color=#FFFFFF>[连携技]</color>或<color=#FFFFFF>[终结技]</color>时，猫又的暴击伤害提升18%，最多叠加3层，退出接战状态时增益效果结束；猫又击败敌人时，该增益效果直接叠加至层数上限。",
+        "desc2": "「对猫希人来说，因攻击行为而获得的正向反馈，\n极有可能触发他们性格中所潜藏的暴力倾向。\n幸运的是，这种倾向似乎并不具有永久性效果…」\n——摘自一本破旧的《猫希人不完全研究手册》"
+      }
+    },
+    "fairy_recommend": {
+      "slot4": 31000,
+      "slot2": 32600,
+      "slot_sub": 31100,
+      "part_sub_list": [
+        20103,
+        21103,
+        12102
+      ],
+      "alt_build": [
+        {
+          "suit_list": [
+            32600,
+            31000
+          ],
+          "part_sub_list": [
+            21103,
+            20103
+          ]
+        },
+        {
+          "suit_list": [],
+          "part_sub_list": [
+            31503,
+            12102
+          ]
+        },
+        {
+          "suit_list": [],
+          "part_sub_list": [
+            12102
+          ]
+        }
+      ],
+      "part4": {
+        "prop": 20103,
+        "name": "暴击率",
+        "format": "{0:0.#%}",
+        "icon": "UI/Sprite/A1DynamicLoad/IconAttribute/UnPacker/Role/IconCrit.png"
+      },
+      "part5": {
+        "prop": 31503,
+        "name": "物理伤害加成",
+        "format": "{0:0.#%}",
+        "icon": "UI/Sprite/A1DynamicLoad/IconGeneralBuff/Packer/IconPhysDmg.png"
+      },
+      "part6": {
+        "prop": 21103,
+        "name": "暴击伤害",
+        "format": "{0:0.#%}",
+        "icon": "UI/Sprite/A1DynamicLoad/IconAttribute/UnPacker/Role/IconCritDam.png"
+      },
+      "part_sub": {
+        "prop": 12102,
+        "name": "攻击力",
+        "format": "{0:0.#%}",
+        "icon": "UI/Sprite/A1DynamicLoad/IconAttribute/UnPacker/Role/IconAttack.png"
+      }
+    },
+    "strategy": [
+      "03",
+      "<IconMap:Icon_GeneralBuff_PhysDmg>物理属性，<IconMap:Icon_AvatarClass_Attack>强攻站场输出",
+      "通过闪避反击攻击大范围敌人",
+      "擅长灵活穿梭、快速输出"
+    ],
+    "potential": [
+      102100,
+      102101,
+      102102,
+      102103,
+      102104,
+      102105
+    ],
+    "potential_detail": {
+      "102100": {
+        "id": 102100,
+        "name": "",
+        "desc": "",
+        "image": "Nekomiya",
+        "level_show_name": "猫的报恩 I",
+        "level": 1,
+        "ability_list": [
+          11021401,
+          11021601,
+          11021701
+        ],
+        "potential_materials": [
+          {
+            "item_id": 20102,
+            "number": 1
+          }
+        ]
+      },
+      "102101": {
+        "id": 102101,
+        "name": "潜能觉醒：夜行习性",
+        "desc": "猫又处于[肉球突袭]状态时，暴击伤害提升<color=#2BAD00>20%</color>。",
+        "image": "Nekomiya",
+        "level_show_name": "猫的报恩 II",
+        "level": 2,
+        "ability_list": [
+          11021401,
+          11021501,
+          11021601,
+          11021701
+        ],
+        "potential_materials": [
+          {
+            "item_id": 20102,
+            "number": 1
+          }
+        ]
+      },
+      "102102": {
+        "id": 102102,
+        "name": "潜能觉醒：夜行习性",
+        "desc": "猫又处于[肉球突袭]状态时，暴击伤害提升<color=#2BAD00>30%</color>。",
+        "image": "Nekomiya",
+        "level_show_name": "猫的报恩 III",
+        "level": 3,
+        "ability_list": [
+          11021401,
+          11021502,
+          11021601,
+          11021701
+        ],
+        "potential_materials": [
+          {
+            "item_id": 20102,
+            "number": 1
+          }
+        ]
+      },
+      "102103": {
+        "id": 102103,
+        "name": "潜能觉醒：夜行习性",
+        "desc": "猫又处于[肉球突袭]状态时，暴击伤害提升<color=#2BAD00>40%</color>。",
+        "image": "Nekomiya",
+        "level_show_name": "猫的报恩 IV",
+        "level": 4,
+        "ability_list": [
+          11021401,
+          11021503,
+          11021601,
+          11021701
+        ],
+        "potential_materials": [
+          {
+            "item_id": 20102,
+            "number": 1
+          }
+        ]
+      },
+      "102104": {
+        "id": 102104,
+        "name": "潜能觉醒：夜行习性",
+        "desc": "猫又处于[肉球突袭]状态时，暴击伤害提升<color=#2BAD00>50%</color>。",
+        "image": "Nekomiya",
+        "level_show_name": "猫的报恩 V",
+        "level": 5,
+        "ability_list": [
+          11021401,
+          11021504,
+          11021601,
+          11021701
+        ],
+        "potential_materials": [
+          {
+            "item_id": 20102,
+            "number": 1
+          }
+        ]
+      },
+      "102105": {
+        "id": 102105,
+        "name": "潜能觉醒：夜行习性",
+        "desc": "猫又处于[肉球突袭]状态时，暴击伤害提升<color=#2BAD00>60%</color>。",
+        "image": "Nekomiya",
+        "level_show_name": "猫的报恩 VI",
+        "level": 6,
+        "ability_list": [
+          11021401,
+          11021505,
+          11021601,
+          11021701
+        ],
+        "potential_materials": [
+          {
+            "item_id": 20102,
+            "number": 1
+          }
+        ]
+      }
+    }
+  }
+}
