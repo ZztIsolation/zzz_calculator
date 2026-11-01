@@ -8,6 +8,10 @@ import {
     loadCalculatorContext,
 } from "../backend/calculator.js"
 import { skillTargetMatches } from "../core/skillTargets.js"
+import { cleanMaintenanceItem } from "../backend/server.js"
+import { validateMaintenanceItem } from "../core/maintenanceValidation.js"
+import { optimizeDriveDiscs, optimizeDriveDiscsAsync } from "../backend/driveDiscOptimizer.js"
+import { characterStore, characterInput } from "./fixtures/pr81-characters.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -17,6 +21,7 @@ assert.ok(agent, "Evelyn should be present in the catalog")
 const ultimateMoves = ["ultimate_nocturne", "ultimate_shadow"]
 const additionalAbilityId = "agent:evelyn_chevalier.additionalAbility"
 const corePassiveId = "agent:evelyn_chevalier.corePassive"
+const skills = catalog.agentSkillsMap.get(agent.id)
 
 function damageInput(moveId, rowId = "damage", extraCritRate = 0) {
     return {
@@ -44,7 +49,7 @@ function damageInput(moveId, rowId = "damage", extraCritRate = 0) {
                 critMode: "expected",
                 skillRef: {
                     agentSkillId: agent.id,
-                    categoryId: moveId === "ex_final" ? "special" : "chain",
+                    categoryId: skills.categories.find(category => category.moves.some(move => move.id === moveId)).id,
                     moveId,
                     rowId,
                 },
@@ -151,4 +156,74 @@ const chainCompiled = chainCalculator.scoreOnlyFromSummary(new Map([["critRate",
 assert.ok(Math.abs(chainCompiled.finalDamage - chainAt.damage.totalFinalDamage) < 1e-8,
     "Compiled scoring should preserve Chain targets and the 125% threshold")
 
-console.log("Evelyn damage tests passed")
+const approx = (actual, expected, label) => assert.ok(Math.abs(actual - expected) <= Math.max(1e-7, Math.abs(expected) * 1e-11), `${label}: ${actual} != ${expected}`)
+const finalLv12 = {
+    basic_cut: [102.9, 124.8, 157.4, 373.7, 447.8, 38.8, 81.3, 94, 230, 253],
+    basic_strangle_i: [453, 182.7], basic_strangle_ii: [490.5, 187.5],
+    dash_attack: [121, 45.7], dodge_counter: [421.4, 281.7],
+    quick_assist: [155.2, 116.7], defensive_assist: [407.7, 514.4, 250.4],
+    assist_followup: [584.2, 374.4], special_bind: [105.1, 78.7], special_burst: [81.1, 68.1, 61.3, 51.6],
+}
+const moves = skills.categories.flatMap(category => category.moves)
+assert.equal(moves.length, 14)
+assert.equal(agent.skillGroups?.length ?? 0, 0)
+const cleanedSkills = cleanMaintenanceItem("agent-skills", structuredClone(skills), catalog)
+assert.deepEqual(validateMaintenanceItem("agent-skills", cleanedSkills, catalog), { ok: true, errors: [] })
+assert.deepEqual(cleanedSkills.categories, skills.categories)
+for (const [moveId, expected] of Object.entries(finalLv12)) {
+    const move = moves.find(move => move.id === moveId)
+    assert.deepEqual(move.rows.map(row => row.values[11]), expected, moveId)
+    assert.ok(move.rows.every(row => row.values.length === 16 && row.values.every(Number.isFinite)))
+    for (const row of move.rows.filter(row => row.kind === "damageMultiplier")) for (const level of [1, 12, 16]) {
+        const request = damageInput(moveId, row.id, 11.6)
+        request.damage.skillLevelsByCategory = Object.fromEntries(skills.categories.map(category => [category.id, level]))
+        const result = calculateInCombatPanel(catalog, request)
+        const m = result.damage.events[0].multipliers
+        assert.equal(scaleBonus(result), 0, `${moveId} excludes named Chain/Ultimate threshold`)
+        approx(m.directDamageBonus, 0, `${moveId} excludes Chain/Ultimate damage bonus`)
+        approx(m.skill, row.values[level - 1] / 100, `${moveId} level ${level}`)
+        // No W-Engine passive selected: ATK 1642, CRIT 80%, CD 50%,
+        // zero element resistance, 953 DEF, level coefficient 794, 150% stun.
+        approx(result.damage.totalFinalDamage, 1642 * row.values[level - 1] / 100 * 1.4 * 794 / 1747 * 1.5, `${moveId} independent formula`)
+        const boosted = structuredClone(request)
+        boosted.combatBuffs.manualStats.push({ stat: "fireDmg", value: 50 })
+        approx(calculateInCombatPanel(catalog, boosted).damage.totalFinalDamage / result.damage.totalFinalDamage,
+            moveId === "dash_attack" ? 1 : 1.5, `${moveId} fire targeting`)
+        const calculator = createInCombatPanelCalculator(catalog, request)
+        const dense = calculator.compileDensePanelScoreTarget({ statIds: [], setIds: [], setIndexById: new Map() })
+        for (const score of [calculator.scoreOnlyFromSummary(new Map(), new Map()),
+            dense.scoreDense([], []), dense.compileForSetCounts([]).scoreScalar([])]) {
+            approx(score.finalDamage, result.damage.totalFinalDamage, `${moveId} scoring parity`)
+        }
+    }
+}
+for (const moveId of ["basic_cut", "special_burst", "ex_final"]) {
+    const move = moves.find(move => move.id === moveId)
+    const sum = move.rows.filter(row => row.kind === "damageMultiplier")
+        .reduce((value, row) => value + calculate(moveId, row.id, 11.6).damage.totalFinalDamage, 0)
+    approx(calculate(moveId, "__generated_hit_total", 11.6).damage.totalFinalDamage, sum, `${moveId} generated total`)
+}
+assert.ok(moves.find(move => move.id === "defensive_assist").rows.every(row => row.kind === "dazeMultiplier"))
+const request = characterInput(catalog, agent.id, 0)
+request.damage.events = [["basic_cut", "__generated_hit_total"], ["dash_attack", "damage"], ["special_burst", "hit_1"]]
+    .map(([moveId, rowId]) => ({ ...damageInput(moveId, rowId).damage.events[0], id: moveId }))
+request.damage.selectedEventId = "basic_cut"
+const store = characterStore(), oracle = []
+function enumerate(discs) {
+    if (discs.length === 6) {
+        oracle.push({ ids: discs.map(disc => disc.id), score: calculateInCombatPanel(catalog, { ...request, driveDiscs: discs }).damage.totalFinalDamage })
+        return
+    }
+    for (const disc of store.driveDiscs.filter(disc => disc.partition === discs.length + 1)) enumerate([...discs, disc])
+}
+enumerate([])
+oracle.sort((a, b) => b.score - a.score || a.ids.join("|").localeCompare(b.ids.join("|")))
+for (const result of [optimizeDriveDiscs(catalog, store, request),
+    await optimizeDriveDiscsAsync(catalog, store, { ...request, settings: { ...request.settings, algorithm: "exact-super-bound-parallel", workerCount: 2 } })]) {
+    assert.equal(result.results.length, 10)
+    result.results.forEach((row, i) => {
+        assert.deepEqual(Object.values(row.driveDiscIdsBySlot), oracle[i].ids)
+        approx(row.score, oracle[i].score, "expanded skills exhaustive Top 10")
+    })
+}
+console.log("Evelyn damage tests passed: full skill tables, final values, elements, exclusions, totals, maintenance and scoring")
