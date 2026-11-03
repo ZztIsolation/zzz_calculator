@@ -12825,7 +12825,7 @@
         "critRate",
         "critDmg"
       ],
-      "hidden": false,
+      "hidden": true,
       "sources": [
         "https://zzz.nanoka.cc/character/1021",
         "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1021.json"
@@ -13442,7 +13442,7 @@
         "critRate",
         "critDmg"
       ],
-      "hidden": false,
+      "hidden": true,
       "sources": [
         "https://zzz.nanoka.cc/character/1201",
         "https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1201.json"

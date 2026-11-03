@@ -40,7 +40,19 @@ for (const [index, id] of characterIds.entries()) {
     }
     assert.equal(AGENT_ID_OVERRIDES[["1021", "1201", "1321"][index]], id)
     assert.equal(catalog.wEnginesMap.get(input(id).wEngineId).relatedAgentId, id)
+    if (id === "evelyn_chevalier") {
+        assert.equal(agent.hidden, false, "Evelyn remains visible on the workbench")
+        assert.ok(catalog.displayAgents.some(item => item.id === id))
+    } else {
+        assert.equal(agent.hidden, true, `${id} stays in the catalog but is hidden from the workbench until review finishes`)
+        assert.equal(catalog.displayAgents.some(item => item.id === id), false)
+    }
 }
+
+assert.equal(catalog.wEnginesMap.get("zzz_wiki_224").hidden, undefined)
+assert.equal(catalog.wEnginesMap.get("zzz_wiki_991").hidden, undefined)
+assert.ok(catalog.displayWEngines.some(item => item.id === "zzz_wiki_224"), "Nekomata signature stays visible")
+assert.ok(catalog.displayWEngines.some(item => item.id === "zzz_wiki_991"), "Harumasa signature stays visible")
 
 const mapping = JSON.parse(readFileSync(new URL("../data/enka_zzz_mapping.json", import.meta.url), "utf8"))
 const imported = mapShowcaseToCatalog(parseEnkaShowcase({ PlayerInfo: { ShowcaseDetail: {
@@ -48,9 +60,10 @@ const imported = mapShowcaseToCatalog(parseEnkaShowcase({ PlayerInfo: { Showcase
         SkillLevelList: [0, 1, 2, 3, 6].map(Index => ({ Index, Level: 12 })),
         Weapon: { Id: [14102, 14120, 14132][i], Level: 60, UpgradeLevel: 1 }, EquippedList: [] })),
 } } }), catalog, mapping, { uid: "100000001" })
-assert.deepEqual(imported.skippedAgents, [])
-assert.deepEqual(imported.mappedAgents.map(a => a.agentId), characterIds)
-assert.deepEqual(imported.mappedAgents.map(a => a.wEngine.id), ["zzz_wiki_224", "zzz_wiki_991", "zzz_wiki_1159"])
+assert.deepEqual(imported.skippedAgents.map(item => item.enkaId), ["1021", "1201"])
+assert.ok(imported.skippedAgents.every(item => item.reason === "Calculator 当前目录未开放"))
+assert.deepEqual(imported.mappedAgents.map(a => a.agentId), ["evelyn_chevalier"])
+assert.deepEqual(imported.mappedAgents.map(a => a.wEngine.id), ["zzz_wiki_1159"])
 assert.ok(imported.mappedAgents.every(a => a.coreSkillLevel === "F" && a.skillLevels.chain === 12))
 
 // Explicit default events and independent multiplier sums preserve the author's

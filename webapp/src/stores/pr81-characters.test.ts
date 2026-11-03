@@ -17,8 +17,17 @@ describe("PR81 character defaults and saved overrides", () => {
   for (const id of ids) {
     const agent = agents.find((a: any) => a.id === id)
     const engine = allEngines.find((e: any) => e.relatedAgentId === id)
-    const meta = { agents: [agent], wEngines: [engine], agentSkills: allSkills.filter((a: any) => a.id === id), combatBuffs: [] }
+    const meta = {
+      agents: [agent],
+      displayAgents: [agent],
+      wEngines: [engine],
+      displayWEngines: [engine],
+      agentSkills: allSkills.filter((a: any) => a.id === id),
+      combatBuffs: [],
+    }
     it(`${id} initializes defaults, preserves a manual event and disabled buffs after reload`, () => {
+      if (id === "evelyn_chevalier") expect(agent.hidden).not.toBe(true)
+      else expect(agent.hidden).toBe(true)
       const store = useBuildStore()
       store.initialize({}, meta)
       expect(store.agentId).toBe(id)
