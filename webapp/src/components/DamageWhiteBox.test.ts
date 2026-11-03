@@ -23,17 +23,39 @@ describe("DamageWhiteBox", () => {
   })
 
   it.each([
-    [undefined, "乱流 · 烈霜（星见雅） ×1"],
-    ["手动命名事件", "乱流 · 手动命名事件 ×1"],
+    [undefined, "乱流 · 烈霜（星见雅）"],
+    ["手动命名事件", "乱流 · 手动命名事件"],
   ])("uses the shared turbulence title while retaining authored label %s", (label, expected) => {
     const wrapper = mount(DamageWhiteBox, { props: { damage: { events: [{
       id: "turbulence", kind: "anomaly", settlementType: "turbulence", count: 1,
       label: label ?? "乱流（烈霜乱流）", finalDamage: 1500,
       input: { kind: "anomaly", settlementType: "turbulence", anomalyEffect: "frost_frozen", count: 1, label },
     }] } } })
-    expect(wrapper.find(".damage-whitebox-current strong").text()).toBe(expected)
-    expect((wrapper.getComponent(NSelect).props("options") as any[])[0].label).toContain(expected)
+    expect(wrapper.find(".damage-whitebox-current strong").text()).toBe(`${expected} ×1`)
+    expect(wrapper.find(".damage-skill-chip-name").text()).toBe(expected)
+    expect(wrapper.find(".damage-skill-chip-count").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("乱流（烈霜乱流）")
+    wrapper.unmount()
+  })
+  it("keeps the event select and excludes skill groups from its options", () => {
+    const wrapper = mountWhiteBox()
+    expect(wrapper.find(".damage-event-select .n-select").exists()).toBe(true)
+    const options = wrapper.getComponent(NSelect).props("options") as Array<{ label: string, value: string }>
+    expect(options.map(option => option.value)).toEqual(["direct-1", "disorder-1"])
+    expect(options[0]?.label).toContain("1,235")
+    expect(options.map(option => option.label).join("|")).not.toContain("技能组")
+    expect(wrapper.text()).not.toContain("结算面板")
+    wrapper.unmount()
+  })
+
+  it("keeps the turbulence title in the event options", () => {
+    const wrapper = mount(DamageWhiteBox, { props: { damage: { events: [{
+      id: "turbulence", kind: "anomaly", settlementType: "turbulence", count: 1,
+      label: "乱流（烈霜乱流）", finalDamage: 1500,
+      input: { kind: "anomaly", settlementType: "turbulence", anomalyEffect: "frost_frozen", count: 1 },
+    }] } } })
+    const options = wrapper.getComponent(NSelect).props("options") as Array<{ label: string }>
+    expect(options[0]?.label).toContain("乱流 · 烈霜（星见雅）")
     wrapper.unmount()
   })
 
@@ -115,7 +137,7 @@ describe("DamageWhiteBox", () => {
     ],
   }
 
-  it("shows the selected skill event, formulas, event variants, and a compact event select", () => {
+  it("shows the selected event summary, compact skill pills and its preview", () => {
     const wrapper = mountWhiteBox()
 
     expect(wrapper.text()).toContain("当前白盒")
@@ -124,53 +146,98 @@ describe("DamageWhiteBox", () => {
     expect(wrapper.text()).toContain("总计 3,457")
     expect(wrapper.text()).toContain("期望 389,141")
     expect(wrapper.text()).not.toContain("389,141.437")
-    expect(wrapper.find(".damage-event-select .n-select").exists()).toBe(true)
-    const options = wrapper.getComponent(NSelect).props("options") as Array<{ label: string, value: string }>
-    expect(options.map(option => option.value)).toEqual(["direct-1", "disorder-1"])
-    expect(options[0]?.label).toContain("1,235")
-    expect(options.map(option => option.label).join("|")).not.toContain("技能组")
-    expect(wrapper.findAll(".damage-event-button")).toHaveLength(0)
-    expect(wrapper.text()).not.toContain("结算面板")
+    expect(wrapper.findAll(".damage-skill-chip")).toHaveLength(2)
+    expect(wrapper.findAll(".damage-skill-chip-name").map(pill => pill.text())).toEqual(["强化普攻：霜月", "烈霜霜寒紊乱（星见雅）"])
+    expect(wrapper.find(".damage-skill-chip-damage").text()).toBe("1,235")
+    expect(wrapper.find(".damage-preview-name").text()).toBe("强化普攻：霜月")
     expect(wrapper.text()).toContain("技能倍率")
     expect(wrapper.text()).toContain("520%")
-    expect(wrapper.text()).toContain("减防后防御（减防/无视防御）= 953 × (1 - 20%) - 0")
-    expect(wrapper.text()).toContain("防御乘区 = 794 / (794 + 762.4)")
+    expect(wrapper.findAll(".damage-whitebox-row")).toHaveLength(0)
+    expect(wrapper.findAll(".damage-preview-row")).toHaveLength(2)
     expect(wrapper.findAll(".damage-whitebox-current-values > span")).toHaveLength(2)
-    expect(wrapper.findAll(".damage-whitebox-row")).toHaveLength(2)
-    expect(wrapper.findAll(".damage-whitebox-row-value").map(row => row.text())).toEqual(["520%", "0.5101"])
+    expect(wrapper.findAll(".damage-preview-row-value").map(row => row.text())).toEqual(["520%", "0.5101"])
   })
 
-  it("collapses derivations behind each multiplier row and expands them on demand", async () => {
+  it("keeps derivations collapsed and reveals them only when a multiplier is clicked", async () => {
     const wrapper = mountWhiteBox()
-    const rows = () => wrapper.findAll(".damage-whitebox-row")
-    const derivationVisible = (index: number) => (rows()[index]!.get(".damage-whitebox-row-main").element as HTMLElement).style.display !== "none"
+    const rows = () => wrapper.findAll(".damage-preview-row")
+    const derivationVisible = (index: number) => rows()[index]!.find(".damage-preview-row-main").exists()
 
-    expect(rows().map(row => row.get(".damage-whitebox-row-head").attributes("aria-expanded"))).toEqual(["false", "false"])
+    expect(rows().map(row => row.get("button.damage-preview-row-head").attributes("aria-expanded"))).toEqual(["false", "false"])
     expect(derivationVisible(1)).toBe(false)
 
-    await rows()[1]!.get(".damage-whitebox-row-head").trigger("click")
+    await rows()[1]!.get("button.damage-preview-row-head").trigger("click")
     expect(derivationVisible(1)).toBe(true)
-    expect(rows()[1]!.get(".damage-whitebox-row-head").attributes("aria-expanded")).toBe("true")
+    expect(rows()[1]!.get("button.damage-preview-row-head").attributes("aria-expanded")).toBe("true")
+    expect(wrapper.text()).toContain("防御乘区 = 794 / (794 + 762.4)")
 
-    await wrapper.get("[data-testid='whitebox-toggle-all']").trigger("click")
-    expect([derivationVisible(0), derivationVisible(1)]).toEqual([true, true])
-    expect(wrapper.get("[data-testid='whitebox-toggle-all']").text()).toBe("全部收起")
-
-    await wrapper.get("[data-testid='whitebox-toggle-all']").trigger("click")
-    expect([derivationVisible(0), derivationVisible(1)]).toEqual([false, false])
+    await rows()[1]!.get("button.damage-preview-row-head").trigger("click")
+    expect(derivationVisible(1)).toBe(false)
   })
 
-  it("switches the visible white-box rows from the event select", async () => {
+  it("keeps Buff sources hidden until the multiplier is expanded", async () => {
     const wrapper = mountWhiteBox()
+    const row = wrapper.find(".damage-preview-row")
+    const source = {
+      key: "driveDisc4pc:shadow_harmony.self",
+      name: "如影相随",
+      sourceTypeLabel: "驱动盘 4 件套",
+      condition: "追加攻击命中敌人",
+      stat: "critRate",
+      value: 0.12,
+    }
+    await wrapper.setProps({ damage: {
+      ...damage,
+      events: damage.events.map(event => event.id === "direct-1" ? {
+        ...event,
+        whiteBoxRows: [{
+          label: "暴击乘区",
+          value: 1.2,
+          displayValue: "1.2",
+          sources: [source],
+        }],
+      } : event),
+    } })
+    expect(wrapper.find(".damage-preview-sources").exists()).toBe(false)
+    await row.get("button.damage-preview-row-head").trigger("click")
+    expect(wrapper.find(".damage-preview-sources").text()).toContain("如影相随")
+    expect(wrapper.find(".damage-preview-sources").text()).toContain("驱动盘 4 件套")
+    expect(wrapper.find(".damage-preview-source-value").text()).toBe("+12%")
+    expect(wrapper.get(".damage-preview-source-contribution").text()).toBe("暴击率 +12%")
+  })
 
-    wrapper.getComponent(NSelect).vm.$emit("update:value", "disorder-1")
+  it("shows flat attack gains with their percentage basis instead of treating percent as flat attack", async () => {
+    const wrapper = mount(DamageWhiteBox, { props: { damage: { events: [{
+      id: "attack", kind: "direct", count: 1, finalDamage: 100,
+      whiteBoxRows: [{ label: "局内攻击力", value: 2168.1, sources: [
+        { name: "基础攻击力", sourceTypeLabel: "角色 / 音擎 / 核心技", value: 1681, valueKind: "flat" },
+        { name: "测试攻击 Buff", sourceTypeLabel: "队友 Buff", value: 168.1, valueKind: "flat", formula: "基础攻击力 1681 × 10%" },
+      ] }],
+    }] } } })
+    expect(wrapper.find(".damage-preview-sources").exists()).toBe(false)
+    await wrapper.get("button.damage-preview-row-head").trigger("click")
+    const sourceArea = wrapper.get(".damage-preview-sources")
+    expect(sourceArea.findAll(".damage-preview-source-value").map(source => source.text())).toEqual(["+1,681", "+168.1"])
+    expect(sourceArea.text()).toContain("基础攻击力 1681 × 10%")
+    expect(sourceArea.text()).not.toContain("+168100%")
+  })
+
+  it("switches the preview only when a skill pill is clicked", async () => {
+    const wrapper = mountWhiteBox()
+    const pills = wrapper.findAll(".damage-skill-chip")
+    await pills[1]!.trigger("mouseenter")
+    expect(wrapper.find(".damage-preview-name").text()).toBe("强化普攻：霜月")
+    await pills[1]!.trigger("click")
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain("当前白盒")
-    expect(wrapper.text()).toContain("烈霜霜寒紊乱（星见雅） ×1")
+    expect(wrapper.find(".damage-preview-name").text()).toBe("烈霜霜寒紊乱（星见雅）")
     expect(wrapper.text()).toContain("紊乱倍率")
-    expect(wrapper.text()).toContain("烈霜霜寒紊乱（星见雅）：450% + 10 × 7.5%")
-    expect(wrapper.text()).not.toContain("防御乘区 = 794 / (794 + 762.4)")
+    expect(pills[1]!.attributes("aria-pressed")).toBe("true")
+
+    await pills[0]!.trigger("click")
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find(".damage-preview-name").text()).toBe("强化普攻：霜月")
+    expect(wrapper.find(".damage-preview-row-value").text()).toBe("520%")
   })
 
   it("keeps luminescence score precision and suffix separate from damage rounding", () => {

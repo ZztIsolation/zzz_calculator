@@ -94,6 +94,23 @@ approx(
     "In-combat breakdown should expose outOfCombatAtk contribution",
 )
 
+for (const [label, result, expectedPctValue] of [
+    ["baseAtk", baseAtkBuff, outOfCombat.base.atk * 0.1],
+    ["outOfCombatAtk", outOfCombatAtkBuff, outOfCombat.panel.atk * 0.1],
+]) {
+    const attackRow = result.damage.whiteBoxRows.find(row => row.label === "局内攻击力")
+    assert.ok(attackRow, `${label} whitebox should expose the attack row`)
+    approx(
+        attackRow.sources.reduce((sum, source) => sum + source.value, 0),
+        result.inCombat.panel.atk,
+        `${label} attack sources should add up to the final in-combat panel`,
+    )
+    const pctSource = attackRow.sources.find(source => source.stat === "atkPct")
+    assert.ok(pctSource, `${label} should expose its percentage attack source`)
+    approx(pctSource.value, expectedPctValue, `${label} percentage source should use its resolved flat contribution`)
+    assert.equal(pctSource.valueKind, "flat")
+}
+
 const withDefaultTeammateBasis = cloneCatalog(catalog)
 withDefaultTeammateBasis.combatBuffs.push({
     id: "test.teammate.atk_pct_without_basis",
