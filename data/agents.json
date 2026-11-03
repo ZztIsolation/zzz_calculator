@@ -14195,7 +14195,7 @@
                 "skillTargets": [
                   {
                     "kind": "skillTag",
-                    "skillTag": "assistAttack"
+                    "skillTag": "followUp"
                   }
                 ]
               },
@@ -14205,7 +14205,11 @@
                 "max": 1,
                 "step": 0.1
               },
-              "condition": "自身为操作角色时，全队追加攻击命中[银星]标记敌人"
+              "condition": "自身为操作角色时，全队追加攻击命中[银星]标记敌人",
+              "valueSource": {
+                "kind": "potentialVisionScaling",
+                "field": "followupDmgPct"
+              }
             }
           ],
           "buffModifiers": []
@@ -14322,6 +14326,50 @@
               "zhCN": "触发6次[白雷]的额外伤害时，将会引发电磁涡流，对目标及其周围的敌人造成零号·安比1000%攻击力的电属性伤害，该伤害被视为[追加攻击]伤害。\n当前不自动加入该次追加攻击事件。"
             },
             "effects": [],
+            "buffModifiers": []
+          }
+        ],
+        "skillBuffs": [
+          {
+            "id": "electromagnetic-vortex",
+            "scope": "inCombat",
+            "name": {
+              "zhCN": "前传主角｜电磁涡流（6影）"
+            },
+            "description": {
+              "zhCN": "累计触发6次[白雷]的额外伤害后引发电磁涡流，对目标及周围敌人造成零号·安比1000%攻击力的电属性伤害，该伤害被视为[追加攻击]。需要6影，默认关闭。"
+            },
+            "defaultChecked": false,
+            "sourceSkillRef": {
+              "agentSkillId": "soldier0_anby",
+              "categoryId": "special",
+              "moveId": "special_3"
+            },
+            "effects": [
+              {
+                "id": "electromagnetic-vortex-dmg",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 100,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "skillTag",
+                      "skillTag": "followUp"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                },
+                "condition": "6影且已累计6次白雷追加伤害"
+              }
+            ],
             "buffModifiers": []
           }
         ]
@@ -14630,7 +14678,57 @@
           },
           "modeled": false
         }
-      ]
+      ],
+      "potentialVision": {
+        "name": {
+          "zhCN": "银白色的心"
+        },
+        "defaultLevel": 0,
+        "maxLevel": 6,
+        "mechanicUnlockLevel": 1,
+        "scaling": {
+          "name": {
+            "zhCN": "潜能觉醒：电脉冲"
+          },
+          "levels": [
+            {
+              "level": 0,
+              "followupDmgPct": 25
+            },
+            {
+              "level": 1,
+              "followupDmgPct": 25
+            },
+            {
+              "level": 2,
+              "followupDmgPct": 34
+            },
+            {
+              "level": 3,
+              "followupDmgPct": 38
+            },
+            {
+              "level": 4,
+              "followupDmgPct": 42
+            },
+            {
+              "level": 5,
+              "followupDmgPct": 46
+            },
+            {
+              "level": 6,
+              "followupDmgPct": 50
+            }
+          ]
+        },
+        "mechanics": {
+          "levelOneUnlocksPotentialScaling": true,
+          "scalingTargets": "additionalAbility.core-team-followup-dmg"
+        },
+        "sources": [
+          "https://static.nanoka.cc/zzz/3.4.1+19851435/zh/character/1381.json"
+        ]
+      }
     }
   ]
 }

@@ -20231,7 +20231,7 @@
               },
               "damageElement": "electric",
               "skillType": "special",
-              "skillTags": [],
+              "skillTags": ["followUp"],
               "rows": [
                 {
                   "id": "hit_1",
@@ -20320,7 +20320,7 @@
               },
               "damageElement": "electric",
               "skillType": "special",
-              "skillTags": [],
+              "skillTags": ["followUp"],
               "rows": [
                 {
                   "id": "hit_1",
