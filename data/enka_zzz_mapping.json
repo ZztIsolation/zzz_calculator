@@ -5,6 +5,7 @@
     "commit": "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554"
   },
   "agents": {
+    "1381": {"id": "soldier0_anby", "name": "零号·安比"},
     "1321": {"id": "evelyn_chevalier", "name": "伊芙琳"},
     "1201": {"id": "asaba_harumasa", "name": "浅羽悠真"},
     "1021": {"id": "nekomata", "name": "猫又"},
@@ -78,6 +79,7 @@
     }
   },
   "wEngines": {
+    "14138": {"id": "zzz_wiki_1197", "name": "牺牲洁纯"},
     "12001": {
       "id": "zzz_wiki_118",
       "name": "「月相」-望"
