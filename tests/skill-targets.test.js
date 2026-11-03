@@ -195,7 +195,7 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     exSpecial: 31,
     fireSuppression: 3,
     dodgeCounter: 12,
-    followUp: 2,
+    followUp: 3,
 })
 // Field Buff imports add skill-scoped targets; keep the catalog total explicit.
 const expectedTargetCount = 120

@@ -14378,7 +14378,7 @@
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "单次白雷循环（强化特殊技＋3次追加）"
+          "zhCN": "白雷循环（潜能未解锁·0影）"
         },
         "events": [
           {
@@ -14389,7 +14389,128 @@
             "stunned": true
           }
         ],
-        "selectedEventId": "white_lightning_loop_1"
+        "selectedEventId": "white_lightning_loop_1",
+        "variants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 2,
+            "name": {
+              "zhCN": "2影爆发链（连携＋终结＋雷殛＋临界）"
+            },
+            "events": [
+              {
+                "id": "burst_chain_2c_1",
+                "kind": "skillGroup",
+                "skillGroupId": "burst_chain",
+                "count": 1,
+                "stunned": true
+              }
+            ],
+            "selectedEventId": "burst_chain_2c_1"
+          },
+          {
+            "mode": "custom",
+            "cinemaLevel": 6,
+            "name": {
+              "zhCN": "6影双爆发链（两轮连携＋终结＋临界）"
+            },
+            "events": [
+              {
+                "id": "burst_chain_6c_a",
+                "kind": "skillGroup",
+                "skillGroupId": "burst_chain",
+                "count": 1,
+                "stunned": true
+              },
+              {
+                "id": "burst_chain_6c_b",
+                "kind": "skillGroup",
+                "skillGroupId": "burst_chain",
+                "count": 1,
+                "stunned": true
+              }
+            ],
+            "selectedEventId": "burst_chain_6c_a"
+          }
+        ],
+        "potentialVariants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 0,
+            "minPotentialLevel": 1,
+            "maxPotentialLevel": 6,
+            "name": {
+              "zhCN": "潜能循环（极雷断空＋雷殛＋苍光·临界·0影）"
+            },
+            "events": [
+              {
+                "id": "potential_full_rotation_1",
+                "kind": "skillGroup",
+                "skillGroupId": "potential_full_rotation",
+                "count": 1,
+                "stunned": true
+              }
+            ],
+            "selectedEventId": "potential_full_rotation_1",
+            "variants": [
+              {
+                "mode": "custom",
+                "cinemaLevel": 2,
+                "name": {
+                  "zhCN": "潜能＋2影爆发链（连携＋终结＋雷殛＋临界）"
+                },
+                "events": [
+                  {
+                    "id": "potential_burst_2a",
+                    "kind": "skillGroup",
+                    "skillGroupId": "potential_full_rotation",
+                    "count": 1,
+                    "stunned": true
+                  },
+                  {
+                    "id": "potential_burst_2b",
+                    "kind": "skillGroup",
+                    "skillGroupId": "burst_chain",
+                    "count": 1,
+                    "stunned": true
+                  }
+                ],
+                "selectedEventId": "potential_burst_2a"
+              },
+              {
+                "mode": "custom",
+                "cinemaLevel": 6,
+                "name": {
+                  "zhCN": "潜能＋6影双爆发链"
+                },
+                "events": [
+                  {
+                    "id": "potential_burst_6a",
+                    "kind": "skillGroup",
+                    "skillGroupId": "potential_full_rotation",
+                    "count": 1,
+                    "stunned": true
+                  },
+                  {
+                    "id": "potential_burst_6b",
+                    "kind": "skillGroup",
+                    "skillGroupId": "burst_chain",
+                    "count": 1,
+                    "stunned": true
+                  },
+                  {
+                    "id": "potential_burst_6c",
+                    "kind": "skillGroup",
+                    "skillGroupId": "burst_chain",
+                    "count": 1,
+                    "stunned": true
+                  }
+                ],
+                "selectedEventId": "potential_burst_6a"
+              }
+            ]
+          }
+        ]
       },
       "preferredDriveDiscs": {
         "defaultSetIds": [
@@ -14418,8 +14539,7 @@
       "importantSubStats": [
         "critRate",
         "critDmg",
-        "atkPct",
-        "penFlat"
+        "atkPct"
       ],
       "importantPanelStats": [
         "atk",
@@ -14482,7 +14602,7 @@
         {
           "id": "basic_full_chain",
           "name": {
-            "zhCN": "普通攻击：电击穿 五段全中"
+            "zhCN": "普通攻击：电击穿 七段全中"
           },
           "defaultCount": 1,
           "minCount": 0,
@@ -14552,6 +14672,32 @@
                 "moveId": "basic_1",
                 "rowId": "hit_5"
               }
+            },
+            {
+              "id": "basic_hit_6",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "basic",
+                "moveId": "basic_1",
+                "rowId": "hit_6"
+              }
+            },
+            {
+              "id": "basic_hit_7",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "basic",
+                "moveId": "basic_1",
+                "rowId": "hit_7"
+              }
             }
           ]
         },
@@ -14612,6 +14758,156 @@
                 "categoryId": "chain",
                 "moveId": "chain_2",
                 "rowId": "hit_1"
+              }
+            }
+          ]
+        },
+        {
+          "id": "potential_full_rotation",
+          "name": {
+            "zhCN": "潜能完整循环（极雷断空＋雷殛＋苍光·临界）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "rotation_ex",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_5",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "rotation_thunder",
+              "kind": "direct",
+              "count": 3,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_3",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "rotation_critical",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_4",
+                "rowId": "hit_1"
+              }
+            }
+          ]
+        },
+        {
+          "id": "burst_chain",
+          "name": {
+            "zhCN": "爆发链（连携＋终结＋雷殛＋临界）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "burst_chain_1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "chain",
+                "moveId": "chain_1",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "burst_ultimate",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "chain",
+                "moveId": "chain_2",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "burst_thunder",
+              "kind": "direct",
+              "count": 3,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_3",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "burst_critical",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_4",
+                "rowId": "hit_1"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cangguang_single",
+          "name": {
+            "zhCN": "单次苍光（白雷追击＋斩击）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "single_white_lightning",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_2",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "single_slash",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_2",
+                "rowId": "hit_2"
               }
             }
           ]
