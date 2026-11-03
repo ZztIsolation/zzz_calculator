@@ -187,17 +187,18 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 247)
-assert.equal(rowCount, 586)
+assert.equal(moveCount, 260)
+assert.equal(rowCount, 625)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
     dashAttack: 21,
     assistAttack: 28,
     exSpecial: 31,
     fireSuppression: 3,
     dodgeCounter: 12,
+    followUp: 3,
 })
 // Field Buff imports add skill-scoped targets; keep the catalog total explicit.
-const expectedTargetCount = 118
+const expectedTargetCount = 120
 assert.equal(storedTargets.length, expectedTargetCount, skillTargetCountMessage(expectedTargetCount, storedTargets))
 
 // Check diagnostic output using an in-memory omission, without changing catalog data.
@@ -206,7 +207,7 @@ const incompleteTargets = storedTargets.slice(1)
 assert.throws(
     () => assert.equal(incompleteTargets.length, expectedTargetCount, skillTargetCountMessage(expectedTargetCount, incompleteTargets)),
     error => error.code === "ERR_ASSERTION"
-        && error.message.includes("expected 118, actual 117")
+        && error.message.includes("expected 120, actual 119")
         && error.message.includes("data/agents.json:")
         && error.message.includes("data/combat_buffs.json:")
         && error.message.includes(`${omittedTarget.ownerId}:`),

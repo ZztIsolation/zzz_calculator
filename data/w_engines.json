@@ -5659,6 +5659,7 @@
       },
       "rarity": "S",
       "specialty": "attack",
+      "relatedAgentId": "soldier0_anby",
       "attribute": "electric",
       "images": {
         "icon": "/assets/w-engines/zzz_wiki_1197.png",
