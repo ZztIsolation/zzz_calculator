@@ -14327,38 +14327,35 @@
         ]
       },
       "defaultCalculationConfig": {
-        "mode": "single",
+        "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "单次终结技：零号·安比"
+          "zhCN": "单次白雷循环（强化特殊技＋3次追加）"
         },
         "events": [
           {
-            "id": "ultimate_1",
-            "kind": "direct",
+            "id": "white_lightning_loop_1",
+            "kind": "skillGroup",
+            "skillGroupId": "white_lightning_loop",
             "count": 1,
-            "stunned": true,
-            "critMode": "expected",
-            "skillRef": {
-              "agentSkillId": "soldier0_anby",
-              "categoryId": "chain",
-              "skillType": "ultimate",
-              "moveId": "chain_2",
-              "rowId": "hit_1"
-            }
+            "stunned": true
           }
         ],
-        "selectedEventId": "ultimate_1"
+        "selectedEventId": "white_lightning_loop_1"
       },
       "preferredDriveDiscs": {
         "defaultSetIds": [
-          "puffer_electro"
+          "shadow_harmony",
+          "woodpecker_electro"
+        ],
+        "defaultTwoPieceSetIds": [
+          "shadow_harmony"
         ],
         "mainStatLimits": {
           "4": [
-            "atkPct",
             "critRate",
-            "critDmg"
+            "critDmg",
+            "atkPct"
           ],
           "5": [
             "electricDmg",
@@ -14371,16 +14368,15 @@
         }
       },
       "importantSubStats": [
-        "atkPct",
         "critRate",
         "critDmg",
+        "atkPct",
         "penFlat"
       ],
       "importantPanelStats": [
         "atk",
         "critRate",
-        "critDmg",
-        "impact"
+        "critDmg"
       ],
       "hidden": false,
       "sources": [
@@ -14396,7 +14392,245 @@
         "unsupportedMechanics": "Additional ability effects, cinema effects and signature W-Engine effects remain descriptive-only in this first PR.",
         "implementedScope": "Base panel, core A-F node deltas, core passive value scaling and source skill multiplier rows 1-16.",
         "weapon": "Signature W-Engine linked through existing repository catalog ID and Enka mapping."
-      }
+      },
+      "skillGroups": [
+        {
+          "id": "white_lightning_loop",
+          "name": {
+            "zhCN": "白雷循环（强化特殊技＋追加攻击）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ex_lightning_break",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_5",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "white_lightning_burst",
+              "kind": "direct",
+              "count": 3,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_3",
+                "rowId": "hit_1"
+              }
+            }
+          ]
+        },
+        {
+          "id": "basic_full_chain",
+          "name": {
+            "zhCN": "普通攻击：电击穿 五段全中"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "basic_hit_1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "basic",
+                "moveId": "basic_1",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "basic_hit_2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "basic",
+                "moveId": "basic_1",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "basic_hit_3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "basic",
+                "moveId": "basic_1",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "basic_hit_4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "basic",
+                "moveId": "basic_1",
+                "rowId": "hit_4"
+              }
+            },
+            {
+              "id": "basic_hit_5",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "basic",
+                "moveId": "basic_1",
+                "rowId": "hit_5"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cangguang_combo",
+          "name": {
+            "zhCN": "苍光连段（苍光＋临界）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "cangguang",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_2",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "cangguang_critical",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "special",
+                "moveId": "special_4",
+                "rowId": "hit_1"
+              }
+            }
+          ]
+        },
+        {
+          "id": "ultimate_slash_thunder",
+          "name": {
+            "zhCN": "终结技：斩空掠电"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ultimate_damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier0_anby",
+                "categoryId": "chain",
+                "moveId": "chain_2",
+                "rowId": "hit_1"
+              }
+            }
+          ]
+        }
+      ],
+      "cinemaDescriptions": [
+        {
+          "cinemaLevel": 1,
+          "name": {
+            "zhCN": "静滞电荷"
+          },
+          "description": {
+            "zhCN": "零号·安比发动[强化特殊技]命中敌人时，将会连续触发3次[白雷]的额外伤害，该效果不会消耗[白雷]层数。"
+          },
+          "modeled": false
+        },
+        {
+          "cinemaLevel": 2,
+          "name": {
+            "zhCN": "冗余协议"
+          },
+          "description": {
+            "zhCN": "零号·安比的暴击率提升12%；发动[终结技]时获得6层[电鸣]（上限6层）；拥有[电鸣]后，[特殊技：苍光]命中拥有[白雷]的敌人时改为消耗1层[电鸣]。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 3,
+          "name": {
+            "zhCN": "旧日荣光"
+          },
+          "description": {
+            "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能输入为最终等级，不在计算中重复加级。"
+          },
+          "modeled": false
+        },
+        {
+          "cinemaLevel": 4,
+          "name": {
+            "zhCN": "银白残响"
+          },
+          "description": {
+            "zhCN": "攻击命中拥有[银星]标记的敌人时，零号·安比无视目标12%电属性伤害抗性。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 5,
+          "name": {
+            "zhCN": "导演剪辑版"
+          },
+          "description": {
+            "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能输入为最终等级，不在计算中重复加级。"
+          },
+          "modeled": false
+        },
+        {
+          "cinemaLevel": 6,
+          "name": {
+            "zhCN": "前传主角"
+          },
+          "description": {
+            "zhCN": "触发6次[白雷]的额外伤害时，将会引发电磁涡流，对目标及其周围的敌人造成零号·安比1000%攻击力的电属性伤害，该伤害被视为[追加攻击]伤害。\n当前不自动加入该次追加攻击事件。"
+          },
+          "modeled": false
+        }
+      ]
     }
   ]
 }
