@@ -4,6 +4,13 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-06 — 危局强袭战 3.3 第二期 Boss 与场地 Buff
+
+- 问题：3.3 版本第二期危局（2026-11-06 至 2026-11-20）此前未入库，场地页签与 Boss 页签在 3.3 只能默认到第一期。条目收尾时用户在维护页调整了锋蚀的穿透率规则，本次按维护页保存结果发布。
+- 变化：依据 [nanoka.cc/boss/690491](https://zzz.nanoka.cc/boss/690491) 页面内嵌来源 JSON（`https://static.nanoka.cc/zzz/3.4.2+20052336/zh/boss/690491.json`，周期 2026-11-06 04:00 至 2026-11-20 03:59）与用户提供的游戏内截图，在 `data/combat_buffs.json` 新增三条 `field.critical_assault.v3_3.p2.*` 场地 Buff（`fieldBuffs` 共 54 项）：**灼曜**建模 `[异常]` 特性攻击力 +10%（按局外攻击力）、触发后全队异常精通 +30 点与属性异常伤害 +10%（持续 15 秒，独立覆盖率）；**岚劫**建模风属性伤害 +40%、风属性暴击伤害 +40%，以及 `[强攻]` 特性攻击力 +25% 与 `[普通攻击]` 伤害 +40%；**锋蚀**建模电属性伤害 +30%、锐化伤害 +10%、穿透率 +20%（维护页后续调整为不限定特性）与 `[强攻]`/`[锋御]` 特性 `[特殊技]`/`[强化特殊技]` 伤害 +30%（按特性拆成两条同值规则）。`data/bosses.json` 新增本期四条敌情与区域增益：僭越者（`boss.hollow_venger`，弱点火/抗性冰）、熔狱行赭（在既有 Boss 上追加本期敌情）、自律强袭单位·「提丰·破坏者型」（`boss.typhon_destroyer`，弱点电/风/抗性火）与复写体·猎血清道夫（本期弱点火/风、抗性物理，因目标数据不同新建 `boss.replica_blood_hunter_janitor.v3_3` 版本条目；3.1 条目保持不变）；Boss 目录 22→25、敌情 30→34，并新增三张本地 Boss 头像。
+- 关键边界：火属性异常积蓄效率、异常积蓄效率、失衡值提升/积累、部位破坏、能量、支援点数、抗打断与操作得分等未建模机制只保留在逐字来源文本中，不生成效果规则；站点占位标题 `(Test1)TBD` 不作为 Buff 名称，条目按机制命名；维护页将锋蚀的 `[锋御]` 重复穿透率规则并入一条不限定特性规则，本次按维护结果保留；`[强攻]` 或 `[锋御]` 无法由单条 requirement 表达，特殊技伤害按特性拆成同值规则；「无视首领 40% 防御力」按 `enemyDefIgnore` 处理；提丰抗性按来源元素表与游戏内截图记为火（来源 JSON 的 `monster_resistance` 为空），保留截图口径。只新增目录数据，不改变计算语义、弹窗布局或用户勾选；同版本更高期的场地数据优先，真实目录默认显示 `危局强袭战 · 3.3版本 · 第二期`，默认显示不等于自动勾选。待核实：3.3 第一期既有 `boss.ether_mutant_trivia` 与本期的僭越者引用同一个 nanoka 头像来源（`Monster_HollowVenger.webp`），且 3.3 第一期来源页的 69048101 现显示为僭越者；本期不回溯修改第一期数据，保留差异另行核对。
+- 验证：本地运行 `npm run test:field-buffs`、`npm run test:boss-catalog`、`npm run test:maintenance-validation`、`npm run test:repository-integrity`（`ok (199 catalog assets verified)`，较基线 196 项恰为新增三张头像）、`npm run test:percent-sanity`、`npm run test:skill-targets`（技能目标总数 118→121，新增岚劫普通攻击与锋蚀特殊技目标）、`npm run test:catalog-loader`、`npm run test:effect-rule-targets` 均通过；`npm run build:webapp` 通过，`BuffPickerModal.test.ts` 71 项通过（真实目录默认 `critical_assault|3.3|2`、三张场地 Buff 渲染顺序，以及切回 `defense_v5|3.3|1` 与 `critical_assault|3.2|2`）；8790 冒烟验证 `/api/health`、`/`、`/api/catalog` 与新增头像均 200。随后已切换为 8787 本地预览服务（`/api/health` 200、`/` 200、目录数据含本期四条敌情与三条场地 Buff、新增头像 200）供确认。以上均为本地检查，不代表远端 CI 或生产验收；用户确认后推送 `main` 并按发布手册经 CI 与 Promote 晋级，远端结果以实际 CI/CD evidence 为准。
+
 ## 2026-11-03 — 暂时隐藏猫又与浅羽悠真
 
 - 问题：11-01 重建 PR81 时将尚未核对完毕的[猫又](nekomata-modeling.md)、[浅羽悠真](harumasa-modeling.md)与已交付的[伊芙琳](evelyn-modeling.md)一并写入 `main`；前台工作台因此可选中未完成核对的角色。

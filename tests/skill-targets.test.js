@@ -197,7 +197,7 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     dodgeCounter: 12,
 })
 // Field Buff imports add skill-scoped targets; keep the catalog total explicit.
-const expectedTargetCount = 118
+const expectedTargetCount = 121
 assert.equal(storedTargets.length, expectedTargetCount, skillTargetCountMessage(expectedTargetCount, storedTargets))
 
 // Check diagnostic output using an in-memory omission, without changing catalog data.
@@ -206,7 +206,7 @@ const incompleteTargets = storedTargets.slice(1)
 assert.throws(
     () => assert.equal(incompleteTargets.length, expectedTargetCount, skillTargetCountMessage(expectedTargetCount, incompleteTargets)),
     error => error.code === "ERR_ASSERTION"
-        && error.message.includes("expected 118, actual 117")
+        && error.message.includes("expected 121, actual 120")
         && error.message.includes("data/agents.json:")
         && error.message.includes("data/combat_buffs.json:")
         && error.message.includes(`${omittedTarget.ownerId}:`),
@@ -233,6 +233,17 @@ const bingxiTargets = combatBuffCatalog.fieldBuffs
 assert.deepEqual(bingxiTargets, [
     { kind: "skillType", skillType: "basic" },
     { kind: "skillType", skillType: "ultimate" },
+])
+const lanjie33Targets = combatBuffCatalog.fieldBuffs
+    .find(buff => buff.id === "field.critical_assault.v3_3.p2.lanjie")
+    .effects.flatMap(effect => effect.target?.skillTargets ?? [])
+assert.deepEqual(lanjie33Targets, [{ kind: "skillType", skillType: "basic" }])
+const fengshi33Targets = combatBuffCatalog.fieldBuffs
+    .find(buff => buff.id === "field.critical_assault.v3_3.p2.fengshi")
+    .effects.flatMap(effect => effect.target?.skillTargets ?? [])
+assert.deepEqual(fengshi33Targets, [
+    { kind: "skillType", skillType: "special" },
+    { kind: "skillType", skillType: "special" },
 ])
 const guancheTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.defense_v5.v3_1.p2.guanche_shuanghan")

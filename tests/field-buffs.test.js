@@ -193,7 +193,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 51, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 54, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -1498,7 +1498,9 @@ for (const coverage of [0, 0.5, 1]) {
 console.log("field Buff regression tests passed")
 
 // 3.3 phase 1: independent numeric examples and event exclusions.
-const ca33 = allFieldBuffs.filter(buff => buff.period?.gameVersion === '3.3' && buff.period?.modeId === 'critical_assault')
+const ca33 = allFieldBuffs.filter(buff =>
+    buff.period?.gameVersion === '3.3' && buff.period?.modeId === 'critical_assault' && buff.period?.phaseNo === 1,
+)
 assert.deepEqual(ca33.map(buff => buff.name.zhCN), ['炽陨', '烁穹', '极韵'])
 for (const buff of ca33) {
     const check = validateMaintenanceItem('field-buffs', buff, { items: catalog.combatBuffs, currentId: buff.id, agentSkills: catalog.agentSkills })
@@ -1626,3 +1628,258 @@ approx(ningnengAnomaly.inCombat.panel.iceDmg - ningnengAnomaly.outOfCombat.panel
 approx(ningnengAnomaly.inCombat.panel.critDmg - ningnengAnomaly.outOfCombat.panel.critDmg, 0,
     'Ningneng CRIT DMG should exclude non-Attack agents')
 console.log('3.3 phase 1 Defense Battle field numerical checks passed')
+
+// 3.3 phase 2 Critical Assault: 灼曜 / 岚劫 / 锋蚀.
+// These records are asserted in a self-contained block instead of the legacy
+// FIELD_BUFF_IDS-derived period logic above, which only models the 3.0–3.2 entries.
+const CRITICAL_ASSAULT_3_3_PHASE_2_IDS = {
+    zhuoyao: 'field.critical_assault.v3_3.p2.zhuoyao',
+    lanjie: 'field.critical_assault.v3_3.p2.lanjie',
+    fengshi: 'field.critical_assault.v3_3.p2.fengshi',
+}
+const EXPECTED_3_3_PHASE_2_NAMES = {
+    [CRITICAL_ASSAULT_3_3_PHASE_2_IDS.zhuoyao]: '灼曜',
+    [CRITICAL_ASSAULT_3_3_PHASE_2_IDS.lanjie]: '岚劫',
+    [CRITICAL_ASSAULT_3_3_PHASE_2_IDS.fengshi]: '锋蚀',
+}
+const criticalAssault33Phase2 = allFieldBuffs.filter(buff =>
+    buff.period?.modeId === 'critical_assault'
+    && buff.period?.gameVersion === '3.3'
+    && buff.period?.phaseNo === 2,
+)
+assert.deepEqual(
+    criticalAssault33Phase2.map(buff => buff.id),
+    Object.values(CRITICAL_ASSAULT_3_3_PHASE_2_IDS),
+    '危局强袭战 3.3 phase 2 should keep its three authored entries in catalog order',
+)
+for (const id of Object.values(CRITICAL_ASSAULT_3_3_PHASE_2_IDS)) {
+    const buff = fieldBuff(id)
+    assert.equal(buff.name?.zhCN, EXPECTED_3_3_PHASE_2_NAMES[id], `${id} should keep its maintained name`)
+    assert.equal(buff.sourceType, 'field', `${id} should be a field Buff`)
+    assert.equal(buff.scope, 'inCombat', `${id} should be an in-combat Buff`)
+    assert.deepEqual(buff.period, {
+        modeId: 'critical_assault',
+        gameVersion: '3.3',
+        phaseNo: 2,
+        phaseName: { zhCN: '第二期' },
+    })
+    assert.equal(buff.source?.zhCN, '危局强袭战')
+    assert.equal(buff.sourcePeriod?.zhCN, '3.3版本第二期')
+    assert.deepEqual(buff.buffModifiers, [], `${id} should not need buff modifiers`)
+    const validation = validateMaintenanceItem('field-buffs', buff, {
+        items: catalog.combatBuffs, currentId: id, agentSkills: catalog.agentSkills,
+    })
+    assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
+}
+
+const [zhuoyao33, lanjie33, fengshi33] = criticalAssault33Phase2.map(buff => fieldBuff(buff.id))
+
+// 灼曜: ATK is Anomaly-specialty only; the trigger clauses stay as conditional rules.
+assert.equal(
+    zhuoyao33.description.zhCN,
+    '[异常]特性代理人的攻击力提升10%，火属性异常积蓄效率提升10%。\n代理人造成属性异常伤害并触发暴击后，全队异常精通提升30点，属性异常伤害提升10%，持续15秒，重复触发时刷新持续时间。',
+)
+assert.deepEqual(
+    zhuoyao33.effects.map(effect => [effect.stat, effect.value]),
+    [['atkPct', 10], ['anomalyProficiency', 30], ['anomalyDamageBonus', 10]],
+)
+assert.deepEqual(zhuoyao33.effects.map(effect => effect.requirement?.specialty ?? null), ['anomaly', null, null])
+assert.deepEqual(
+    zhuoyao33.effects.map(effect => effect.target),
+    [{ kind: 'default' }, { kind: 'default' }, { kind: 'default' }],
+)
+assert.equal(zhuoyao33.effects[0].mode, 'pct')
+assert.equal(zhuoyao33.effects[0].basis, 'outOfCombatAtk')
+for (const effect of zhuoyao33.effects.slice(1)) {
+    assert.equal(effect.condition, '代理人造成属性异常伤害并触发暴击后')
+    assert.equal(effect.durationSeconds, 15)
+}
+// 火属性异常积蓄效率提升10% remains descriptive only, matching the maintained source text.
+assert.ok(zhuoyao33.description.zhCN.includes('火属性异常积蓄效率提升10%'))
+
+// 岚劫: elemental damage is unconditional; ATK and Basic Attack damage are Attack-specialty only.
+assert.equal(
+    lanjie33.description.zhCN,
+    '代理人造成的风属性伤害提升40%，风属性暴击伤害提升40%。\n[强攻]特性的代理人攻击力提升25%，[普通攻击]造成的伤害提升40%。',
+)
+assert.deepEqual(
+    lanjie33.effects.map(effect => [effect.stat, effect.value]),
+    [['windDmg', 40], ['windCritDmg', 40], ['atkPct', 25], ['dmgBonus', 40]],
+)
+assert.deepEqual(lanjie33.effects.map(effect => effect.requirement?.specialty ?? null), [null, null, 'attack', 'attack'])
+assert.deepEqual(lanjie33.effects[3].target, {
+    kind: 'skill',
+    skillTargets: [{ kind: 'skillType', skillType: 'basic' }],
+})
+assert.equal(lanjie33.effects[2].mode, 'pct')
+assert.equal(lanjie33.effects[2].basis, 'outOfCombatAtk')
+
+// 锋蚀: the maintained catalog keeps PEN Ratio as one unrestricted rule (maintenance-page adjustment);
+// the "attack or armorer" clause can only be expressed per specialty, so Special damage keeps two rules.
+assert.equal(
+    fengshi33.description.zhCN,
+    '代理人的电属性伤害提升30%，锐化伤害提升10%。\n[强攻]或[锋御]特性的代理人穿透率提升20%，[特殊技]、[强化特殊技]造成的伤害提升30%。',
+)
+assert.deepEqual(
+    fengshi33.effects.map(effect => [effect.stat, effect.value]),
+    [
+        ['electricDmg', 30], ['sharpDmgBonus', 10],
+        ['penRatio', 20],
+        ['dmgBonus', 30], ['dmgBonus', 30],
+    ],
+)
+assert.deepEqual(
+    fengshi33.effects.map(effect => effect.requirement?.specialty ?? null),
+    [null, null, null, 'attack', 'armorer'],
+)
+assert.deepEqual(
+    fengshi33.effects.map(effect => effect.target.kind),
+    ['default', 'default', 'default', 'skill', 'skill'],
+)
+assert.deepEqual(
+    fengshi33.effects.slice(3).map(effect => effect.target.skillTargets),
+    [[{ kind: 'skillType', skillType: 'special' }], [{ kind: 'skillType', skillType: 'special' }]],
+)
+
+function calculateAttackSpecial(fieldBuffId, damageElement = '') {
+    return calculateInCombatPanel(catalog, {
+        ...catalog.examples.yeShunguang.input,
+        driveDiscs: [],
+        combatBuffs: {
+            activeBuffIds: [fieldBuffId],
+            runtimeInputs: { [fieldBuffId]: {} },
+        },
+        damage: {
+            skillRef: {
+                agentSkillId: 'ye_shunguang',
+                categoryId: 'special',
+                moveId: 'draw_blue_waves',
+                rowId: 'damage',
+                level: 12,
+            },
+            ...(damageElement ? { damageElement } : {}),
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                ...(damageElement ? { resistanceByElement: { [damageElement]: 20 } } : {}),
+            },
+        },
+    })
+}
+
+function calculateArmorerSpecial(fieldBuffId) {
+    return calculateInCombatPanel(catalog, {
+        agentId: 'claret',
+        wEngineId: 'zzz_wiki_2188',
+        wEngineModificationLevel: 5,
+        coreSkillLevel: 'F',
+        driveDiscs: [],
+        combatBuffs: {
+            activeBuffIds: [fieldBuffId],
+            runtimeInputs: { [fieldBuffId]: {} },
+        },
+        damage: {
+            skillRef: {
+                agentSkillId: 'claret',
+                categoryId: 'special',
+                moveId: 'special_first_light',
+                rowId: 'damage',
+                level: 12,
+            },
+            target: { defense: 953, levelCoefficient: 794 },
+        },
+    })
+}
+
+const lanjie33Attack = calculateAttackBasic(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.lanjie, {}, 'wind')
+approx(lanjie33Attack.damage.multipliers.directDamageBonus, 0.4, '岚劫 should grant Attack agents 40% Basic Attack damage')
+approx(
+    lanjie33Attack.inCombat.panel.atk - lanjie33Attack.outOfCombat.panel.atk,
+    lanjie33Attack.outOfCombat.panel.atk * 0.25,
+    '岚劫 should grant Attack agents 25% of out-of-combat ATK',
+)
+approx(
+    lanjie33Attack.inCombat.panel.windDmg - lanjie33Attack.outOfCombat.panel.windDmg,
+    0.4,
+    '岚劫 should grant 40% Wind damage',
+)
+const lanjie33Physical = calculateAttackBasic(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.lanjie)
+approx(
+    lanjie33Attack.damage.multipliers.critDmg - lanjie33Physical.damage.multipliers.critDmg,
+    0.4,
+    '岚劫 40% Wind CRIT DMG should only raise Wind direct-damage CRIT DMG',
+)
+const lanjie33Anomaly = calculateSkill(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.lanjie, miyabiSkillRefs.basic)
+approx(
+    lanjie33Anomaly.inCombat.panel.atk - lanjie33Anomaly.outOfCombat.panel.atk,
+    0,
+    '岚劫 ATK should exclude non-Attack agents',
+)
+approx(lanjie33Anomaly.damage.multipliers.directDamageBonus, 0, '岚劫 Basic Attack damage should exclude non-Attack agents')
+approx(
+    lanjie33Anomaly.inCombat.panel.windDmg - lanjie33Anomaly.outOfCombat.panel.windDmg,
+    0.4,
+    '岚劫 Wind damage is unconditional for every agent',
+)
+const lanjie33Armorer = calculateArmorerSpecial(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.lanjie)
+approx(
+    lanjie33Armorer.inCombat.panel.atk - lanjie33Armorer.outOfCombat.panel.atk,
+    0,
+    '岚劫 ATK should exclude Armorer agents',
+)
+approx(lanjie33Armorer.damage.multipliers.directDamageBonus, 0, '岚劫 Basic Attack damage should exclude Armorer agents')
+
+const fengshi33Attack = calculateAttackBasic(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.fengshi, {}, 'electric')
+approx(
+    fengshi33Attack.inCombat.panel.penRatio - fengshi33Attack.outOfCombat.panel.penRatio,
+    0.2,
+    '锋蚀 should grant Attack agents 20% PEN Ratio',
+)
+approx(
+    fengshi33Attack.inCombat.panel.electricDmg - fengshi33Attack.outOfCombat.panel.electricDmg,
+    0.3,
+    '锋蚀 should grant 30% Electric damage',
+)
+approx(fengshi33Attack.damage.multipliers.directDamageBonus, 0, '锋蚀 Special damage should not apply to Basic Attacks')
+const fengshi33Special = calculateAttackSpecial(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.fengshi)
+approx(fengshi33Special.damage.multipliers.directDamageBonus, 0.3, '锋蚀 should grant Attack agents 30% Special damage')
+const fengshi33Armorer = calculateArmorerSpecial(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.fengshi)
+approx(
+    fengshi33Armorer.inCombat.panel.penRatio - fengshi33Armorer.outOfCombat.panel.penRatio,
+    0.2,
+    '锋蚀 PEN Ratio applies to Armorer agents through the unrestricted rule',
+)
+approx(fengshi33Armorer.damage.multipliers.directDamageBonus, 0.3, '锋蚀 should grant Armorer agents 30% Special damage')
+const fengshi33Anomaly = calculateSkill(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.fengshi, miyabiSkillRefs.basic)
+approx(
+    fengshi33Anomaly.inCombat.panel.penRatio - fengshi33Anomaly.outOfCombat.panel.penRatio,
+    0.2,
+    '锋蚀 PEN Ratio is unrestricted after the maintenance-page adjustment',
+)
+approx(
+    fengshi33Anomaly.inCombat.panel.electricDmg - fengshi33Anomaly.outOfCombat.panel.electricDmg,
+    0.3,
+    '锋蚀 Electric damage is unconditional for every agent',
+)
+
+const zhuoyao33Anomaly = calculateAnomaly(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.zhuoyao, {
+    id: 'zhuoyao-burn', kind: 'anomaly', settlementType: 'attribute', anomalyEffect: 'burn', procCount: 1,
+})
+approx(
+    zhuoyao33Anomaly.inCombat.panel.atk - zhuoyao33Anomaly.outOfCombat.panel.atk,
+    zhuoyao33Anomaly.outOfCombat.panel.atk * 0.1,
+    '灼曜 should grant Anomaly agents 10% of out-of-combat ATK',
+)
+approx(
+    zhuoyao33Anomaly.inCombat.panel.anomalyProficiency - zhuoyao33Anomaly.outOfCombat.panel.anomalyProficiency,
+    30,
+    '灼曜 should grant 30 Anomaly Proficiency',
+)
+approx(zhuoyao33Anomaly.damage.multipliers.attributeAnomalyDamage, 1.1, '灼曜 should grant 10% attribute-anomaly damage')
+const zhuoyao33Attack = calculateAttackBasic(CRITICAL_ASSAULT_3_3_PHASE_2_IDS.zhuoyao)
+approx(
+    zhuoyao33Attack.inCombat.panel.atk - zhuoyao33Attack.outOfCombat.panel.atk,
+    0,
+    '灼曜 ATK should exclude non-Anomaly agents',
+)
+console.log('3.3 phase 2 Critical Assault field numerical checks passed')

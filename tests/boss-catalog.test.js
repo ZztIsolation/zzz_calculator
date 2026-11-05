@@ -13,9 +13,9 @@ const meta = buildMeta(catalog)
 const source = JSON.parse(await readFile(path.join(rootDir, "data", "bosses.json"), "utf8"))
 
 assert.equal(source.version, 2)
-assert.equal(source.bosses.length, 22)
-assert.equal(meta.bosses.length, 22)
-assert.equal(meta.bossCombatBuffs.length, 30)
+assert.equal(source.bosses.length, 25)
+assert.equal(meta.bosses.length, 25)
+assert.equal(meta.bossCombatBuffs.length, 34)
 
 for (const boss of source.bosses) {
     assert.ok(boss.images.icon.startsWith("/assets/bosses/"))
@@ -48,8 +48,8 @@ const bossEntries = source.bosses.flatMap(boss =>
         ...(encounter.playerDebuffs ?? []),
     ]))
 const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
-assert.equal(bossEntries.length, 55)
-assert.equal(bossEffects.length, 60)
+assert.equal(bossEntries.length, 61)
+assert.equal(bossEffects.length, 71)
 for (const effect of bossEffects) {
     assert.deepEqual(
         effect.coverage,
@@ -492,3 +492,92 @@ for (const stacks of [0,1,4]) {
     assert.equal(resultFor(id,{[id]:{effects:{unknown_complex_v3_3_p1_crit:{stacks}}}}).inCombat.buffTotals.critDmg,stacks*0.25)
 }
 console.log('3.3 phase 1 boss stack checks passed')
+
+const phase33PhaseTwoBossIds = source.bosses
+    .filter(boss => boss.encounters.some(encounter => encounter.appearances.some(appearance =>
+        appearance.modeId === "critical_assault"
+        && appearance.gameVersion === "3.3"
+        && appearance.phaseNo === 2)))
+    .map(boss => boss.id)
+assert.deepEqual(phase33PhaseTwoBossIds, [
+    "boss.molten_hunt",
+    "boss.hollow_venger",
+    "boss.typhon_destroyer",
+    "boss.replica_blood_hunter_janitor.v3_3",
+])
+
+const hollowVengerBoss = source.bosses.find(boss => boss.id === "boss.hollow_venger")
+assert.equal(hollowVengerBoss?.target.defense, 952)
+assert.deepEqual(hollowVengerBoss?.target.weaknessElements, ["fire"])
+assert.deepEqual(hollowVengerBoss?.target.resistanceElements, ["ice"])
+const typhonBoss = source.bosses.find(boss => boss.id === "boss.typhon_destroyer")
+assert.equal(typhonBoss?.target.defense, 952)
+assert.deepEqual(typhonBoss?.target.weaknessElements, ["electric", "wind"])
+assert.deepEqual(typhonBoss?.target.resistanceElements, ["fire"])
+const replicaV33Boss = source.bosses.find(boss => boss.id === "boss.replica_blood_hunter_janitor.v3_3")
+assert.equal(replicaV33Boss?.target.defense, 476)
+assert.deepEqual(replicaV33Boss?.target.weaknessElements, ["fire", "wind"])
+assert.deepEqual(replicaV33Boss?.target.resistanceElements, ["physical"])
+const replicaV31Boss = source.bosses.find(boss => boss.id === "boss.replica_blood_hunter_janitor")
+assert.deepEqual(replicaV31Boss?.target.weaknessElements, ["ice"])
+assert.equal(replicaV31Boss?.encounters.length, 1)
+assert.equal(replicaV31Boss?.encounters[0].id, "boss_encounter.replica_blood_hunter_janitor.v3_1.p2")
+
+const hollowVengerPhase33P2 = resultFor("boss_encounter.hollow_venger.v3_3.p2")
+assert.equal(
+    hollowVengerPhase33P2.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    0.3,
+)
+
+const moltenHuntPhase33P2 = resultFor("boss_encounter.molten_hunt.v3_3.p2")
+assert.equal(moltenHuntPhase33P2.inCombat.buffTotals.critDmg, 0.75)
+assert.equal(
+    moltenHuntPhase33P2.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    -0.3,
+)
+for (const stacks of [0, 1, 3]) {
+    const id = "boss_encounter.molten_hunt.v3_3.p2"
+    const result = resultFor(id, { [id]: { effects: { molten_hunt_v3_3_p2_overheat_crit_dmg: { stacks } } } })
+    assert.equal(result.inCombat.buffTotals.critDmg, stacks * 0.25)
+}
+
+const replicaPhase33P2 = resultFor("boss_encounter.replica_blood_hunter_janitor.v3_3.p2")
+const replicaPhase33P2Modifiers = replicaPhase33P2.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(replicaPhase33P2.inCombat.buffTotals.critDmg, 0.75)
+assert.ok(Math.abs(
+    replicaPhase33P2.inCombat.panel.def - replicaPhase33P2.outOfCombat.panel.def
+    - replicaPhase33P2.outOfCombat.panel.def * 0.3,
+) < 1e-6)
+assert.equal(replicaPhase33P2Modifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.15)
+assert.equal(replicaPhase33P2Modifiers.find(effect => effect.stat === "sharpDmgBonus")?.value, 0.6)
+assert.equal(replicaPhase33P2Modifiers.find(effect => effect.stat === "windCritDmg")?.value, 0.8)
+assert.equal(replicaPhase33P2Modifiers.find(effect => effect.stat === "iceCritDmg")?.value, 0.8)
+assert.equal(replicaPhase33P2.damage.targetBreakdown.enemyDefReduction, 0.4)
+
+const typhonPhase33P2Encounter = typhonBoss?.encounters
+    .find(encounter => encounter.id === "boss_encounter.typhon_destroyer.v3_3.p2")
+const typhonFourHands = typhonPhase33P2Encounter?.playerBuffs
+    .find(entry => entry.id === "typhon_destroyer_v3_3_p2_four_hands")
+const typhonChainUltimateRule = typhonFourHands?.effects
+    .find(effect => effect.id === "typhon_destroyer_v3_3_p2_chain_ultimate")
+assert.equal(typhonChainUltimateRule?.stat, "dmgBonus")
+assert.equal(typhonChainUltimateRule?.value, 10)
+assert.deepEqual(typhonChainUltimateRule?.target.skillTargets, [
+    { kind: "skillType", skillType: "chain" },
+    { kind: "skillType", skillType: "ultimate" },
+])
+assert.equal(typhonChainUltimateRule?.requirement.eventStunned, true)
+const typhonPhase33P2 = resultFor("boss_encounter.typhon_destroyer.v3_3.p2")
+const typhonPhase33P2Modifiers = typhonPhase33P2.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+const typhonDmgBonusModifier = typhonPhase33P2Modifiers.find(effect => effect.stat === "dmgBonus")
+if (typhonDmgBonusModifier) {
+    assert.equal(typhonDmgBonusModifier.value, 0.1)
+    assert.equal(typhonPhase33P2.inCombat.buffTotals.dmgBonus, 0)
+} else {
+    assert.equal(typhonPhase33P2.inCombat.buffTotals.dmgBonus, 0.1)
+}
+console.log('3.3 phase 2 boss checks passed')

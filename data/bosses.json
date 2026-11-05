@@ -2966,6 +2966,102 @@
             }
           ],
           "hidden": false
+        },
+        {
+          "id": "boss_encounter.molten_hunt.v3_3.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.3",
+              "phaseNo": 2,
+              "startDate": "2026-11-06",
+              "endDate": "2026-11-20"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "熔狱行赭进入[熔狱]状态后，其受到的属性异常伤害降低30%；每击碎一颗燧石，全队额外恢复20点能量；每触发一次[连携招架]首领会获得1层[过热]；累计触发两次[招架支援]或[极限闪避]首领会获得1层[过热]，每层[过热]会使全队代理人暴击伤害提升25%。最多叠加3层，持续20秒，触发[招架支援]或重复触发[过热]时刷新持续时间。\n成功触发[完美反制]时，可获得2000操作得分；每击碎一颗燧石可获得1000操作分，最多获得5000操作得分。"
+          },
+          "recommendedSpecialties": [],
+          "playerBuffs": [
+            {
+              "id": "molten_hunt_v3_3_p2_overheat",
+              "name": {
+                "zhCN": "过热"
+              },
+              "description": {
+                "zhCN": "每触发一次[连携招架]首领会获得1层[过热]；累计触发两次[招架支援]或[极限闪避]首领会获得1层[过热]，每层[过热]会使全队代理人暴击伤害提升25%。最多叠加3层，持续20秒，触发[招架支援]或重复触发[过热]时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "molten_hunt_v3_3_p2_overheat_crit_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": 25,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "molten_hunt_v3_3_p2_overheat_stacks",
+                  "stackLabel": {
+                    "zhCN": "过热层数"
+                  },
+                  "durationSeconds": 20,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  },
+                  "condition": "每触发一次[连携招架]；累计触发两次[招架支援]或[极限闪避]"
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "molten_hunt_v3_3_p2_anomaly_damage_reduction",
+              "name": {
+                "zhCN": "属性异常伤害减免"
+              },
+              "description": {
+                "zhCN": "熔狱行赭进入[熔狱]状态后，其受到的属性异常伤害降低30%"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "molten_hunt_v3_3_p2_anomaly_damage_reduction_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": -30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  },
+                  "condition": "熔狱行赭进入[熔狱]状态后"
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.3 第二期敌人数据与效果（nanoka.cc 690491）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690491"
+            }
+          ],
+          "hidden": false
         }
       ],
       "hidden": false
@@ -3394,6 +3490,403 @@
                 "zhCN": "3.3 第一期敌人数据与效果（nanoka.cc 690481）"
               },
               "url": "https://zzz.nanoka.cc/boss/690481"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.hollow_venger",
+      "name": {
+        "zhCN": "僭越者"
+      },
+      "aliases": [
+        "Hollow Venger"
+      ],
+      "images": {
+        "icon": "/assets/bosses/hollow-venger.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/Monster_HollowVenger.webp"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "fire"
+        ],
+        "resistanceElements": [
+          "ice"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.hollow_venger.v3_3.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.3",
+              "phaseNo": 2,
+              "startDate": "2026-11-06",
+              "endDate": "2026-11-20"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "首领敌人受到攻击时，此次攻击造成的异常积蓄效率提升10%。\n首领敌人每次进入属性异常状态时，都会获得1层残晖印记，持有的残晖印记到达3层时，会消耗所有的残晖印记并进入[蜡翼]状态，持续30秒。\n首领敌人处于[蜡翼]状态时，受到的属性异常伤害提升30%，进入属性异常状态时额外累积5%失衡值，但不再获得残晖印记。\n首领敌人进入失衡状态时，立刻进入[蜡翼]状态，若此时已经处于[蜡翼]状态，则刷新持续时间。\n每次成功触发[连携招架]应对敌人攻击，可额外获得1000操作得分；\n敌人展开空间屏障后，每次成功踩踏金色的曜界并触发招架支援，可额外获得1500操作得分；最多获得5000操作得分。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "hollow_venger_v3_3_p2_wax_wing",
+              "name": {
+                "zhCN": "蜡翼"
+              },
+              "description": {
+                "zhCN": "首领敌人处于[蜡翼]状态时，受到的属性异常伤害提升30%，进入属性异常状态时额外累积5%失衡值，但不再获得[残晖印记]。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "hollow_venger_v3_3_p2_anomaly",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": 30,
+                  "condition": "首领敌人处于[蜡翼]状态",
+                  "durationSeconds": 30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.3 第二期敌人数据与效果（nanoka.cc 690491）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690491"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.typhon_destroyer",
+      "name": {
+        "zhCN": "自律强袭单位·「提丰·破坏者型」"
+      },
+      "aliases": [
+        "Autonomous Assault Unit - Typhon Destroyer",
+        "提丰·破坏者型"
+      ],
+      "images": {
+        "icon": "/assets/bosses/typhon-destroyer.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/Monster_TyphonDestroyer.webp"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "electric",
+          "wind"
+        ],
+        "resistanceElements": [
+          "fire"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.typhon_destroyer.v3_3.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.3",
+              "phaseNo": 2,
+              "startDate": "2026-11-06",
+              "endDate": "2026-11-20"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "代理人发动[招架支援]命中首领敌人时，将对其施加1层[难敌四手]，[招架支援]累计命中3次时，将触发部位破坏，并额外施加3层[难敌四手]，每层[难敌四手]会使代理人对首领敌人造成的失衡值提升15%，在失衡状态下[连携技]和[终结技]对其造成的伤害提升10%；敌人充电蓄能时，将修复受损部位并重置部位破坏进度；敌人从失衡状态恢复时，[难敌四手]层数将会被重置。\n该场战斗中，将不再消耗[支援点数]。\n成功触发[极限支援]时，可获得300操作得分。\n成功造成部位破坏时，可获得900操作得分，最多获得5000操作得分。\n特殊技能期间，抗打断能力提升。"
+          },
+          "recommendedSpecialties": [],
+          "playerBuffs": [
+            {
+              "id": "typhon_destroyer_v3_3_p2_four_hands",
+              "name": {
+                "zhCN": "难敌四手"
+              },
+              "description": {
+                "zhCN": "代理人发动[招架支援]命中首领敌人时，将对其施加1层[难敌四手]，[招架支援]累计命中3次时，将触发部位破坏，并额外施加3层[难敌四手]，每层[难敌四手]会使代理人对首领敌人造成的失衡值提升15%，在失衡状态下[连携技]和[终结技]对其造成的伤害提升10%；敌人充电蓄能时，将修复受损部位并重置部位破坏进度；敌人从失衡状态恢复时，[难敌四手]层数将会被重置。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "typhon_destroyer_v3_3_p2_chain_ultimate",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "skill",
+                    "skillTargets": [
+                      {
+                        "kind": "skillType",
+                        "skillType": "chain"
+                      },
+                      {
+                        "kind": "skillType",
+                        "skillType": "ultimate"
+                      }
+                    ]
+                  },
+                  "stat": "dmgBonus",
+                  "mode": "flat",
+                  "value": 10,
+                  "condition": "在失衡状态下",
+                  "requirement": {
+                    "eventStunned": true
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.3 第二期敌人数据与效果（nanoka.cc 690491）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690491"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.replica_blood_hunter_janitor.v3_3",
+      "name": {
+        "zhCN": "复写体·猎血清道夫"
+      },
+      "aliases": [],
+      "images": {
+        "icon": "/assets/bosses/replica-blood-hunter-janitor.v3-3.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/Monster_ClonedBlackWolf.webp"
+      },
+      "target": {
+        "defense": 476,
+        "weaknessElements": [
+          "fire",
+          "wind"
+        ],
+        "resistanceElements": [
+          "physical"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.replica_blood_hunter_janitor.v3_3.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.3",
+              "phaseNo": 2,
+              "startDate": "2026-11-06",
+              "endDate": "2026-11-20"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "每次成功应对首领的攻击并使其触发特殊跪地，可获得1000操作得分；[控制技]期间，每次成功应对首领的攻击，可获得500操作得分；[完美反制]首领的[控制技]时，可获得2000操作得分。[控制技]期间，通过[反制支援]造成[完美反制]时，会获得该次[控制技]剩余的成功应对得分。最多获得5000操作得分。\n[完美反制]首领的控制技后，全队代理人造成的失衡值提升15%，防御力提升30%，攻击命中敌人时暴击伤害提升75%，属性异常伤害提升15%。\n首领失衡期间，全队代理人造成的锐化伤害提升60%，造成的风属性和冰属性暴击伤害提升80%，且无视首领40%的防御力。"
+          },
+          "recommendedSpecialties": [],
+          "playerBuffs": [
+            {
+              "id": "replica_blood_hunter_v3_3_p2_perfect_counter",
+              "name": {
+                "zhCN": "完美反制增益"
+              },
+              "description": {
+                "zhCN": "[完美反制]首领的控制技后，全队代理人造成的失衡值提升15%，防御力提升30%，攻击命中敌人时暴击伤害提升75%，属性异常伤害提升15%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "replica_blood_hunter_v3_3_p2_def_pct",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "defPct",
+                  "mode": "pct",
+                  "basis": "outOfCombatDef",
+                  "value": 30,
+                  "condition": "完美反制首领的控制技后",
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_v3_3_p2_crit_dmg",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "value": 75,
+                  "condition": "完美反制首领的控制技后",
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_v3_3_p2_anomaly",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": 15,
+                  "condition": "完美反制首领的控制技后",
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "replica_blood_hunter_v3_3_p2_stunned",
+              "name": {
+                "zhCN": "失衡期间增益"
+              },
+              "description": {
+                "zhCN": "首领失衡期间，全队代理人造成的锐化伤害提升60%，造成的风属性和冰属性暴击伤害提升80%，且无视首领40%的防御力。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "replica_blood_hunter_v3_3_p2_sharp_dmg",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "sharpDmgBonus",
+                  "mode": "flat",
+                  "value": 60,
+                  "condition": "首领失衡期间",
+                  "requirement": {
+                    "eventStunned": true
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_v3_3_p2_wind_crit_dmg",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "windCritDmg",
+                  "mode": "flat",
+                  "value": 80,
+                  "condition": "首领失衡期间",
+                  "requirement": {
+                    "eventStunned": true
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_v3_3_p2_ice_crit_dmg",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "iceCritDmg",
+                  "mode": "flat",
+                  "value": 80,
+                  "condition": "首领失衡期间",
+                  "requirement": {
+                    "eventStunned": true
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_v3_3_p2_def_ignore",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "enemyDefIgnore",
+                  "mode": "flat",
+                  "value": 40,
+                  "condition": "首领失衡期间",
+                  "requirement": {
+                    "eventStunned": true
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.3 第二期敌人数据与效果（nanoka.cc 690491）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690491"
             }
           ],
           "hidden": false
