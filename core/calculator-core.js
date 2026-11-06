@@ -14,6 +14,17 @@ export { isTurbulenceSettlement } from "./anomalySettlement.js"
 import { expandCalculationConfigSkillGroups } from "./calculationSkillGroups.js"
 import { skillMultiplierTargetId, skillTagsForMove, skillTargetMatches, skillTypeForMove } from "./skillTargets.js"
 import {
+    attackSourceBreakdown,
+    damageModifierSourceBreakdown,
+    panelDamageSourceBreakdown,
+    followUpSourceBreakdown,
+    followUpSourceKeys,
+    inactiveSourceEntries,
+    mergeSourceBreakdowns,
+    sheerForceSourceBreakdown,
+    whiteBoxRowWithSources,
+} from "./damageSourceAttribution.js"
+import {
     disorderBaseMultiplier,
     disorderMultiplierScale,
     normalizeDamageScale,
@@ -787,6 +798,16 @@ function wEngineTeamModificationLevelMap(catalog, combatInput = {}) {
     return normalizeWEngineKeyedRecord(catalog, combatInput.wEngineTeamModificationLevels)
 }
 
+// Teammate W-Engine buffs must display the localized engine name. Some
+// passive effect names are only stored in English, so the engine name is the
+// dependable Chinese label for the source card.
+function teamWEngineSourceName(sourceWEngine) {
+    const name = sourceWEngine?.name
+    if (name && typeof name === "object") {
+        return name.zhCN ? name : (name.en ?? null)
+    }
+    return name ?? null
+}
 function materializedTeamWEngineEntry(sourceWEngine, levelMap = {}) {
     const key = wEngineTeamBuffKey(sourceWEngine)
     const modificationLevel = strictWEngineModificationLevel(levelMap[key], sourceWEngine)
@@ -2491,7 +2512,7 @@ function collectActiveBuffModifiers({
     for (const entry of activeTeamWEngineEntries) {
         modifiers.push(...collectBuffModifiers(entry.teamBuff, {
             key: entry.key,
-            name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine?.name,
+            name: teamWEngineSourceName(entry.sourceWEngine) ?? entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name,
             sourceType: "wEngineTeam",
         }))
     }
@@ -4508,6 +4529,36 @@ function effectiveTurbulenceDamageEvent(event, bonusTotals) {
         tickCount: timing.tickCount,
     }
 }
+function commonDamageSourceMappings(event) {
+    const modifier = key => ({ key, modifier: true })
+    return {
+        "增伤乘区": [{ key: "dmgBonus" }, { key: `${event.damageElement}Dmg` }, modifier("directDamageBonus"), { key: "followUp" }],
+        "普通增伤区": [{ key: "dmgBonus" }, { key: `${event.damageElement}Dmg` }, modifier("directDamageBonus")],
+        "防御乘区": [{ key: "penRatio" }, { key: "penFlat" }, { key: "enemyDefReduction" }, modifier(DEF_IGNORE_KEY_BY_ELEMENT[event.damageElement])],
+        "抗性乘区": [modifier("enemyResReduction"), modifier(RES_REDUCTION_KEY_BY_ELEMENT[event.damageElement]), { key: "allResIgnore" }, { key: `${event.damageElement}ResIgnore` }],
+        "失衡乘区": [modifier("stunDmgMultiplierBonus"), modifier("stunDmgMultiplierBonusAlways")],
+        "浸染乘区": [modifier("imbuementDmgBonus")],
+    }
+}
+function anomalySourceMappings(event) {
+    const modifier = key => ({ key, modifier: true })
+    return {
+        "局内攻击力": [{ key: "attack" }],
+        ...commonDamageSourceMappings(event),
+        "异常精通区": [{ key: "anomalyProficiencyFlat" }],
+        "异常倍率": [modifier("baseMultiplierBonus")],
+        "紊乱倍率": [modifier("baseMultiplierBonus")],
+        "乱流倍率": [modifier("baseMultiplierBonus")],
+        "异放最终倍率": [modifier("baseMultiplierBonus")],
+        "属性异常增伤区": [modifier("anomalyDamageBonus")],
+        "异常增伤区": [modifier("anomalyDamageBonus")],
+        "异常增伤合计": [modifier("anomalyDamageBonus"), modifier("turbulenceDamageBonus")],
+        "紊乱增伤区": [modifier("disorderDamageBonus")],
+        "乱流增伤区": [modifier("turbulenceDamageBonus")],
+        "异化乘区": [modifier("alienationCoefficientBonus")],
+        "异常暴击区": [modifier("anomalyCritRate"), modifier("anomalyCritDmg"), modifier("anomalyCritRatePerInitialMasteryAbove100")],
+    }
+}
 
 function critDmgBonusWhiteBoxText(skillTargetedCritDmgBonus, elementCritDmgBonus) {
     return [
@@ -4516,13 +4567,40 @@ function critDmgBonusWhiteBoxText(skillTargetedCritDmgBonus, elementCritDmgBonus
     ].filter(Boolean).join(" + ")
 }
 
+function withCombatSources(rows, sourceContext, event, mappings) {
+    if (!sourceContext) return rows
+    const effects = sourceContext.activeEffects ?? []
+    return rows.map(row => {
+        const stats = mappings[String(row.label ?? "")]
+        if (!stats) return row
+        // Skill-tag scoped bonuses are reported by their own bucket, so they
+        // are removed from every generic damage bucket for this event.
+        const followUpKeys = new Set(followUpSourceKeys(effects, event, damageModifierAppliesTo))
+        const sources = stats.map(stat => {
+            switch (stat.key) {
+                case "attack": return attackSourceBreakdown(effects, sourceContext.outOfCombat)
+                case "sheerForce": return sheerForceSourceBreakdown(effects, sourceContext.outOfCombat)
+                case "followUp": return followUpSourceBreakdown(effects, event, damageModifierAppliesTo)
+                default: {
+                    const breakdown = stat.modifier
+                        ? damageModifierSourceBreakdown(effects, stat.key, { event, appliesTo: damageModifierAppliesTo })
+                        : panelDamageSourceBreakdown(effects, stat.key, { targetKind: stat.targetKind ?? null })
+                    return breakdown.filter(source => !followUpKeys.has(source.key))
+                }
+            }
+        })
+        return whiteBoxRowWithSources(row, sources)
+    })
+}
+
+
 function critRateBonusWhiteBoxText(skillTargetedCritRateBonus) {
     return skillTargetedCritRateBonus
         ? `定向暴击率 ${formatDamagePercent(skillTargetedCritRateBonus)}`
         : ""
 }
 
-function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritRateBonus = 0, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, directDamageBonus, dmgMultiplier, imbuementMultiplier = 1, targetBreakdown, skillMultiplierBonus, skillMultiplierScaleBonus = 0, effectiveSkillMultiplier, finalDamage, singleDamage }) {
+function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritRateBonus = 0, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, directDamageBonus, dmgMultiplier, imbuementMultiplier = 1, targetBreakdown, skillMultiplierBonus, skillMultiplierScaleBonus = 0, effectiveSkillMultiplier, finalDamage, singleDamage, sourceContext = null }) {
     const critModeLabel = {
         expected: "期望",
         crit: "暴击",
@@ -4531,12 +4609,46 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
     const damageElementText = damageElementLabel(event.damageElement)
     const critRateBonusText = critRateBonusWhiteBoxText(skillTargetedCritRateBonus)
     const critDmgBonusText = critDmgBonusWhiteBoxText(skillTargetedCritDmgBonus, elementCritDmgBonus)
+    // Rebuild the per-source breakdown that the aggregated totals lost.
+    // `sourceContext` is optional so optimizer and score paths stay unchanged.
+    const sources = sourceContext
+        ? (() => {
+            const modifierOptions = { event, appliesTo: damageModifierAppliesTo }
+            // Panel-level bonuses (drive disc main stats, W-Engine sub stats) are
+            // already baked into the panel and never pass through activeEffects,
+            // so they need their own entry to keep the row explainable.
+            const outCritDmg = Number(sourceContext.outOfCombat?.panel?.critDmg ?? 0)
+            const baseCritSources = []
+            if (outCritDmg) baseCritSources.push({ name: "局外面板", sourceType: "panel", sourceTypeLabel: "角色 / 音擎 / 驱动盘", key: "panel:critDmg", stat: "critDmg", value: outCritDmg, condition: null })
+            const outCritRate = Number(sourceContext.outOfCombat?.panel?.critRate ?? 0)
+            if (outCritRate) baseCritSources.push({ name: "局外面板", sourceType: "panel", sourceTypeLabel: "角色 / 音擎 / 驱动盘", key: "panel:critRate", stat: "critRate", value: outCritRate, condition: null })
+            const panelBonus = Number(sourceContext.outOfCombat?.selectedDmgBonus ?? 0)
+            const panelSources = panelBonus
+                ? [{ name: "局外面板", sourceType: "panel", sourceTypeLabel: "角色 / 音擎 / 驱动盘", key: "panel:dmgBonus", stat: "dmgBonus", value: panelBonus, condition: null }]
+                : []
+            const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
+            return {
+                attack: attackSourceBreakdown(sourceContext.activeEffects, sourceContext.outOfCombat),
+                critRate: mergeSourceBreakdowns(baseCritSources.filter(source => source.stat === "critRate"), panelDamageSourceBreakdown(sourceContext.activeEffects, "critRate"), damageModifierSourceBreakdown(sourceContext.activeEffects, "critRate", modifierOptions)),
+                critDmg: mergeSourceBreakdowns(baseCritSources.filter(source => source.stat === "critDmg"), panelDamageSourceBreakdown(sourceContext.activeEffects, "critDmg"), damageModifierSourceBreakdown(sourceContext.activeEffects, "critDmg", modifierOptions), damageModifierSourceBreakdown(sourceContext.activeEffects, elementCritDmgKey, modifierOptions)),
+                dmgBonus: mergeSourceBreakdowns(
+                    panelSources,
+                    damageModifierSourceBreakdown(sourceContext.activeEffects, "dmgBonus", modifierOptions),
+                    damageModifierSourceBreakdown(sourceContext.activeEffects, `${event.damageElement}Dmg`, modifierOptions),
+                    damageModifierSourceBreakdown(sourceContext.activeEffects, "directDamageBonus", modifierOptions),
+                ),
+                imbuement: damageModifierSourceBreakdown(sourceContext.activeEffects, "imbuementDmgBonus", modifierOptions),
+                inactive: inactiveSourceEntries(sourceContext.ignoredEffects),
+            }
+        })()
+        : null
     const rows = [
         {
             label: event.damageBasis === "anomalyProficiency" ? "局内异常精通" : "局内攻击力",
             formula: event.damageBasis === "anomalyProficiency" ? "本次伤害以局内异常精通为基础值" : "来自局内面板攻击力",
             value: damageBasisValue,
             displayValue: formatDamageNumber(damageBasisValue),
+            ...(sources ? { sources: sources.attack } : {}),
         },
         {
             label: "技能倍率",
@@ -4557,17 +4669,21 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
                     : critModeLabel,
             value: critMultiplier,
             displayValue: formatDamageNumber(critMultiplier, 4),
+            ...(sources ? { sources: mergeSourceBreakdowns(sources.critRate, sources.critDmg) } : {}),
         },
         {
             label: "增伤乘区",
             formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${directDamageBonus ? ` + 技能目标增伤 ${formatDamagePercent(directDamageBonus)}` : ""}`,
             value: dmgMultiplier,
             displayValue: formatDamageNumber(dmgMultiplier, 4),
+            ...(sources ? { sources: sources.dmgBonus } : {}),
         },
         defenseWhiteBoxRow(targetBreakdown),
         resistanceWhiteBoxRow({ targetBreakdown, damageElementText }),
         stunWhiteBoxRow(targetBreakdown),
-        imbuementWhiteBoxRow(imbuementMultiplier),
+        sources
+            ? { ...imbuementWhiteBoxRow(imbuementMultiplier), sources: sources.imbuement }
+            : imbuementWhiteBoxRow(imbuementMultiplier),
     ]
     if (event.damageScale !== 1) {
         rows.push({
@@ -4895,7 +5011,7 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
     return rows
 }
 
-function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, includeWhiteBox }) {
+function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, includeWhiteBox, sourceContext = null }) {
     const atk = Number(panel.atk ?? 0)
     const damageBasisValue = directDamageBasisValue(panel, event)
     const rawCritRate = Number(panel.critRate ?? 0)
@@ -5005,7 +5121,7 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
             stun: targetBreakdown.activeStunMultiplier,
         },
         targetBreakdown,
-        whiteBoxRows: includeWhiteBox
+        whiteBoxRows: withCombatSources(includeWhiteBox
             ? directDamageWhiteBoxRows({
                 event,
                 damageBasisValue,
@@ -5026,12 +5142,14 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
                 effectiveSkillMultiplier,
                 finalDamage,
                 singleDamage,
-            })
-            : [],
+                sourceContext,
+            }) : [], sourceContext, event, {
+                ...commonDamageSourceMappings(event),
+            }),
     }
 }
 
-function calculateSharpDamageEventCore({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agent, includeWhiteBox }) {
+function calculateSharpDamageEventCore({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agent, includeWhiteBox, sourceContext = null }) {
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const damageElement = event.damageElement
     const elementDmgKey = `${damageElement}Dmg`
@@ -5131,7 +5249,7 @@ function calculateSharpDamageEventCore({ event, panel, outOfCombatPanel = panel,
             profile,
             crit: sharpCrit,
         },
-        whiteBoxRows: includeWhiteBox
+        whiteBoxRows: withCombatSources(includeWhiteBox
             ? sharpWhiteBoxRows({
                 event,
                 result: selectedResult,
@@ -5145,8 +5263,12 @@ function calculateSharpDamageEventCore({ event, panel, outOfCombatPanel = panel,
                 sharpDmgBonus,
                 skillMultiplierBonus,
                 damageElementText: damageElementLabel(damageElement),
-            })
-            : [],
+            }) : [], sourceContext, event, {
+                ...commonDamageSourceMappings({ ...event, damageElement }),
+                "局内防御力": [{ key: "defPct" }, { key: "defFlat" }],
+                "锐暴乘区": [{ key: "critRate" }, { key: "lacerationDmg" }],
+                "锐化增伤乘区": [{ key: "sharpDmgBonus", modifier: true }, ...(elementSharpDmgKey ? [{ key: elementSharpDmgKey, modifier: true }] : [])],
+            }),
     }
 }
 
@@ -5211,7 +5333,7 @@ function aggregateGeneratedSharpDamageEvent({ event, parentResult, componentResu
     }
 }
 
-function calculateSharpDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agent, includeWhiteBox }) {
+function calculateSharpDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agent, includeWhiteBox, sourceContext = null }) {
     const componentEvents = generatedSharpDamageComponentEvents(event)
     if (componentEvents.length < 2) {
         return calculateSharpDamageEventCore({
@@ -5222,6 +5344,7 @@ function calculateSharpDamageEvent({ event, panel, outOfCombatPanel = panel, bon
             target,
             agent,
             includeWhiteBox,
+            sourceContext,
         })
     }
     const componentResults = componentEvents.map(componentEvent => calculateSharpDamageEventCore({
@@ -5232,6 +5355,7 @@ function calculateSharpDamageEvent({ event, panel, outOfCombatPanel = panel, bon
         target,
         agent,
         includeWhiteBox,
+        sourceContext,
     }))
     const parentResult = calculateSharpDamageEventCore({
         event: { ...event, generatedSkillComponents: [] },
@@ -5241,6 +5365,7 @@ function calculateSharpDamageEvent({ event, panel, outOfCombatPanel = panel, bon
         target,
         agent,
         includeWhiteBox,
+        sourceContext,
     })
     return aggregateGeneratedSharpDamageEvent({
         event,
@@ -5470,10 +5595,10 @@ function aggregateGeneratedDirectDamageEvent({ event, parentResult, componentRes
     }
 }
 
-function calculateDirectDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox }) {
+function calculateDirectDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox, sourceContext = null }) {
     const componentEvents = generatedDirectDamageComponentEvents(event)
     if (componentEvents.length < 2) {
-        return calculateDirectDamageEventCore({ event, panel, bonusTotals, target, includeWhiteBox })
+        return calculateDirectDamageEventCore({ event, panel, bonusTotals, target, includeWhiteBox, sourceContext })
     }
 
     const componentResults = componentEvents.map(componentEvent =>
@@ -5483,6 +5608,7 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
             bonusTotals,
             target,
             includeWhiteBox,
+            sourceContext,
         }))
     const parentResult = calculateDirectDamageEventCore({
         event: {
@@ -5493,6 +5619,7 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
         bonusTotals,
         target,
         includeWhiteBox,
+        sourceContext,
     })
     return aggregateGeneratedDirectDamageEvent({
         event,
@@ -5503,7 +5630,7 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
     })
 }
 
-function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, includeWhiteBox }) {
+function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, includeWhiteBox, sourceContext = null }) {
     const hp = Number(panel.hp ?? 0)
     const atk = Number(panel.atk ?? 0)
     const sheerForceFlat = isRuptureAgent(agent) ? Number(panel.sheerForceFlat ?? 0) : 0
@@ -5612,8 +5739,8 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
             stun: targetBreakdown.activeStunMultiplier,
         },
         targetBreakdown,
-        whiteBoxRows: includeWhiteBox
-            ? sheerDamageWhiteBoxRows({
+        whiteBoxRows: withCombatSources(
+            includeWhiteBox ? sheerDamageWhiteBoxRows({
                 event,
                 hp,
                 atk,
@@ -5637,9 +5764,17 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
                 sheerDmgMultiplier,
                 finalDamage,
                 singleDamage,
-            })
-            : [],
-    }
+            }) : [],
+            sourceContext,
+            event,
+            {
+                ...commonDamageSourceMappings(event),
+                "局内贯穿力": [{ key: "sheerForce" }],
+                "贯穿力换算": [{ key: "sheerForce" }],
+                "暴击乘区": [{ key: "critRate" }, { key: "critDmg" }, { key: elementCritDmgKey, modifier: true }],
+                "贯穿增伤区": [{ key: "sheerDmgBonus", modifier: true }, ...(elementSheerDmgKey ? [{ key: elementSheerDmgKey, modifier: true }] : [])],
+            },
+        )}
 }
 
 function releaseOnlyBonusTotals(bonusTotals = {}) {
@@ -5777,7 +5912,7 @@ export function calculateAnomalyUnitDamage({
     }
 }
 
-function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agentLevel, includeWhiteBox, sourceContext = null }) {
     const sourceEvent = {
         ...event,
         settlementType: "turbulence",
@@ -5858,7 +5993,7 @@ function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel
             remainingSeconds: Number(event.remainingSeconds ?? 0),
             elapsedSeconds: Number(event.elapsedSeconds ?? 0),
         },
-        whiteBoxRows: includeWhiteBox
+        whiteBoxRows: withCombatSources(includeWhiteBox
             ? anomalyDamageWhiteBoxRows({
                 event,
                 atk: Number(panel.atk ?? 0),
@@ -5877,12 +6012,11 @@ function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel
                 effectiveBaseMultiplier,
                 finalDamage,
                 singleDamage,
-            })
-            : [],
+            }) : [], sourceContext, event, anomalySourceMappings(event)),
     }
 }
 
-function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox, sourceContext = null }) {
     const source = releaseSourceContext(event, panel, outOfCombatPanel, bonusTotals, agentLevel)
     const sourceUnit = calculateAnomalyUnitDamage({
         event,
@@ -5996,7 +6130,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         targetBreakdown,
         releaseBreakdown,
         sourceUnit,
-        whiteBoxRows: includeWhiteBox
+        whiteBoxRows: withCombatSources(includeWhiteBox
             ? anomalyDamageWhiteBoxRows({
                 event,
                 atk: Number(source.panel.atk ?? 0),
@@ -6014,8 +6148,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
                 effectiveBaseMultiplier,
                 finalDamage,
                 singleDamage,
-            })
-            : [],
+            }) : [], sourceContext, event, anomalySourceMappings(event)),
     }
 }
 
@@ -6180,7 +6313,7 @@ function calculateLuminescenceDamageEvent({ event, panel, outOfCombatPanel = pan
     }
 }
 
-function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agentLevel, includeWhiteBox, sourceContext = null }) {
     if (isLuminescenceSettlement(event)) {
         return calculateLuminescenceDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, includeWhiteBox })
     }
@@ -6188,10 +6321,10 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
     event = effectiveTurbulenceDamageEvent(event, bonusTotals)
     event = effectiveAttributeAnomalyDamageEvent(event, bonusTotals)
     if (isTurbulenceSettlement(event)) {
-        return calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox })
+        return calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox, sourceContext })
     }
     if (isReleaseSettlement(event)) {
-        return calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox })
+        return calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox, sourceContext })
     }
     const atk = Number(panel.atk ?? 0)
     const isDisorder = isDisorderDamageEvent(event)
@@ -6295,8 +6428,8 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
             damageScale: event.damageScale,
         },
         targetBreakdown,
-        whiteBoxRows: includeWhiteBox
-            ? anomalyDamageWhiteBoxRows({
+        whiteBoxRows: withCombatSources(
+            includeWhiteBox ? anomalyDamageWhiteBoxRows({
                 event,
                 atk,
                 selectedDmgBonus,
@@ -6312,13 +6445,23 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
                 effectiveBaseMultiplier,
                 finalDamage,
                 singleDamage,
-            })
-            : [],
+            }) : [],
+            sourceContext,
+            event,
+            anomalySourceMappings(event),
+        ),
     }
 }
 
 function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel, bonusTotals, input, includeWhiteBox = true, skillOptions = {} }) {
     const damageRequest = normalizeDamageRequest(input, agent, catalog, skillOptions)
+    const sourceContext = skillOptions.activeEffects || skillOptions.ignoredEffects
+        ? {
+            activeEffects: skillOptions.activeEffects ?? [],
+            ignoredEffects: skillOptions.ignoredEffects ?? [],
+            outOfCombat: skillOptions.outOfCombat ?? null,
+        }
+        : null
     const events = damageRequest.events.map(event => {
         if (event.kind === "direct") {
             return calculateDirectDamageEvent({
@@ -6327,6 +6470,7 @@ function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel
                 bonusTotals,
                 target: damageRequest.target,
                 includeWhiteBox,
+                sourceContext,
             })
         }
         if (event.kind === "sheer") {
@@ -6337,6 +6481,7 @@ function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel
                 bonusTotals,
                 target: damageRequest.target,
                 includeWhiteBox,
+                sourceContext,
             })
         }
         if (event.kind === "sharp") {
@@ -6348,6 +6493,7 @@ function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel
                 bonusTotals,
                 target: damageRequest.target,
                 includeWhiteBox,
+                sourceContext,
             })
         }
         return calculateAnomalyDamageEvent({
@@ -6358,6 +6504,7 @@ function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel
             target: damageRequest.target,
             agentLevel: damageRequest.agentLevel,
             includeWhiteBox,
+            sourceContext,
         })
     })
     const selectedEvent = events.find(event => event.id === damageRequest.selectedEventId) ?? events[0] ?? null
@@ -10096,7 +10243,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 agent,
                 effect: entry.teamBuff,
                 key: entry.key,
-                name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine.name,
+                name: teamWEngineSourceName(entry.sourceWEngine) ?? entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name,
                 sourceType: "wEngineTeam",
                 conditionLabel: entry.teamBuff?.condition,
                 outOfCombat,
@@ -10339,7 +10486,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     agent,
                     effect: entry.teamBuff,
                     key: entry.key,
-                    name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine.name,
+                    name: teamWEngineSourceName(entry.sourceWEngine) ?? entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name,
                     sourceType: "wEngineTeam",
                     conditionLabel: entry.teamBuff?.condition,
                     outOfCombat,
@@ -10496,6 +10643,8 @@ export function createInCombatPanelCalculator(catalog, input) {
                     potentialLevel,
                     outOfCombatBaseAtk: outOfCombat.base?.atk,
                     buffModifiers: activeBuffModifiers,
+                    activeEffects,
+                    ignoredEffects,
                 },
             })
 
@@ -10682,7 +10831,7 @@ export function calculateInCombatPanel(catalog, input) {
             agent,
             effect: entry.teamBuff,
             key: entry.key,
-            name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine.name,
+            name: teamWEngineSourceName(entry.sourceWEngine) ?? entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name,
             sourceType: "wEngineTeam",
             conditionLabel: entry.teamBuff?.condition,
             outOfCombat,
@@ -10870,8 +11019,10 @@ export function calculateInCombatPanel(catalog, input) {
             coreSkillLevel: input.coreSkillLevel,
             cinemaLevel: input.cinemaLevel,
             potentialLevel,
-            outOfCombatBaseAtk: outOfCombat.base?.atk,
+            outOfCombat,
             buffModifiers: activeBuffModifiers,
+            activeEffects,
+            ignoredEffects,
         },
     })
 

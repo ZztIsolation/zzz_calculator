@@ -440,6 +440,8 @@ declare module "@runtime/local-store.js" {
 declare module "@core/shared-combat.js" {
   export const ANOMALY_EFFECT_LABELS: Record<string, string>
   export const DISORDER_EFFECT_LABELS: Record<string, string>
+  export const DAMAGE_MODIFIER_KIND_LABELS: Record<string, string>
+  export const STORED_STAT_LABELS: Record<string, string>
   export const CUSTOM_BUFF_SKILL_STAT_OPTIONS: Array<[string, string, string, string | null]>
   export const CUSTOM_BUFF_STAT_OPTIONS: Array<[string, string, string, string | null]>
   export const RES_IGNORE_STAT_BY_ELEMENT: Record<string, string>

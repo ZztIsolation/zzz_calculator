@@ -696,6 +696,23 @@ const ordinary = calculateInCombatPanel(catalog, {
         selectedEventId: "ordinary",
     },
 })
+const sharpSources = marrowEvent.whiteBoxRows.find(row => row.label === "锐暴乘区")?.sources ?? []
+assert.ok(sharpSources.some(source => source.stat === "critRate" && source.value === 0.3), "Sharp whitebox should identify CRIT Rate separately")
+assert.ok(sharpSources.some(source => source.stat === "lacerationDmg" && source.value === 0.25), "Sharp whitebox should identify laceration damage separately")
+const sharpDmgSources = marrowEvent.whiteBoxRows.find(row => row.label === "普通增伤区")?.sources ?? []
+approx(sharpDmgSources.filter(source => source.stat === "dmgBonus").reduce((sum, source) => sum + source.value, 0), marrowEvent.multipliers.damage - 1, "Sharp ordinary damage sources must not double-count panel buffs")
+const yixuanResult = calculateInCombatPanel(catalog, {
+    agentId: "yixuan", wEngineId: "zzz_wiki_1342", driveDiscs: [], cinemaLevel: 6,
+    combatBuffs: { activeBuffIds: ["agent:yixuan.corePassive", "agent:yixuan.additionalAbility", "agent:yixuan.cinema.6"] },
+    damage: catalog.agentsMap.get("yixuan").defaultCalculationConfig,
+})
+const sheerEvent = yixuanResult.damage.events.find(event => event.kind === "sheer")
+const sheerSources = sheerEvent.whiteBoxRows.find(row => row.label === "贯穿力换算")?.sources ?? []
+approx(sheerSources.reduce((sum, source) => sum + source.value, 0), sheerEvent.multipliers.sheerForce, "Sheer sources should add up to actual sheer force")
+assert.ok(sheerSources.some(source => source.displayStat === "固定生命转贯穿力"), "Sheer source should explain HP conversion")
+assert.ok(sheerSources.some(source => source.displayStat === "固定攻击转贯穿力"), "Sheer source should explain ATK conversion")
+assert.ok(sheerEvent.whiteBoxRows.find(row => row.label === "贯穿增伤区")?.sources.some(source => source.stat === "sheerDmgBonus"), "Sheer bonus should identify its own damage type")
+
 assert.equal(ordinary.damage.events[0].multipliers.critRate, 1, "ordinary CR remains capped at 100%")
 
 console.log("sharp damage tests passed")
