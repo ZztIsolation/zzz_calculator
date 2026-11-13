@@ -40,7 +40,8 @@ for (const source of fixture.rows) {
 }
 assert.equal(fixture.rows.length, 40)
 assert.equal(fixture.officialOverrides.length, 3)
-assert.equal(buildMeta(catalog).agents.find(a => a.id === "pyrois").cinemaDescriptions.at(-1).modeled, false)
+// Preserve the maintained deletion of level-only and unrevealed placeholder entries.
+assert.deepEqual(buildMeta(catalog).agents.find(a => a.id === "pyrois").cinemaDescriptions.map(item => item.cinemaLevel), [1, 2, 4])
 assert.equal(agent.combatBuffs.skillBuffs.length, 0)
 assert.equal(agent.combatBuffs.additionalAbility.defaultChecked, true)
 assert.match(agent.combatBuffs.corePassive.description.zhCN, /万军诛绝.*凯旋坦途.*无拘剑势.*永陷幽囚/)
