@@ -193,7 +193,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 54, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 57, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -1883,3 +1883,19 @@ approx(
     '灼曜 ATK should exclude non-Anomaly agents',
 )
 console.log('3.3 phase 2 Critical Assault field numerical checks passed')
+const defense332 = catalog.combatBuffs.filter(b => b.id.startsWith('field.defense_v5.v3_3.p2.'))
+assert.deepEqual(defense332.map(b => b.name.zhCN), ['岚火燎天', '炽阳焚夜', '极凛破界'])
+for (const buff of defense332) {
+    const validation = validateMaintenanceItem('fieldBuffs', buff, { combatBuffs: catalog.combatBuffs, currentId: buff.id, agentSkills: catalog.agentSkills })
+    assert.equal(validation.ok, true, JSON.stringify(validation.errors))
+}
+const lanhuoAttack = calculateAttackBasic(defense332[0].id, {}, 'wind')
+approx(lanhuoAttack.inCombat.panel.atk - lanhuoAttack.outOfCombat.panel.atk, lanhuoAttack.outOfCombat.panel.atk * 0.35, '岚火燎天 ATK')
+approx(lanhuoAttack.inCombat.panel.windDmg - lanhuoAttack.outOfCombat.panel.windDmg, 0.2, '岚火燎天 Wind damage')
+const lanhuoAnomaly = calculateSkill(defense332[0].id, miyabiSkillRefs.basic)
+approx(lanhuoAnomaly.inCombat.panel.atk - lanhuoAnomaly.outOfCombat.panel.atk, 0, '岚火燎天 excludes Anomaly ATK')
+const chiyangAttack = calculateAttackBasic(defense332[1].id)
+approx(chiyangAttack.inCombat.panel.atk - chiyangAttack.outOfCombat.panel.atk, chiyangAttack.outOfCombat.panel.atk * 0.1, '炽阳焚夜 team ATK includes Attack agents')
+const jilinAttack = calculateAttackBasic(defense332[2].id)
+approx(jilinAttack.inCombat.panel.fireDmg - jilinAttack.outOfCombat.panel.fireDmg, 0, '极凛破界 excludes non-Rupture fire damage')
+console.log('3.3 phase 2 Defense Battle checks passed')

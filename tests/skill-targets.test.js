@@ -187,14 +187,14 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 247)
-assert.equal(rowCount, 586)
+assert.equal(moveCount, 260)
+assert.equal(rowCount, 611)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
-    dashAttack: 21,
-    assistAttack: 28,
+    dashAttack: 22,
+    assistAttack: 29,
     exSpecial: 31,
     fireSuppression: 3,
-    dodgeCounter: 12,
+    dodgeCounter: 13,
 })
 // Field Buff imports add skill-scoped targets; keep the catalog total explicit.
 const expectedTargetCount = 121

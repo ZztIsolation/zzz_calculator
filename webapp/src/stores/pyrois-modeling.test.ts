@@ -94,6 +94,6 @@ describe("Pyrois configuration", () => {
       expect(cinema5ChainLevel).toBe(initialChainLevel)
       expect(cinema6ChainLevel).toBe(initialChainLevel)
     }
-    expect(agent.cinemaDescriptions[5]).toMatchObject({ modeled: false })
+    expect(agent.cinemaDescriptions.map((item: any) => item.cinemaLevel)).toEqual([1, 2, 4])
   })
 })

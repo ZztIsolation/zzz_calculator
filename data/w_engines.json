@@ -9671,6 +9671,131 @@
         "effectBuff": "The 20-second team anomaly-crit trigger is retained as a runtime snapshot condition; duration refresh is descriptive because combat timing is not simulated."
       },
       "hidden": false
+    },
+  {
+    "id": "zzz_wiki_14163",
+    "hidden": true,
+    "name": {
+      "zhCN": "禁罪囚笼",
+      "en": "Incarcerating Grip"
+    },
+    "rarity": "S",
+    "specialty": "attack",
+    "attribute": "wind",
+    "relatedAgentId": "severian_lowell",
+    "images": {
+      "icon": "/assets/w-engines/zzz_wiki_14163.webp",
+      "source": "https://static.nanoka.cc/assets/zzz/Weapon_S_1631.webp"
+    },
+    "level60": {
+      "atkBase": 713,
+      "advancedStat": {
+        "stat": "critRate",
+        "value": 24,
+        "mode": "flat"
+      }
+    },
+    "modification": {
+      "minLevel": 1,
+      "maxLevel": 5,
+      "defaultLevel": 1
+    },
+    "effect": {
+      "name": {
+        "zhCN": "恶有恶报",
+        "en": "Evil Caught Within"
+      },
+      "requirement": {
+        "specialty": "attack",
+        "label": {
+          "zhCN": "对于【强攻】角色，能够触发以下效果",
+          "en": "For Attack Agents, the following effects can be triggered."
+        }
+      },
+      "description": {
+        "zhCN": "暴击率提升20%/23%/26%/29%/32%；装备者的普通攻击命中敌人时，攻击力提升10%/11.5%/13%/14.5%/16%，且造成的伤害无视目标15%/17.3%/19.5%/21.8%/24%风属性伤害抗性，持续16秒。"
+      },
+      "selfBuff": {
+        "scope": "inCombat",
+        "effects": [
+          {
+            "id": "severian-signature-crit-rate",
+            "type": "fixed",
+            "stat": "critRate",
+            "mode": "flat",
+            "value": 20,
+            "target": {
+              "kind": "default"
+            },
+            "modificationValues": {
+              "value": [
+                20,
+                23,
+                26,
+                29,
+                32
+              ]
+            }
+          },
+          {
+            "id": "severian-signature-atk",
+            "type": "fixed",
+            "stat": "atkPct",
+            "mode": "pct",
+            "basis": "outOfCombatAtk",
+            "value": 10,
+            "target": {
+              "kind": "default"
+            },
+            "condition": "普通攻击命中敌人",
+            "durationSeconds": 16,
+            "modificationValues": {
+              "value": [
+                10,
+                11.5,
+                13,
+                14.5,
+                16
+              ]
+            }
+          },
+          {
+            "id": "severian-signature-wind-res-ignore",
+            "type": "fixed",
+            "stat": "windResIgnore",
+            "mode": "flat",
+            "value": 15,
+            "target": {
+              "kind": "default"
+            },
+            "condition": "普通攻击命中敌人",
+            "durationSeconds": 16,
+            "modificationValues": {
+              "value": [
+                15,
+                17.3,
+                19.5,
+                21.8,
+                24
+              ]
+            }
+          }
+        ],
+        "appliesToOutOfCombatPanel": false,
+        "buffModifiers": []
+      },
+      "teamBuff": null
+    },
+    "sources": [
+      "https://zzz.nanoka.cc/character/1631",
+      "https://zzz.nanoka.cc/weapon/14163",
+      "https://static.nanoka.cc/zzz/3.4.3+20291004/en/weapon/14163.json"
+    ],
+    "verification": {
+      "level60Stats": "Nanoka 3.4.3+20291004",
+      "effectText": "Nanoka weapon 14163; R1-R5 values preserved",
+      "effectBuff": "self buff modeled with refinement values and 16-second duration"
     }
+  }
   ]
 }
