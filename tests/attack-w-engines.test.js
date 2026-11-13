@@ -56,12 +56,12 @@ function approx(actual, expectedValue, message) {
     assert.ok(Math.abs(Number(actual) - expectedValue) < 1e-9, `${message}: expected ${expectedValue}, got ${actual}`)
 }
 
-assert.equal(attackEngines.length, 25, "Official Attack W-Engine catalog should contain 25 entries")
-assert.equal(new Set(attackEngines.map(item => textOf(item.name))).size, 25, "Attack W-Engine names should be unique")
+assert.equal(attackEngines.length, 26, "Official Attack W-Engine catalog should contain 26 entries")
+assert.equal(new Set(attackEngines.map(item => textOf(item.name))).size, 26, "Attack W-Engine names should be unique")
 assert.deepEqual(
     Object.fromEntries(["B", "A", "S"].map(rarity => [rarity, attackEngines.filter(item => item.rarity === rarity).length])),
-    { B: 3, A: 8, S: 14 },
-    "Official rarity distribution should remain 3 B / 8 A / 14 S",
+    { B: 3, A: 8, S: 15 },
+    "Official rarity distribution should remain 3 B / 8 A / 15 S",
 )
 
 for (const [id, name, rarity, atkBase, stat, value, effectName] of expected) {
@@ -102,7 +102,7 @@ for (const [id, name, rarity, atkBase, stat, value, effectName] of expected) {
 const agentIds = new Set(catalog.agents.map(item => item.id))
 assert.deepEqual(
     attackEngines.filter(item => item.relatedAgentId && !["zzz_wiki_224", "zzz_wiki_991", "zzz_wiki_1159"].includes(item.id)).map(item => [item.id, item.relatedAgentId]),
-    [["cloudcleave_radiance", "ye_shunguang"], ["zzz_wiki_223", "soldier_11"], ["zzz_wiki_225", "ellen_joe"], ["zzz_wiki_2031", "pyrois"], ["zzz_wiki_2162", "sigrid"]],
+    [["cloudcleave_radiance", "ye_shunguang"], ["zzz_wiki_223", "soldier_11"], ["zzz_wiki_225", "ellen_joe"], ["zzz_wiki_2031", "pyrois"], ["zzz_wiki_2162", "sigrid"], ["zzz_wiki_14163", "severian_lowell"]],
     "Maintained Attack agents should receive their signature W-Engine relationship",
 )
 assert.deepEqual(
@@ -191,3 +191,7 @@ approx(deepSeaVisitor.inCombat.buffTotals.iceDmg, 0.5, "Deep Sea Visitor rank 5 
 approx(deepSeaVisitor.inCombat.buffTotals.critRate, 0.4, "Deep Sea Visitor rank 5 should allow both independent CRIT Rate Buffs")
 
 console.log("attack W-Engine catalog tests passed")
+
+assert.equal(engine("zzz_wiki_14163").hidden, true)
+assert.equal(engine("zzz_wiki_14163").relatedAgentId, "severian_lowell")
+assert.equal(catalog.agents.find(agent => agent.id === "severian_lowell").hidden, true)

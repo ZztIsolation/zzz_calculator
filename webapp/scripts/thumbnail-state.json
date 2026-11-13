@@ -141,6 +141,10 @@
       "sourceHash": "bdab1d77a0fd4ed4b52f877ee528e513d95de8d7b173c76ed4765649b26237ad",
       "thumbnailUrl": "/assets/thumbs/agents/seed.172c7678b7f6b454.webp"
     },
+    "/assets/agents/severian_lowell.png": {
+      "sourceHash": "1ed9a9da6ac6c430bcfc49174fdd14cdb6ffe535b30030930320366a88bf743f",
+      "thumbnailUrl": "/assets/thumbs/agents/severian_lowell.cf5530f0a409cb7a.webp"
+    },
     "/assets/agents/sigrid.png": {
       "sourceHash": "8d3ba3fffe11a5b3ad5aaa70fa55223fbc745ff4af90b5f53138df8442d44123",
       "thumbnailUrl": "/assets/thumbs/agents/sigrid.e26108dd29c7beba.webp"
@@ -320,6 +324,10 @@
     "/assets/w-engines/zzz_wiki_141.png": {
       "sourceHash": "1951e747a4fd8f6c4da418991f23510e8fb6b9776ac0cac8b02fa1c8ced2a4b0",
       "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_141.01000bca0a7ef810.webp"
+    },
+    "/assets/w-engines/zzz_wiki_14163.webp": {
+      "sourceHash": "73f100e1d04607557556177829c321919f65c8cffb83567c5d4c9ead2e7211a5",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_14163.132c2f7131df3557.webp"
     },
     "/assets/w-engines/zzz_wiki_142.png": {
       "sourceHash": "958cfd921db6701ee72700e2da1cb744e9e39494f70bed18d1820969ffdedade",

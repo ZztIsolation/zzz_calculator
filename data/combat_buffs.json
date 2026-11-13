@@ -9593,6 +9593,260 @@
         }
       ],
       "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_3.p2.lanhuo_liaotian",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.3",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "岚火燎天"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.3版本第二期"
+      },
+      "description": {
+        "zhCN": "[强攻]特性的代理人的攻击力提升35%，风属性伤害提升20%。\n代理人的[终结技]命中敌人后，其风属性伤害抗性降低15%，持续30秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_3_p2_lanhuo_liaotian_atkPct",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "value": 35,
+          "basis": "outOfCombatAtk",
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_3_p2_lanhuo_liaotian_windDmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windDmg",
+          "mode": "flat",
+          "value": 20,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_3_p2_lanhuo_liaotian_enemyWindResReduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyWindResReduction",
+          "mode": "flat",
+          "value": 15,
+          "condition": "代理人的[终结技]命中敌人后",
+          "durationSeconds": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_3.p2.chiyang_fenye",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.3",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "炽阳焚夜"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.3版本第二期"
+      },
+      "description": {
+        "zhCN": "[异常]特性代理人造成属性异常伤害并触发暴击后，全队攻击力提升10%，属性异常伤害提升20%，持续15秒，重复触发时刷新持续时间。\n代理人使敌人进入火属性异常状态后，其火属性伤害抗性降低10%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_3_p2_chiyang_fenye_atkPct",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "value": 10,
+          "basis": "outOfCombatAtk",
+          "condition": "[异常]特性代理人造成属性异常伤害并触发暴击后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_3_p2_chiyang_fenye_anomalyDamageBonus",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "value": 20,
+          "condition": "[异常]特性代理人造成属性异常伤害并触发暴击后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_3_p2_chiyang_fenye_enemyFireResReduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyFireResReduction",
+          "mode": "flat",
+          "value": 10,
+          "condition": "代理人使敌人进入火属性异常状态后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_3.p2.jilin_pojie",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.3",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "极凛破界"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.3版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人的贯穿伤害提升35%。\n[命破]特性的代理人发动[终结技]后，其火属性伤害和冰属性伤害提升50%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_3_p2_jilin_pojie_sheerDmgBonus",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "sheerDmgBonus",
+          "mode": "flat",
+          "value": 35,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_3_p2_jilin_pojie_fireDmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "fireDmg",
+          "mode": "flat",
+          "value": 50,
+          "requirement": {
+            "specialty": "rupture"
+          },
+          "condition": "[命破]特性的代理人发动[终结技]后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_3_p2_jilin_pojie_iceDmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceDmg",
+          "mode": "flat",
+          "value": 50,
+          "requirement": {
+            "specialty": "rupture"
+          },
+          "condition": "[命破]特性的代理人发动[终结技]后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
     }
   ],
   "bossBuffs": [],

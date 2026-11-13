@@ -7176,16 +7176,6 @@
           "modeled": true
         },
         {
-          "cinemaLevel": 3,
-          "name": {
-            "zhCN": "命定枷锁"
-          },
-          "description": {
-            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技等级+2。技能等级输入为最终等级，不重复加级。"
-          },
-          "modeled": true
-        },
-        {
           "cinemaLevel": 4,
           "name": {
             "zhCN": "焚昼孽火"
@@ -7194,26 +7184,6 @@
             "zhCN": "日华完美格挡获得生命上限8%的护盾，持续10秒；持盾时失衡值+10%。不增加伤害。"
           },
           "modeled": true
-        },
-        {
-          "cinemaLevel": 5,
-          "name": {
-            "zhCN": "稚子禁卫"
-          },
-          "description": {
-            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技等级再+2。技能等级输入为最终等级，不重复加级。"
-          },
-          "modeled": true
-        },
-        {
-          "cinemaLevel": 6,
-          "name": {
-            "zhCN": "拂晓晨星"
-          },
-          "description": {
-            "zhCN": "官方尚未揭示六影独有效果；当前结果仅计算至五影已知效果。"
-          },
-          "modeled": false
         }
       ],
       "coreSkill": {
@@ -8718,32 +8688,12 @@
           "modeled": true
         },
         {
-          "cinemaLevel": 3,
-          "name": {
-            "zhCN": "无名氏"
-          },
-          "description": {
-            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级+2。"
-          },
-          "modeled": true
-        },
-        {
           "cinemaLevel": 4,
           "name": {
             "zhCN": "因势利导"
           },
           "description": {
             "zhCN": "触发强击或紊乱后全队属性异常伤害提升18%。"
-          },
-          "modeled": true
-        },
-        {
-          "cinemaLevel": 5,
-          "name": {
-            "zhCN": "囤积癖好"
-          },
-          "description": {
-            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级再+2。"
           },
           "modeled": true
         },
@@ -11522,32 +11472,12 @@
           "modeled": true
         },
         {
-          "cinemaLevel": 3,
-          "name": {
-            "zhCN": "稻草人症候群"
-          },
-          "description": {
-            "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技]技能等级+2\n技能等级输入是最终等级，不重复加级。"
-          },
-          "modeled": true
-        },
-        {
           "cinemaLevel": 4,
           "name": {
             "zhCN": "生命尽头与冷酷仙境"
           },
           "description": {
             "zhCN": "[终结技：烬火追魂]以及[普通攻击：焚罪]终结一击命中处于异常状态的敌人时，\n额外触发一次[异放]效果，固定结算600%倍率的对应属性的属性异常伤害。\n使用独立600%异放事件手动加入，不自动叠加到默认单次异放；按约定不继承主异放的40%额外暴伤。"
-          },
-          "modeled": true
-        },
-        {
-          "cinemaLevel": 5,
-          "name": {
-            "zhCN": "狂欢马戏团"
-          },
-          "description": {
-            "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技]技能等级+2\n技能等级输入是最终等级，不重复加级。"
           },
           "modeled": true
         },
@@ -12328,19 +12258,6 @@
             "buffModifiers": []
           },
           {
-            "cinemaLevel": 3,
-            "cinemaName": {
-              "zhCN": "好奇的左尾"
-            },
-            "scope": "inCombat",
-            "defaultChecked": false,
-            "description": {
-              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能输入为最终等级，不在计算中重复加级。"
-            },
-            "effects": [],
-            "buffModifiers": []
-          },
-          {
             "cinemaLevel": 4,
             "cinemaName": {
               "zhCN": "磨爪"
@@ -12376,19 +12293,6 @@
                 "durationSeconds": 15
               }
             ],
-            "buffModifiers": []
-          },
-          {
-            "cinemaLevel": 5,
-            "cinemaName": {
-              "zhCN": "幸运的右尾"
-            },
-            "scope": "inCombat",
-            "defaultChecked": false,
-            "description": {
-              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能输入为最终等级，不在计算中重复加级。"
-            },
-            "effects": [],
             "buffModifiers": []
           },
           {
@@ -13256,19 +13160,6 @@
             "buffModifiers": []
           },
           {
-            "cinemaLevel": 3,
-            "cinemaName": {
-              "zhCN": "白色谎言"
-            },
-            "scope": "inCombat",
-            "defaultChecked": false,
-            "description": {
-              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能使用最终等级，不在计算中重复加级。"
-            },
-            "effects": [],
-            "buffModifiers": []
-          },
-          {
             "cinemaLevel": 4,
             "cinemaName": {
               "zhCN": "偶有充盈"
@@ -13277,19 +13168,6 @@
             "defaultChecked": false,
             "description": {
               "zhCN": "[电囚]效果的持续时间提升至20秒；[冲刺攻击：飞弦·斩]命中敌人时，悠真获得30点喧响值，同一招式内最多触发一次；发动[终结技]时，将为场上所有敌人施加满层[电囚]效果。"
-            },
-            "effects": [],
-            "buffModifiers": []
-          },
-          {
-            "cinemaLevel": 5,
-            "cinemaName": {
-              "zhCN": "无人知晓"
-            },
-            "scope": "inCombat",
-            "defaultChecked": false,
-            "description": {
-              "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技] 技能等级+2\n技能使用最终等级，不在计算中重复加级。"
             },
             "effects": [],
             "buffModifiers": []
@@ -13940,6 +13818,399 @@
         "buffs": "Core tether CR and signature 2 Heartstring stacks are condition snapshots; coverage and stacks remain adjustable. No named teammates or unconfirmed team buffs are preloaded.",
         "statBasis": "Level60 stats exclude core nodes; cumulative source core entries are converted to deltas."
       }
+    },
+  {
+    "id": "severian_lowell",
+    "name": {
+      "zhCN": "赛维里安·洛威尔"
+    },
+    "rarity": "S",
+    "attribute": "wind",
+    "damageElement": "wind",
+    "specialty": "attack",
+    "attackTypes": [
+      "slash"
+    ],
+    "faction": "都市秩序部",
+    "images": {
+      "portrait": "/assets/agents/severian_lowell.png",
+      "source": "https://baike.mihoyo.com/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen",
+      "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen"
+    },
+    "level60": {
+      "hpBase": 7826,
+      "atkBase": 858,
+      "defBase": 606,
+      "critRate": 5,
+      "critDmg": 50,
+      "impact": 94,
+      "anomalyProficiency": 90,
+      "anomalyMastery": 91,
+      "energyRegen": 120,
+      "penRatio": 0
+    },
+    "combatBuffs": {
+      "corePassive": {
+        "scope": "inCombat",
+        "name": {
+          "zhCN": "核心被动：风回无终"
+        },
+        "description": {
+          "zhCN": "核心技等级1/2/3/4/5/6/7时，额外获得的暴击伤害为9.6%/9.6%/19.2%/19.2%/28.8%/28.8%/28.8%，基础攻击力为0/25/25/50/50/75/75点；赛维里安的暴击伤害提升30%，造成的伤害提升12.5%；队伍中存在其他风属性角色时，造成的伤害额外提升15%。赛维里安在即将受到敌人攻击的瞬间发动[普通攻击：疾锋]时，可以闪避本次攻击；通过前三段普攻闪避时自动发动[普通攻击：烈旋]，第四段普攻则提升本次普攻的伤害倍率和失衡倍率至与[普通攻击：烈旋]一致。赛维里安进入战场时获得两层[烁影]；拥有[烁影]且不具有无敌效果时，受到敌人非控制技攻击且未能主动闪避或招架时，消耗一层[烁影]自动闪避并发动[普通攻击：烈旋]。通过[普通攻击：疾锋]成功闪避、触发[烁影]自动闪避和直接闪避都视为[极限闪避]；[烁影]最多两层，满层时再次获得会获得一层[凭风]，且下次[普通攻击：疾锋]提升为[普通攻击：烈旋]。每次极限闪避获得一层[凭风]；拥有[凭风]且处于接战状态时可发动[登场技]。通过固定招式命中敌人或触发极限闪避时获得[流息]，[流息]上限150点；[流息]达到100点时，长按可消耗100点发动[普通攻击：苍风影猎]。"
+        },
+        "effects": [
+          {
+            "id": "severian-core-crit-dmg",
+            "type": "fixed",
+            "stat": "critDmg",
+            "value": 30,
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
+          },
+          {
+            "id": "severian-core-dmg",
+            "type": "fixed",
+            "stat": "dmgBonus",
+            "value": 12.5,
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
+          },
+          {
+            "id": "severian-core-wind-dmg",
+            "type": "fixed",
+            "stat": "dmgBonus",
+            "value": 15,
+            "mode": "flat",
+            "condition": "队伍中存在其他风属性角色",
+            "target": {
+              "kind": "default"
+            }
+          }
+        ],
+        "buffModifiers": [],
+        "defaultChecked": true,
+        "mechanics": {
+          "flowBreathMaximum": 150,
+          "sparkShadowMaximum": 2,
+          "windRelyingMaximum": 1
+        }
+      },
+      "additionalAbility": {
+        "scope": "inCombat",
+        "name": {
+          "zhCN": "额外能力"
+        },
+        "description": {
+          "zhCN": "最优编配队伍中存在支援、击破或与自身阵营相同的角色时，赛维里安每拥有1%暴击率，自身攻击力提升8.5点，最多计入100%暴击率。"
+        },
+        "effects": [
+          {
+            "id": "severian-additional-crit-to-atk",
+            "type": "formula",
+            "stat": "atkFlat",
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            },
+            "source": {
+              "kind": "inCombatStat",
+              "stat": "critRate",
+              "unit": "storedPercent",
+              "label": {
+                "zhCN": "局内暴击率"
+              },
+              "variable": "x"
+            },
+            "formula": {
+              "expression": "min(max(x, 0), 100) * 8.5",
+              "valueUnit": "flat"
+            },
+            "condition": "队伍中存在支援、击破或同阵营角色"
+          }
+        ],
+        "buffModifiers": [],
+        "defaultChecked": true
+      },
+      "cinemaBuffs": [
+        {
+          "cinemaLevel": 1,
+          "cinemaName": {
+            "zhCN": "双份浓缩"
+          },
+          "scope": "inCombat",
+          "defaultChecked": false,
+          "description": {
+            "zhCN": "赛维里安释放连携技累积的[流息]值提升至50点；通过登场技入场时会将招式替换为连携技；每次释放普通攻击：苍风影猎会获得1层[凭风]；攻击命中目标时无视目标15%的风属性抗性。"
+          },
+          "effects": [
+            {
+              "id": "severian-c1-wind-res-ignore",
+              "type": "fixed",
+              "stat": "windResIgnore",
+              "value": 15,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "cinemaLevel": 2,
+          "cinemaName": {
+            "zhCN": "理性的缰绳"
+          },
+          "scope": "inCombat",
+          "defaultChecked": false,
+          "description": {
+            "zhCN": "赛维里安进入战场时回复150点[流息]；触发极限闪避或释放普通攻击：苍风影猎时，使自身穿透率提升20%，持续25秒。"
+          },
+          "effects": [
+            {
+              "id": "severian-c2-pen",
+              "type": "fixed",
+              "stat": "penRatio",
+              "value": 20,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "cinemaLevel": 4,
+          "cinemaName": {
+            "zhCN": "光与影的界限"
+          },
+          "scope": "inCombat",
+          "defaultChecked": false,
+          "description": {
+            "zhCN": "赛维里安进入战斗或换入前场时攻击力提升10%，持续30秒；释放普通攻击：烈旋或普通攻击：苍风影猎时，提升自身喧响值获取效率10%，持续15秒。"
+          },
+          "effects": [
+            {
+              "id": "severian-c4-atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "value": 10,
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "cinemaLevel": 6,
+          "cinemaName": {
+            "zhCN": "最后一盏灯"
+          },
+          "scope": "inCombat",
+          "defaultChecked": false,
+          "description": {
+            "zhCN": "赛维里安释放连携技累积的[流息]值提升至50点；赛维里安的攻击命中目标时无视目标15%的风属性抗性。"
+          },
+          "effects": [
+            {
+              "id": "severian-c6-wind-res-ignore",
+              "type": "fixed",
+              "stat": "windResIgnore",
+              "value": 15,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      ]
+    },
+    "coreSkill": {
+      "name": {
+        "zhCN": "风回无终"
+      },
+      "defaultLevel": "F",
+      "maxLevel": "F",
+      "levels": [
+        {
+          "level": "A",
+          "label": "强化A",
+          "stats": [
+            {
+              "stat": "critDmg",
+              "value": 9.6,
+              "mode": "flat",
+              "target": "panel"
+            }
+          ],
+          "skillLevelBonuses": [
+            {
+              "skill": "corePassive",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "level": "B",
+          "label": "强化B",
+          "stats": [
+            {
+              "stat": "atkBase",
+              "value": 25,
+              "mode": "flat",
+              "target": "base"
+            }
+          ],
+          "skillLevelBonuses": [
+            {
+              "skill": "corePassive",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "level": "C",
+          "label": "强化C",
+          "stats": [
+            {
+              "stat": "critDmg",
+              "value": 9.6,
+              "mode": "flat",
+              "target": "panel"
+            }
+          ],
+          "skillLevelBonuses": [
+            {
+              "skill": "corePassive",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "level": "D",
+          "label": "强化D",
+          "stats": [
+            {
+              "stat": "atkBase",
+              "value": 25,
+              "mode": "flat",
+              "target": "base"
+            }
+          ],
+          "skillLevelBonuses": [
+            {
+              "skill": "corePassive",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "level": "E",
+          "label": "强化E",
+          "stats": [
+            {
+              "stat": "critDmg",
+              "value": 9.6,
+              "mode": "flat",
+              "target": "panel"
+            }
+          ],
+          "skillLevelBonuses": [
+            {
+              "skill": "corePassive",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "level": "F",
+          "label": "强化F",
+          "stats": [
+            {
+              "stat": "atkBase",
+              "value": 25,
+              "mode": "flat",
+              "target": "base"
+            }
+          ],
+          "skillLevelBonuses": [
+            {
+              "skill": "corePassive",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "corePassiveScaling": {
+        "name": {
+          "zhCN": "核心被动：风回无终"
+        },
+        "levels": [
+          { "level": 1, "critDmgPct": 9.6, "atkBase": 0 },
+          { "level": 2, "critDmgPct": 9.6, "atkBase": 25 },
+          { "level": 3, "critDmgPct": 19.2, "atkBase": 25 },
+          { "level": 4, "critDmgPct": 19.2, "atkBase": 50 },
+          { "level": 5, "critDmgPct": 28.8, "atkBase": 50 },
+          { "level": 6, "critDmgPct": 28.8, "atkBase": 75 },
+          { "level": 7, "critDmgPct": 28.8, "atkBase": 75 }
+        ]
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen",
+        "https://zzz.nanoka.cc/character/1631"
+      ]
+    },
+    "preferredDriveDiscs": {
+      "mainStatLimits": {
+        "4": [
+          "critRate",
+          "critDmg"
+        ],
+        "5": [
+          "windDmg",
+          "atkPct",
+          "penRatio"
+        ],
+        "6": [
+          "atkPct"
+        ]
+      }
+    },
+    "importantSubStats": [
+      "critRate",
+      "critDmg",
+      "atkPct",
+      "penFlat"
+    ],
+    "importantPanelStats": [
+      "atk",
+      "critRate",
+      "critDmg"
+    ],
+    "hidden": true,
+    "sources": [
+      "https://baike.mihoyo.com/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen",
+      "https://zzz.nanoka.cc/character/1631"
+    ],
+    "verification": {
+      "dataVersion": "official entry 2217; Nanoka 3.4.3+20291004 character 1631",
+      "acquiredAt": "2026-11-10",
+      "scope": "完整技能倍率表已录入；未创建技能组或管理员默认循环。核心节点逐等级累计暴击伤害与基础攻击力已按 Nanoka 1631 资料录入；资源、动作和自动闪避链不自动模拟。",
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen",
+        "https://zzz.nanoka.cc/character/1631"
+      ]
     }
+  }
   ]
 }
