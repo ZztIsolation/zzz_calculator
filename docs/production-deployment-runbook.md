@@ -54,7 +54,7 @@ Promote deploy(candidate_sha, confirm_production=true)
 
 - 从 `main` dispatch 后，候选SHA即冻结；后续main提交不混入该发布。
 - 记录 promotion run/attempt、actor、candidate/deploy前后SHA、CI/artifact、ruleset、生产 evidence、`.deployed-commit`、服务健康与回滚目录。
-- 生产服务的实际切换仍由受保护的 manager 执行，并保留健康、Nginx、静态资源、同源存储、Helper/Scanner manifest和自动回滚门禁。manager 命令契约不要在本文件复制，按[控制面说明](../deploy/production/README.md#control-plane-responsibilities)和脚本核对。
+- 生产服务的实际切换仍由受保护的 manager 执行，并保留健康、Nginx、静态资源、同源存储、Helper/Scanner manifest和自动回滚门禁。manager 命令契约不要在本文件复制，按[控制面说明](../deploy/production/README.md#控制面职责)和脚本核对。
 
 ## 计算器候选验收
 

@@ -1,56 +1,56 @@
-# Recover a frozen production candidate without restarting the live service
+# 恢复冻结的生产候选（不重启在线服务）
 
-Status: current bounded recovery guide. Checked 2026-11-18 against commit `9d51640c23697a849bdd3674b7f645a30c9f76b0`. Keep `PRODUCTION_CD_ENABLED=false` during diagnosis and control-plane installation; this gate prevents promotion, not Calculator service execution. Do not rerun an old production job just to obtain new workflow code.
+状态：现行有界恢复指南。核对：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`。诊断和控制面安装期间保持 `PRODUCTION_CD_ENABLED=false`：该门禁阻止晋级，但不阻止 Calculator 服务运行。不要为了拿到新的工作流代码而重跑旧的生产任务。
 
-Use [the release runbook](../../docs/production-deployment-runbook.md) for normal promotion and [the manager contract](README.md) for command deadlines and evidence. The 2026-10-02 incident narrative is preserved in [the archive](../../docs/archive/deploy-recovery-2026-10-02.md).
+常规晋级见[发布手册](../../docs/production-deployment-runbook.md)，命令期限与证据见[管理器说明](README.md)。2026-10-02 事故的叙述保存在[归档](../../docs/archive/deploy-recovery-2026-10-02.md)。
 
-## 1. Identify the state
+## 1. 判断状态
 
-Classify the report before touching production:
+动生产之前先给报告分类：
 
-- **Candidate not switched**: promotion eligibility, artifact download, upload or validation failed before `current` changed.
-- **Candidate frozen, transaction timed out**: the runner stopped waiting; this is not proof that the manager or public release stopped.
-- **Control plane mismatch**: installed manager/worker/gateway/sudoers hashes or account contract differ from the reviewed bundle.
-- **Switched but public check failed**: manager must have automatic rollback evidence; confirm current, previous and last release state.
-- **Artifact or SHA mismatch**: stop; never substitute a later main commit, a rebuilt local package or a different evidence file.
+- **候选未切换**：晋级资格、产物下载、上传或校验在 `current` 变化之前失败。
+- **候选已冻结，事务超时**：runner 不再等待；这不证明管理器或公开发布已经停止。
+- **控制面不一致**：已安装的管理器/worker/网关/sudoers 哈希或账号约定与评审过的包不同。
+- **已切换但公开检查失败**：管理器必须有自动回滚证据；确认 current、previous 和最近发布的状态。
+- **产物或 SHA 不一致**：停止；绝不能用更晚的 main 提交、本地重新构建的包或不同的证据文件替代。
 
-Preserve run IDs, candidate SHA, CI run, artifact name, promotion run, timestamps and the last evidence summary. Do not paste credentials or candidate stdout into chat or the repository.
+保留运行 ID、候选 SHA、CI run、产物名、晋级 run、时间戳和最后一份证据摘要。不要把凭据或候选的标准输出贴到聊天或仓库里。
 
-## 2. Bounded audit
+## 2. 有界审计
 
-After the reviewed fix is merged and its exact main CI succeeds, dispatch `Audit deploy baseline` from `main` with `mode=audit`. This is read-only and retains the current `deploy` ref. The audit has a 125-second total runner budget (120 seconds plus 5 seconds termination), because the manager audit action allows 90 seconds plus 30 seconds cleanup on a degraded host. A timeout, unavailable lock or missing evidence is a failed audit, never evidence that production is unchanged.
+评审过的修复合并、且其确切的 main CI 成功之后，从 `main` 发起 `Audit deploy baseline`，`mode=audit`。它只读，并保留当前的 `deploy` 引用。审计的 runner 总预算为 125 秒（120 秒加 5 秒终止），因为在降级主机上管理器 audit 动作允许 90 秒加 30 秒清理。超时、锁不可用或缺少证据都是审计失败，**绝不是**生产未变的证据。
 
-The audit may collect fixed diagnostic metadata: installed control-plane hashes, service PID/start time/restart counter, manager/systemd state, validation units, lock identity, transient upload/validation entries, disk/memory/I/O summary, release tree hashes, Nginx and manifest invariants. It must not collect credentials, process arguments, candidate-controlled logs, screenshots or complete user data.
+审计可以收集固定的诊断元数据：已安装的控制面哈希、服务 PID/启动时间/重启计数、管理器/systemd 状态、校验单元、锁身份、瞬时上传/校验条目、磁盘/内存/I/O 摘要、发布目录树哈希、Nginx 与 manifest 不变量。不得收集凭据、进程参数、候选可控的日志、截图或完整用户数据。
 
-If the manager is old, the audit should report the installation boundary. Do not remove arguments, disable the sandbox or retry with guessed systemd properties to get past a capability failure.
+如果管理器是旧版本，审计应报告安装边界。不要为了绕过能力失败而删除参数、关闭沙箱或猜测 systemd 属性重试。
 
-## 3. Install only the control plane
+## 3. 只安装控制面
 
-When the reviewed control-plane bundle is ready, install it through the root bootstrap described in [README.md](README.md#one-time-initialization-and-upgrades). Keep the application service, Nginx, `current`, release state and download origin untouched. Verify installed hashes, account/group/shell/mode/ownership contracts, gateway restrictions and the service PID/restart counter afterward.
+评审过的控制面包就绪后，通过[管理器说明](README.md#一次性初始化与升级)描述的 root bootstrap 安装。保持应用服务、Nginx、`current`、发布状态和下载源不被触碰。安装后验证已安装文件哈希、账号/组/shell/权限/属主约定、网关限制，以及服务 PID 和重启计数。
 
-A control-plane installation is complete only when the static validator, shell syntax checks, SSH gateway tests, systemd profile tests and installed file hashes agree. It does not make a candidate eligible and does not restart Calculator.
+只有当静态校验器、shell 语法检查、SSH 网关测试、systemd 配置测试和已安装文件哈希全部一致，控制面安装才算完成。它不会让候选获得资格，也不会重启 Calculator。
 
-## 4. Resume a frozen candidate
+## 4. 恢复冻结的候选（Resume）
 
-First set `PRODUCTION_CD_ENABLED` back to `true`: the baseline audit required `false`, but Resume and its reusable production deployment reject that disabled state. See the [workflow gates](../../docs/production-deployment-runbook.md#工作流门禁表).
+先把 `PRODUCTION_CD_ENABLED` 改回 `true`：基线审计要求它为 `false`，但 Resume 及其复用的生产部署会拒绝这个禁用状态。见[工作流门禁表](../../docs/production-deployment-runbook.md#工作流门禁表)。
 
-Only after audit/control-plane checks pass, dispatch `Resume deploy` with the exact:
+只有审计和控制面检查通过之后，才发起 `Resume deploy`，参数必须精确：
 
-- `candidate_sha` currently pointed to by `deploy`;
-- successful `ci_run_id` that owns the immutable artifact;
-- original owner-dispatched `promotion_run_id`;
-- `confirm_production=true`.
+- `candidate_sha`：`deploy` 当前指向的提交；
+- 拥有不可变产物的成功 `ci_run_id`；
+- 原由所有者发起的 `promotion_run_id`；
+- `confirm_production=true`。
 
-The workflow must recheck owner/triggering actor, original promotion run, frozen SHA, `deploy` ancestry/current SHA, CI/artifact availability, workflow ref and ruleset before production access. If any value changed, stop and create a new reviewed candidate. Do not use `main` HEAD as a substitute.
+访问生产之前，工作流必须重新校验所有者/触发者、原晋级 run、冻结的 SHA、`deploy` 的祖先关系与当前 SHA、CI/产物可用性、工作流引用和 ruleset。任何值变化都要停止并创建新的、经评审的候选，不得以 `main` HEAD 替代。
 
-## 5. Rollback
+## 5. 回滚
 
-If the transaction has a committed switch and manager evidence indicates public validation failure, first confirm automatic rollback status and the actual `current` target. If manual rollback is required, the repository owner dispatches `Rollback production` with `confirm=true`; it uses the server-recorded previous release and serializes with the production lock.
+如果事务已有提交的切换，且管理器证据表明公开校验失败，先确认自动回滚的状态和 `current` 的实际目标。需要手动回滚时，由仓库所有者发起 `Rollback production`，`confirm=true`；它使用服务器记录的上一个发布，并与生产锁串行。
 
-After rollback, check `/`, `/api/health`, `/api/catalog`, `.deployed-commit`, service active state, `NRestarts`, Nginx and manifest invariants. Keep new/old release directories, artifacts and evidence for the retention period. Do not delete browser IndexedDB/localStorage, maintenance history or user drafts to make an old release pass.
+回滚之后检查 `/`、`/api/health`、`/api/catalog`、`.deployed-commit`、服务 active 状态、`NRestarts`、Nginx 和 manifest 不变量。新旧发布目录、产物和证据在保留期内保持不动。不要为了让旧版本通过而删除浏览器的 IndexedDB/localStorage、维护历史或用户草稿。
 
-## 6. Stop conditions
+## 6. 停止条件
 
-Stop and report when any of these occurs: candidate SHA is not an ancestor of main; `deploy` moved; artifact/evidence hash is missing or mismatched; owner/triggering actor is not authorized; lock cannot be acquired; sandbox profile is unsupported; current release or state files changed unexpectedly; automatic rollback failed; health or static asset checks remain red; or evidence cannot be committed atomically.
+出现以下任一情况就停止并报告：候选 SHA 不是 main 的祖先；`deploy` 已移动；产物/证据哈希缺失或不一致；所有者/触发者未获授权；无法获得锁；沙箱配置不受支持；current 发布或状态文件发生意外变化；自动回滚失败；健康或静态资源检查仍然是红的；证据无法原子提交。
 
-The correct next action is a new controlled investigation or a new exact-SHA candidate, not a force push, direct SSH edit, longer unbounded wait or silent retry.
+正确的下一步是新的受控调查，或新的精确 SHA 候选，**而不是** force push、直接 SSH 修改、更长的无限等待或悄悄重试。
