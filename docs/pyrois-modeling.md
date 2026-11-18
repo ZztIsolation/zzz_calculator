@@ -55,7 +55,7 @@
 
 日冕遗蜕的通用20%暴击率对强攻角色生效；以太抗性无视通过 `requirement.agentIds: ["pyrois"]` 限制在佩洛伊斯。空白名单/未配置不额外限制，非法非数组输入由维护校验拒绝。
 
-核心成长、Buff选择器和维护页读取同一套核心成长表。目录目前要求核心被动四分支统一选用，不应通过旧的分支Buff ID建立多个可独立关闭的伪选项。Enka 展柜还需要单独的头像映射：角色资料存在不等于 `1551` 已可导入；映射由 [data/enka_zzz_mapping.json](../data/enka_zzz_mapping.json) 和 [entity-mapping.js](../core/enka-import/entity-mapping.js)共同决定。
+核心成长、Buff选择器和维护页读取同一套核心成长表。目录目前要求核心被动四分支统一选用，不应通过旧的分支Buff ID建立多个可独立关闭的伪选项。当前 Enka 映射快照已包含 `1551 → pyrois`；实际导入仍由 [data/enka_zzz_mapping.json](../data/enka_zzz_mapping.json) 和 [entity-mapping.js](../core/enka-import/entity-mapping.js)共同决定。
 
 ## 验证入口
 

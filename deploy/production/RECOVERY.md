@@ -32,6 +32,8 @@ A control-plane installation is complete only when the static validator, shell s
 
 ## 4. Resume a frozen candidate
 
+First set `PRODUCTION_CD_ENABLED` back to `true`: the baseline audit required `false`, but Resume and its reusable production deployment reject that disabled state. See the [workflow gates](../../docs/production-deployment-runbook.md#工作流门禁表).
+
 Only after audit/control-plane checks pass, dispatch `Resume deploy` with the exact:
 
 - `candidate_sha` currently pointed to by `deploy`;

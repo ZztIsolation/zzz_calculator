@@ -16,14 +16,13 @@
 
 ## 架构边界
 
-本地扩展（2026-10-13）：南宫羽异放条目的`minCinemaLevel`与常数节点的七档`cinemaValues`
-必须按当前影画解析；低于门槛的条目不可选择。
+当前异放方案仅按 `minimumCinemaLevel` 过滤。南宫羽目录使用的 `minCinemaLevel` 和常量节点的 `cinemaValues` 未被运行时代码读取，六影门槛及二影常量成长尚未生效；复现与影响见[南宫羽已知缺陷](nangongyu-modeling.md#已知缺陷)。
 
 验证入口：[浏览器本地计算](../tests/browser-local-compute.test.js)、[生产服务](../tests/server-production.test.js)。
 
 - `core/` 只承载可跨平台复用的计算、规范化、校验和优化搜索逻辑，不直接依赖 DOM、浏览器存储或 Node 文件系统。
 
-- `webapp/src/runtime/` 提供 catalog、IndexedDB/localStorage、扫描器桥接和浏览器 Worker 等平台适配。
+- `webapp/src/runtime/` 提供 catalog、IndexedDB/localStorage 和扫描器桥接等平台适配；浏览器优化 Worker 位于 [optimizer.worker.ts](../webapp/src/workers/optimizer.worker.ts)，由 [stores/optimizer.ts](../webapp/src/stores/optimizer.ts) 创建。
 
 - `backend/` 提供 Node API、文件存储适配和静态产物服务；同一业务规则不得在后端和浏览器各维护一份。
 
@@ -122,7 +121,7 @@
 
 - 菲欧妮的异放必须从她自身的 `releaseSkillRef` 读取当前技能等级的 `releaseMultiplier` 行；焚罪和烬火追魂分别保持独立倍率方案，影画4的固定600%方案不继承主要异放的额外异常暴伤。
   两项主异放的额外异常暴伤由默认开启的技能来源 Buff 提供，规则使用 `target.releaseTargets` 指向焚罪与烬火追魂方案；关闭该 Buff 后主异放各减少40个百分点，影画4额外异放、普通属性异常、乱流和紊乱不得受影响。
-  灼蚀异常暴击率使用初始异常掌控的 `clamp(30% + max(掌控 - 155, 0) × 0.7%, 0, 100%)`，只命中属性异常与异放；普通异常、紊乱、乱流和直伤必须保持隔离。
+  灼蚀异常暴击率使用初始异常掌控的 `clamp(30% + max(掌控 - 155, 0) × 0.7%, 0, 100%)`，与灼蚀异常暴伤规则一样命中属性异常、乱流和异放；紊乱和直伤必须保持隔离。
   默认循环为一次火属性灼烧异放，普通攻击12级、焚罪445%、核心F、额外能力开启；灼蚀周期火伤只能由用户手动加入核心技能事件，不得自动生成时间轴或敌人状态。
 
 - 管理员默认计算的右侧事件详情必须以正常文本色展示中文静态值，包括只读的“是否失衡”；不得用低对比度禁用控件承担只读展示，事件切换和保存不得修改管理员配置。
@@ -235,7 +234,7 @@
   维护页与保存接口的校验上下文必须携带完整角色清单（维护页用目录角色并以当前草稿替换同一角色，保存接口用数据文件角色并以清理后的草稿替换），草稿内新增的异放方案必须能在同一次保存中被引用。
   `anomalyEffects` 缺失或输入为空数组时表示命中该结算类型的全部具体异常，非空时才作为精确白名单，维护保存和 API 返回必须省略空数组。
   异放的具体异常筛选指原异常，不筛选触发者或倍率方案；属性异常的 `anomalyVariants` 继续独立生效。实际计算事件仍必须指定具体异常。切换异常目标的结算类型必须重置为全部且离开属性异常时清除异常形态；
-  异放定向规则不得伪装为普通异常形态。指定模式提供角色、大类、可选招式和可选倍率行，通用模式支持多选大类，标签模式支持多选冲刺攻击、强化特殊技和支援攻击。
+  异放定向规则不得伪装为普通异常形态。指定模式提供角色、大类、可选招式和可选倍率行，通用模式支持多选大类，标签模式支持多选，合法标签白名单直接以 [core/skillTargets.js](../core/skillTargets.js) 的 `SKILL_TAGS` 为准。
   同一规则的标签按 OR 匹配，但不得与指定招式或通用大类混用。维护页与工作台自定义 Buff 不得显示或新建 `moveIdPrefixes`，也不得出现“既有招式系列”；
   工作台自定义 Buff 不得暴露缺少异常目标选择的 `anomalyDurationBonusSeconds`。
 
@@ -294,7 +293,7 @@
 
 - 新建请求允许省略顶层 ID；后端在校验前补齐顶层与嵌套 ID，已有 ID 必须保持不变。场地 Buff 继续根据玩法、版本、期数和名称生成稳定 ID。
 
-- 异常资料读取 `anomalyEffects.effects` 并按 `settlementType` 区分异常和紊乱；队友 Buff 按角色分组、一次编辑一个 Buff，保存时保持“队友 ID + Buff ID”双层结构。
+- 异常资料读取 `anomalyEffects.effects` 并按 `settlementType` 区分属性异常（`attribute`）、紊乱（`disorder`）和乱流（`turbulence`）；队友 Buff 按角色分组、一次编辑一个 Buff，保存时保持“队友 ID + Buff ID”双层结构。
 
 - 队友角色分组必须在角色层保存合法的 `attribute` 与 `specialty` 枚举，维护页新增或保存时两者均必填，`/api/catalog` 与 `/api/meta` 必须完整保留。
   队友 Buff 页签使用两个不可重复的队友槽位，按特性分组选择角色，并保留文本搜索；批量添加和移除只作用于当前可见 Buff。新选队友默认勾选普通 Buff，影画选择累积切换对应影画 Buff，潜能 Buff 独立手动选择；

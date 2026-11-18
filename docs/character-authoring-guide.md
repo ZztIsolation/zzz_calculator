@@ -153,7 +153,7 @@
 - 初版问题：专属字段过多、普通暴击率与锐化语义混用、局外属性和快速路径遗漏；发布拆分还曾漏带维护删除。
 - 后续修正：独立Sharp域贯通面板、事件、白盒和优化；以事件类型推导行为；默认循环表达影画差异；最终目录保留人工删除。
 - 可复用原则：新域完整接入，自动值不交给维护者手输；交付时把有意删除与新增功能同等核对。
-- 证据：[Sharp核心](../core/sharpDamage.js)、[Sharp测试](../tests/sharp-damage.test.js)、[发布打包](../scripts/package-server-release.js)。`87258ef`的目录只有1/2/4/6影，`744ddbd`加入六影循环时重新含有3/5影；后续 `fe403bc` 目录恢复人工删除，可用Git逐记录对照。
+- 证据：[Sharp核心](../core/sharpDamage.js)、[Sharp测试](../tests/sharp-damage.test.js)、[发布打包](../scripts/package-server-release.js)。原记录引用的 `87258ef` 无法在本地 Git 对象库解析，其目录是否只有1/2/4/6影待核实；`744ddbd`加入六影循环时重新含有3/5影；后续 `fe403bc` 目录恢复人工删除，可用Git逐记录对照。
 
 ### 佩洛伊斯
 

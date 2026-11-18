@@ -27,7 +27,7 @@
 
 它不保存风化来源、第二异常、来源面板快照、剩余时间、待确认倍率或特殊形态。正式伤害使用当前非风属性角色的面板；维琳娜作为队友只通过已选择的队友Buff提供乱流倍率、乱流增伤和抗性无视。维琳娜界面展示说明，但不生成要求她自身面板的正式乱流事件。异常代理人的完整组队伤害仍不在本模型内。
 
-维琳娜的异放是另一种 `settlementType: "release"`。她通过 `releaseSource` 选择 `micro_vortex`、`broad_vortex` 或 `ultimate_wind`，强制使用风化基底；保存后的维琳娜事件不再携带通用 `triggerActorRef`/`anomalySource` 字段。通用Aria/Vivian双来源模型不因此删除。当前目录的管理员默认是“单次风化”，不是异放；已有自定义直伤和异放配置不得被新默认覆盖。
+维琳娜的异放是另一种 `settlementType: "release"`。她通过 `releaseSource` 选择 `micro_vortex`、`broad_vortex` 或 `ultimate_wind`，强制使用风化基底；保存后的维琳娜事件不再携带通用 `triggerActorRef`/`anomalySource` 字段。通用Aria/Vivian双来源模型不因此删除。当前目录的管理员默认是“单次风化”，不是异放；默认事件 ID `velina-broad-vortex-release` 是历史残留名，实际字段为 `settlementType: "attribute"`、`anomalyEffect: "wind_corrosion"`、`count: 1`、`procCount: 1`，不能按 ID 后缀判断结算类型；已有自定义直伤和异放配置不得被新默认覆盖。
 
 ## 乱流倍率与时间
 
@@ -62,7 +62,7 @@
 
 ## 当前维护和验证
 
-维护目录是默认配置的事实来源；维护编辑后应保存、刷新并重新打开确认，不可让旧迁移入口自动恢复“单次广域气旋异放”。
+维护目录是默认配置的事实来源；维护编辑后应保存、刷新并重新打开确认，不可让旧迁移入口自动恢复“单次广域气旋异放”；默认事件历史 ID 与实际单次风化的区别见[正式事件结构](#正式事件结构)。
 
 - `npm run test:turbulence-damage`：乱流/紊乱倍率、时间、属性过滤、来源继承和跨路径结果。
 - `npm run test:velina-damage`、`npm run test:velina-c6-damage`：维琳娜公式、异放来源、六影作用范围。

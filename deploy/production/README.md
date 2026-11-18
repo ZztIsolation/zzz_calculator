@@ -49,7 +49,7 @@ The manager must preserve the browser origin and local data contract: production
 
 The manager accepts only supported systemd versions after parsing both client and PID1 versions; it selects the fixed v239/v242/v248 sandbox profile and does not retry unknown properties on an older host. Candidate code runs in the validation sandbox with a read-only deployment root, bounded tmpfs and no access to production secrets. The forced gateway disables PTY, agent/X11/port forwarding and arbitrary shell execution.
 
-The production service, Nginx, download origin and release directories are inspected by the manager but are not templates for blind overwrite. Preserveon-site copies and apply only explicitly reviewed control-plane changes. Never put private keys, passwords, cookies or Basic Auth values in this document, commands, evidence or logs.
+The production service, Nginx, download origin and release directories are inspected by the manager but are not templates for blind overwrite. Preserve on-site copies and apply only explicitly reviewed control-plane changes. Never put private keys, passwords, cookies or Basic Auth values in this document, commands, evidence or logs.
 
 ## Workflow ownership
 

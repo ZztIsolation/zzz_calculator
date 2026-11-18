@@ -35,7 +35,7 @@
 表格、图表、导航条和事件列表可在明确的局部容器滚动，但横向溢出不能传递到页面或弹窗外层。添加复杂表单时给最外层添加`data-layout-surface`，给关键字段添加`data-layout-field`。
 
 
-吸顶元素统一以 `--app-topbar-height` 为偏移；顶栏在窄屏换行时必须同步更新该变量，吸顶内容不得压住顶栏。
+当前 `webapp/src/styles/tokens.css` 将 `--app-topbar-height` 固定为 `56px`；工作台结果列以该变量加 `18px` 为吸顶偏移，仅在视口宽度大于 `1280px` 时吸顶，较窄时改为静态定位（`WorkbenchResultColumn.vue`）。顶栏在窄屏换行时同步更新变量的机制尚未实现，不能把它当作现有布局保证。
 
 ## 顶栏导航（2026-10-25）
 

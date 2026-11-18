@@ -230,6 +230,24 @@ Aria's player editor constrains the source to her own Corruption. Velina uses
 [Wind topic](wind-anomaly-modeling.md). Fixed Release multipliers replace the anomaly
 multiplier basis, rather than blindly multiplying final damage.
 
+### Anomaly crit outcomes
+
+[anomalyCrit.js](../core/anomalyCrit.js) supports `expected`, `crit` and `nonCrit`;
+an absent or unknown mode normalizes to `expected`. Supported events have
+`kind: "anomaly"` and settlement type omitted, `attribute`, `release` or
+`turbulence`; Disorder is not supported.
+
+Finite CRIT Rate is clamped to 0–1 and finite CRIT DMG to a nonnegative value;
+non-finite inputs become zero. With effective rate r > 0 and damage d > 0,
+the multipliers are `1 + r * d`, `1 + d` and `1`, respectively. Unsupported
+events or a zero rate/damage always use multiplier 1, even when `crit` was
+requested. `resolveAnomalyCritState` preserves the normalized requested mode
+but reports effective mode `nonCrit` when CRIT is unavailable.
+
+`anomalyDamageVariants` returns no variants when CRIT is unavailable; otherwise
+each mode reports single damage as base single damage times its multiplier,
+and final damage as single damage times event count.
+
 ## Optimization and persistence
 
 Strict optimization uses the same event semantics as normal calculation. Preserve

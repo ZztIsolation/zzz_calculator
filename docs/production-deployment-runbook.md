@@ -13,6 +13,23 @@
 - 生产失败使用 `Resume deploy` 重试冻结候选，或由 owner 显式运行 `Rollback production`；不得直接push `deploy`、force-push、PAT回退或手工修改线上目录。
 - `Audit deploy baseline` 和生产工作流的 `dry-run` 只读/隔离运行，不改变公开版本；它们不是生产发布成功证据。
 
+## 工作流门禁表
+
+以下逐项依据当前 `.github/workflows/*.yml` 的触发器、输入声明及校验分支核对。变量值为字符串精确比较；“不检查”不表示免除 owner、环境、分支保护、SHA、CI 或产物等其他校验。手动生产操作仍须显式授权。
+
+| 工作流（源码） | 允许的发起分支 / 入口 | `PRODUCTION_CD_ENABLED` 要求 | 输入参数 |
+| --- | --- | --- | --- |
+| [CI](../.github/workflows/ci.yml) | push 到 `main`；PR 目标为 `main`；手动 dispatch 未额外限制分支 | 不检查 | 无 |
+| [Deploy legacy GitHub Pages fallback](../.github/workflows/pages.yml) | 仅手动 dispatch，文件未限制分支 | 不检查 | 无 |
+| [Promote deploy](../.github/workflows/promote-deploy.yml) | 仅从 `main` 手动发起 | 必须为 `true` | `candidate_sha`：必填 string，必须等于发起时的 main 完整SHA，后续 main 前进时仍须为其祖先；`confirm_production`：必填 boolean，默认 false，执行须 true |
+| [Resume deploy](../.github/workflows/resume-deploy.yml) | 仅从 `deploy` 手动发起 | 必须为 `true` | `candidate_sha`、`ci_run_id`、`promotion_run_id`：均必填 string，分别为冻结SHA、成功 main CI、原晋级run；`confirm_production`：必填 boolean，默认 false，执行须 true |
+| [Rollback production](../.github/workflows/rollback-production.yml) | 仅从 `deploy` 手动发起，workflow SHA 必须等于受保护 deploy 当前SHA | **不检查该变量**，false 不会阻止回滚 | `confirm`：必填 boolean，默认 false，执行须 true |
+| [Audit deploy baseline](../.github/workflows/audit-deploy-baseline.yml) | 仅从 `main` 手动发起 | 必须为 `false` | `mode`：必填 choice，`audit` / `dry-run`，默认 `audit` |
+| [Deploy production — 手动入口](../.github/workflows/deploy-production.yml) | 仅从 `deploy` 发起，workflow SHA 必须等于受保护 deploy 当前SHA；只支持 audit/dry-run | 手动分支不检查该变量 | `mode`：必填 choice，`audit` / `dry-run`，默认 `dry-run`；`run_id`：可选 string，留空解析 deploy HEAD 的成功 main CI |
+| [Deploy production — 复用入口](../.github/workflows/deploy-production.yml) | 仅允许 Promote/main、Resume/deploy、Audit deploy baseline/main 三种调用方与 workflow ref 组合 | Promote/Resume 必须为 `true`；Audit 必须为 `false` | `candidate_sha`、`ci_run_id`：必填 string；`promotion_run_id`：声明为可选 string，但 deploy 模式校验要求有效数字run；`operation_mode`：可选 string，默认 `deploy`，Promote/Resume 只允许 `deploy`，Audit 只允许 `audit` / `dry-run` |
+
+Promote、Resume、Rollback、Audit 及 Deploy production 的手动入口还校验发起者和重跑者均为仓库所有者。CI 仅对符合文件条件的 main push/手动运行生成生产 artifact；PR 验证通过不等于已有可晋级产物。上表只描述 YAML 的分支门禁，不推断仓库外部环境保护配置。
+
 ## 发布前冻结
 
 1. 确认目标是网站、Helper/Scanner，还是联合发布。三者可独立回档；联合发布按“二进制对象 → CDN版本URL → Helper manifest → 网站 → Scanner manifest → 精确刷新manifest”顺序。
