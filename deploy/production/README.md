@@ -1,6 +1,6 @@
 # 生产部署管理器（deploy manager）
 
-本文描述已安装的部署控制面，**不是**常规发布检查清单：候选冻结、CI/产物核对和由所有者发起的晋级见[仓库发布手册](../../docs/production-deployment-runbook.md)，有界恢复见[RECOVERY.md](RECOVERY.md)。核对：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`（部署控制面源码）。
+本文描述已安装的部署控制面，**不是**常规发布检查清单：候选冻结、CI/产物核对和由所有者发起的晋级见[仓库发布手册](../../docs/production-deployment-runbook.md)，有界恢复见[RECOVERY.md](RECOVERY.md)。状态：现行说明。核对日期：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`（部署控制面源码）。
 
 ## 控制面职责
 

@@ -6,7 +6,7 @@ Language: [简体中文](README.zh-CN.md)
 
 ## Upload Update Summaries
 
-- **2026-11-18 — Documentation entry points and temporary-artifact hygiene**: removed committed investigation artifacts, made the README point to the complete documentation index, and synchronized the current-document full-review baseline; no calculation, catalog, deployment or user-data behavior changed.
+- **2026-11-18 — Documentation overhaul**: AGENTS.md gained a project overview and a task routing table; character-specific docs moved under `docs/characters/`; the regression contract was cut to cross-character invariants; a periodic catalog maintenance handbook was added; committed investigation artifacts were removed. No calculation, catalog, deployment or user-data behavior changed.
 - **2026-11-06 — Critical Assault 3.3 phase-two bosses and Field Buffs**: added the phase-two Field Buffs, four encounters and three local boss icons; unsupported mechanics remain descriptive, and the maintenance-page adjustment is preserved as saved.
 - **2026-11-03 — Nekomata and Asaba Harumasa temporarily hidden**: their models, skills, Buffs, icons, Enka mappings and maintenance entries remain, but they stay out of the workbench, optimizer and Enka choice lists until review is complete; Evelyn remains visible.
 - **2026-11-01 — Completed Evelyn skill multiplier catalog**: filled the Basic, Dodge, Assist and Basic Special multiplier tables under the current complete-skill model boundary.

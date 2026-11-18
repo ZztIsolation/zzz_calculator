@@ -1,6 +1,6 @@
 # 恢复冻结的生产候选（不重启在线服务）
 
-状态：现行有界恢复指南。核对：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`。诊断和控制面安装期间保持 `PRODUCTION_CD_ENABLED=false`：该门禁阻止晋级，但不阻止 Calculator 服务运行。不要为了拿到新的工作流代码而重跑旧的生产任务。
+状态：现行有界恢复指南。核对日期：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`。诊断和控制面安装期间保持 `PRODUCTION_CD_ENABLED=false`：该门禁阻止晋级，但不阻止 Calculator 服务运行。不要为了拿到新的工作流代码而重跑旧的生产任务。
 
 常规晋级见[发布手册](../../docs/production-deployment-runbook.md)，命令期限与证据见[管理器说明](README.md)。2026-10-02 事故的叙述保存在[归档](../../docs/archive/deploy-recovery-2026-10-02.md)。
 
