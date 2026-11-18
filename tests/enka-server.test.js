@@ -79,7 +79,7 @@ async function provePackagedMappingSurvivesLegacyValidationData() {
   )
   try {
     const mapping = await loadEnkaMappingSnapshot(backendDir, legacyDataDir)
-    assert.equal(mapping.source.commit, "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554")
+    assert.equal(mapping.source.commit, "9780bb7dc728cf1862de8e080e9d56e60a7c496b")
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

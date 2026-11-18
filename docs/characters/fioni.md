@@ -1,0 +1,59 @@
+# 菲欧妮（`fioni`）
+
+| 项目 | 内容 |
+| --- | --- |
+| 游戏 ID | `1641`；官方条目 `2216` |
+| 首页与优化器 | 可见 |
+| 资料来源 | 见下文“来源与取值边界”；资料核对日期 2026-10-17 |
+| 实现核对 | 2026-11-18；基准提交 `9d51640c23697a849bdd3674b7f645a30c9f76b0` |
+| 验证入口 | `npm run test:fioni-damage` |
+
+## 来源与取值边界
+
+- [米游社 HoYoWiki 角色条目 2216](https://baike.mihoyo.com/zzz/wiki/content/2216/detail?mhy_presentation_style=fullscreen)
+- [Nanoka 角色页](https://zzz.nanoka.cc/character/1641)
+- [Nanoka 结构化数据 3.3.12+19629936](https://static.nanoka.cc/zzz/3.3.12+19629936/en/character/1641.json)
+
+官方结构化条目是技能、面板和影画的主来源，条目本身标注技能数据来自创作体验服。官方未提供核心被动主体的 A-F 数值表，因此使用 Nanoka 同版本条目补齐：异常精通 `43/50/57/64/71/78/85`，灼蚀异常暴伤 `12.5/14.5833/16.6667/18.75/20.8333/22.9167/25%`，灼蚀周期火伤 `25/29.1667/33.3333/37.5/41.6667/45.8333/50%`。计算保留这些线性小数，界面按现有格式化规则显示。
+
+## 面板与核心
+
+60 级、未计核心节点的面板为：生命 7673、攻击 797、防御 612、冲击 86、异常精通 118、异常掌控 116、暴击率 5%、暴击伤害 50%。A/C/E 各增加 12 点基础异常掌控，B/D/F 各增加 25 点基础攻击；F 级面板为攻击 872、异常掌控 152、异常精通 203。初始核心主体档的异常精通为 161。
+
+核心被动按角色 Buff 处理，不建立敌人状态机。灼蚀异常暴击率使用：
+
+`clamp(30 + max(初始异常掌控 - 155, 0) × 0.7, 0, 100)%`
+
+该 Buff 使用通用异常结算范围，命中属性异常、乱流和异放；额外能力的异常暴伤 `+15%` 默认启用；影画 1 的灼蚀异常暴伤 `+25%`、影画 2 的自身伤害 `+30%`、影画 6 的全属性抗性无视和异放防御无视均按独立影画 Buff 保存。
+
+## 异放与默认目标
+
+异放使用独立 `settlementType: "release"`。焚罪和烬火追魂的异放倍率作为技能目录中的 `releaseMultiplier` 行保存，并由异放方案的 `releaseSkillRef` 绑定当前技能等级。两项主异放共用默认开启的技能来源 Buff，以 `target.releaseTargets` 精确提供额外异常暴伤 `+40%`；影画4方案不在目标列表中，因此不继承该加成：
+
+- 焚罪：`225%→525%`；
+- 烬火追魂：`300%→705%`；
+- 影画 4 额外异放：固定 `600%`，最低开放影画为 4 的独立方案，不继承主要异放的额外 40% 异常暴伤。
+
+异常 Buff 的 `target.releaseTargets` 是通用的具体异放筛选，目标由触发角色 `agentId` 与异放方案 `profileId` 组成；留空表示该规则作用于所选结算类型的全部异放，非空目标只能用于纯异放规则。
+
+默认循环是一次火属性灼烧异放，来源为焚罪，普通攻击等级 12，因此默认异放倍率为 `445%`。默认配置为 C0、核心 F、额外能力开启；当前默认配置没有 `variants`，技能等级按用户选择的最终等级读取，不再声称存在 C3/C5 默认等级变体。
+
+## 优化器
+
+精准优化（`exact-super-bound`）遇到异放事件时，必须使用固定套装 objective 内核的可证明区间上界。核心被动的灼蚀异常暴击率公式 `clamp(30 + max(初始异常掌控 - 155, 0) × 0.7, 0, 100)` 单调非减且有上界，由白名单解析器 `compileInitialMasteryAnomalyCritFormula` 编译：只接受 `clamp(base + max(x - threshold, 0) * rate, 0, cap)` 这一形状，`base`/`threshold`/`rate`/`cap` 可为字面量或目录参数，要求 `rate`、`cap` 非负，并逐点与通用表达式求值核对。编译成功时按初始异常掌控的区间上界求值，纳入固定套装 objective 内核后 `releaseIntervalBound` 才允许为 true，默认单次异放的精准优化因此恢复剪枝。
+
+其他动态公式或无法证明的区间仍使固定内核返回无限上界并继续全枚举。严格优化器在需要异放区间上界时以 `releaseIntervalBoundEnabled` 和 `releaseBoundFallbackReason` 报告状态，后者取 `fixed-kernel-unavailable`、`dynamic-formula-unsupported`、`dynamic-out-of-combat-requirement` 或 `interval-bound-unsafe` 之一。该修复不改变伤害语义：公式仍按通用求值路径结算，区间上界只服务剪枝，Top 10 必须与关闭剪枝的 `exact-legacy` 一致。
+
+## 未自动模拟的机制
+
+燔焰、升变、枯荣、生竭、重明、完美格挡获得燔焰、终结技自动追击、灼蚀持续时间刷新和每 8 秒周期伤害的自动计时都保留在技能/核心描述中。灼蚀周期伤害另提供可选核心技能事件，用户可手动加入次数；不会自动生成完整战斗时间轴。
+
+不自动模拟生命值消耗、资源回复和入场追击；灼蚀的跨角色效果通过队友条目提供（见回归验收边界），但不建立灼蚀状态机，也不自动判断队友异常是否触发。
+
+## 回归验收边界
+
+- 队友条目（`data/combat_buffs.json` 的 `teammates`，ID `fioni.core.sear`、`fioni.additional.sear_crit_dmg`、`fioni.cinema_1.sear_crit_dmg`）只含对全队生效的灼蚀异常暴击率与暴击伤害（核心 F 级 25%、额外能力 15%、影画一 25%），命中属性异常、乱流和异放，不命中紊乱；灼蚀暴击率读取外部输入“菲欧妮初始异常掌控”，默认 255（达到暴击率上限 100%），其余自身效果（影画二及以后、灼蚀伤害、异放暴伤）不进入队友条目。独立算例见 `npm run test:teammate-team-effects`。
+
+- 两项主异放的额外异常暴伤 Buff 关闭后，主异放各减少 40 个百分点；影画 4 额外异放、普通属性异常、乱流和紊乱不得受影响。
+- 区间上界已纳入固定套装 objective 后，严格优化器必须报告 `releaseIntervalBoundEnabled: true` 且 `releaseBoundFallbackReason: null`。
+- Top 10 驱动盘 ID 与分数必须与关闭剪枝的 `exact-legacy` 完全一致，且 `scoredCombinationCount + prunedBySuperBound === estimatedCombinationCount`。

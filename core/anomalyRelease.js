@@ -93,6 +93,26 @@ function clampValue(value, lower, upper) {
     return Math.max(lower, Math.min(upper, value))
 }
 
+export function normalizeCinemaLevel(value = 0) {
+    const numeric = Number(value ?? 0)
+    return Number.isFinite(numeric) ? Math.max(0, Math.min(6, Math.trunc(numeric))) : 0
+}
+
+export function minimumCinemaLevelForReleaseProfile(profile = {}) {
+    const raw = profile?.minimumCinemaLevel ?? profile?.minCinemaLevel ?? 0
+    const numeric = Number(raw)
+    return Number.isFinite(numeric) ? numeric : 0
+}
+
+function constantValueForCinema(node = {}, context = {}) {
+    if (node.cinemaValues === undefined) return node.value
+    if (!Array.isArray(node.cinemaValues) || node.cinemaValues.length !== 7
+        || !Array.from(node.cinemaValues).every(Number.isFinite)) {
+        throw new Error("异放公式常量的 cinemaValues 必须包含 0 到 6 影共 7 个数值。")
+    }
+    return node.cinemaValues[normalizeCinemaLevel(context?.cinemaLevel)]
+}
+
 function displayNumber(value, precision = 6) {
     if (!Number.isFinite(Number(value))) {
         return "-"
@@ -145,7 +165,7 @@ function evaluateLeaf(node, context) {
     let modifierFactor = null
 
     if (node.kind === "constant") {
-        rawValue = finiteNumber(node.value, "异放公式常量")
+        rawValue = finiteNumber(constantValueForCinema(node, context), "异放公式常量")
         sourceLabel = expressionLabel(node, "常量")
     } else if (node.kind === "triggerStat") {
         const panelKind = node.panel === "inCombat" ? "inCombat" : "outOfCombat"
@@ -340,9 +360,9 @@ export function isReleaseSettlement(event = {}) {
 }
 
 export function anomalyReleaseProfiles(agent = {}, cinemaLevel = 0) {
-    const level = Math.max(0, Math.min(6, Math.trunc(Number(cinemaLevel ?? 0))))
+    const level = normalizeCinemaLevel(cinemaLevel)
     return (Array.isArray(agent?.anomalyReleaseProfiles) ? agent.anomalyReleaseProfiles : [])
-        .filter(profile => Number(profile?.minimumCinemaLevel ?? 0) <= level)
+        .filter(profile => minimumCinemaLevelForReleaseProfile(profile) <= level)
 }
 
 export function isVelinaReleaseAgent(agent = {}) {
@@ -474,7 +494,7 @@ export function evaluateReleaseExpressionInterval(node, context = {}) {
         const unit = node.unit ?? "raw"
         let raw
         if (node.kind === "constant") {
-            raw = intervalOf(node.value, "异放公式常量")
+            raw = intervalOf(constantValueForCinema(node, context), "异放公式常量")
         } else if (node.kind === "triggerStat") {
             const panelKind = node.panel === "inCombat" ? "inCombat" : "outOfCombat"
             const stat = String(node.stat ?? "").trim()
@@ -637,6 +657,9 @@ export function validateAnomalyReleaseProfile(profile = {}) {
                 conversionSourceCount += 1
             }
         }
+        if (node.cinemaValues !== undefined && (node.kind !== "constant" || node.op)) {
+            errors.push(`${path}.cinemaValues 只能用于常量节点。`)
+        }
         if (node.op) {
             if (!RELEASE_OPERATIONS.has(node.op)) errors.push(`${path} 使用了不支持的运算。`)
             for (const [index, arg] of (node.args ?? []).entries()) validateNode(arg, `${path}.args[${index}]`, allowWhiteBoxRole)
@@ -644,6 +667,17 @@ export function validateAnomalyReleaseProfile(profile = {}) {
         }
         if (!RELEASE_LEAF_KINDS.has(node.kind)) errors.push(`${path} 使用了不支持的节点。`)
         if (!RELEASE_UNITS.has(node.unit)) errors.push(`${path}.unit 必须显式使用 raw、percent 或 decimal。`)
+        if (node.kind === "constant" && node.cinemaValues !== undefined) {
+            if (!Array.isArray(node.cinemaValues) || node.cinemaValues.length !== 7) {
+                errors.push(`${path}.cinemaValues 必须包含 0 到 6 影共 7 个数值。`)
+            } else {
+                Array.from(node.cinemaValues).forEach((value, index) => {
+                    if (!Number.isFinite(value)) {
+                        errors.push(`${path}.cinemaValues[${index}] 必须是有限数值。`)
+                    }
+                })
+            }
+        }
         if (node.kind === "triggerStat") {
             if (!RELEASE_TRIGGER_STATS.has(node.stat)) errors.push(`${path}.stat 不是允许的触发者属性。`)
             if (!["outOfCombat", "inCombat"].includes(node.panel)) errors.push(`${path}.panel 必须是 outOfCombat 或 inCombat。`)

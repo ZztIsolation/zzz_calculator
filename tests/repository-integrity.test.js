@@ -9,6 +9,16 @@ import { fileURLToPath } from "node:url"
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const assetsDir = path.join(rootDir, "webapp", "public", "assets")
 
+function validateModelingNotesPaths(value) {
+    if (!value || typeof value !== "object") return
+    for (const [key, item] of Object.entries(value)) {
+        if (key === "modelingNotes" && typeof item === "string" && item.startsWith("docs/")) {
+            assert.ok(existsSync(path.join(rootDir, item)), `missing modeling document: ${item}`)
+        }
+        validateModelingNotesPaths(item)
+    }
+}
+
 function collectAssetPaths(value, output) {
     if (typeof value === "string" && value.startsWith("/assets/")) {
         output.add(value)
@@ -39,6 +49,7 @@ const referencedAssets = new Set()
 for (const trackedPath of trackedFiles.filter(fileName => /^data\/[^/]+\.json$/.test(fileName))) {
     const value = JSON.parse(await readFile(path.join(rootDir, trackedPath), "utf8"))
     collectAssetPaths(value, referencedAssets)
+    validateModelingNotesPaths(value)
     assert.equal(containsObjectKey(value, "appliesTo"), false, `${trackedPath} must not persist legacy appliesTo filters`)
 }
 

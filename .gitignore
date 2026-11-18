@@ -8,6 +8,10 @@ pnpm-debug.log*
 .server*.log
 *.log
 
+# local investigation scripts and generated evidence
+tmp/
+.tmp_*
+
 .env
 .env.*
 

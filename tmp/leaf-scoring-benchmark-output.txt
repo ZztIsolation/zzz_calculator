@@ -1,6 +1,0 @@
-fioni release 叶子评分路径微基准（同一组面板/词条）
-map scoreOnlyFromSummary: 974.10 us/call
-indexed scoreOnlyFromIndexedSummary: 698.60 us/call
-dense scoreDense: 299.66 us/call
-fixed-dense-fallback scoreScalar: 293.89 us/call
-calculate full: 6980.98 us/call

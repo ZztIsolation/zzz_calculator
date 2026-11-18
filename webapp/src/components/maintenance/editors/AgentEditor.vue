@@ -512,7 +512,6 @@ function addDefaultTeammate() {
           <label class="maintenance-field"><span>第几个影画</span><NSelect v-model:value="buff.cinemaLevel" :options="[1,2,3,4,5,6].map(level => option(level, `影画 ${level}`))" :disabled="disabled" @update:value="changed" /></label>
           <label class="maintenance-field"><span>影画名称</span><NInput :value="textOf(buff.cinemaName)" :disabled="disabled" @update:value="buff.cinemaName = { zhCN: String($event) }; changed()" /></label>
           <label class="maintenance-field"><span>生效范围</span><NSelect :value="buff.scope" :options="SCOPE_OPTIONS" :disabled="disabled" @update:value="setBuffScope(buff, String($event))" /></label>
-          <label class="maintenance-switch-field"><span>默认启用</span><NSwitch v-model:value="buff.defaultChecked" :disabled="disabled" @update:value="changed" /></label>
           <label class="maintenance-field maintenance-field-wide"><span>Buff 描述</span><NInput type="textarea" :value="textOf(buff.description)" :disabled="disabled" @update:value="buff.description = { zhCN: String($event) }; changed()" /></label>
         </div>
         <EffectRulesEditor :model="buff" :catalog="catalog" :disabled="disabled" :allow-coverage="buff.scope === 'inCombat'" @change="changed" />

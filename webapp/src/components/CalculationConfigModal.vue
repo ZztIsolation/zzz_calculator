@@ -139,7 +139,7 @@ const supportsRelease = computed(() => releaseProfiles.value.length > 0)
 const supportsLuminescence = computed(() => props.agent?.id === "remielle_dan" || props.agent?.luminescenceModel?.status === "implemented")
 const releaseSourceLocked = computed(() => isAriaReleaseSourceLocked(props.agent))
 const releaseSourceReadOnly = computed(() => releaseSourceLocked.value || isFioniReleaseSourceLocked(props.agent))
-const fioniReleaseProfileOptions = computed(() => releaseProfiles.value.map((profile: any) => ({
+const releaseProfileOptions = computed(() => releaseProfiles.value.map((profile: any) => ({
   label: textOf(profile.name) || profile.id,
   value: profile.id,
 })))
@@ -378,6 +378,7 @@ function releaseBreakdown(event: any) {
   try {
     const releaseModifiers = releaseModifierValues(event, effect)
     const evaluated = evaluateAnomalyReleaseProfile(profile, {
+      cinemaLevel: props.cinemaLevel ?? 0,
       originalBaseMultiplier: Number(effect.baseMultiplier ?? 0),
       trigger: {
         inCombatPanel: props.releaseContext?.inCombatPanel ?? {},
@@ -422,7 +423,7 @@ function releaseSkillMultiplierFor(profile: any, event: any) {
     profile?.releaseSkillRef ?? event?.releaseSkillRef, { skillLevelsByCategory: props.skillLevels, coreSkillLevel: props.releaseContext?.coreSkillLevel })?.releaseSkillMultiplier
 }
 
-function updateFioniReleaseProfile(profileId: string) {
+function updateReleaseProfile(profileId: string) {
   const profile = anomalyReleaseProfile(props.agent, profileId, "", props.cinemaLevel ?? 0)
   if (!profile || !selectedEvent.value) return
   updateSelectedEvent({
@@ -520,6 +521,7 @@ function anomalyCritPreviewEvent(event: any) {
       : undefined,
     releaseCoreScalingRow: settlementType === "release" ? corePassiveScalingRow(props.agent, props.releaseContext?.coreSkillLevel) : undefined,
     ...(settlementType === "release" ? {
+      cinemaLevel: props.cinemaLevel ?? 0,
       releaseSkillMultiplier: releaseSkillMultiplierFor(
         anomalyReleaseProfile(props.agent, event.triggerActorRef?.profileId, effect?.element, props.cinemaLevel ?? 0),
         event,
@@ -1890,11 +1892,11 @@ function save() {
                   <NSelect v-else :value="selectedEvent?.anomalySource?.actorRef?.agentId" :options="releaseSourceOptions" filterable aria-label="原异常施加者" @update:value="updateReleaseSourceAgent(String($event))" />
                 </div>
               </div>
-              <div v-if="isReleaseSettlement(selectedEvent) && isFioniReleaseSourceLocked(agent)" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="fioni-release-profile">
-                <span class="metric-title">异放来源</span>
+              <div v-if="isReleaseSettlement(selectedEvent) && !isVelinaRelease && releaseProfiles.length > 1" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" :data-layout-field="isFioniReleaseSourceLocked(agent) ? 'fioni-release-profile' : 'release-profile'">
+                <span class="metric-title">{{ isFioniReleaseSourceLocked(agent) ? '异放来源' : '倍率方案' }}</span>
                 <div class="metric-value">
-                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(fioniReleaseProfileOptions, selectedEvent?.triggerActorRef?.profileId ?? '') }}</span>
-                  <NSelect v-else :value="selectedEvent?.triggerActorRef?.profileId" :options="fioniReleaseProfileOptions" aria-label="菲欧妮异放来源" @update:value="updateFioniReleaseProfile(String($event))" />
+                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(releaseProfileOptions, selectedEvent?.triggerActorRef?.profileId ?? '') }}</span>
+                  <NSelect v-else :value="selectedEvent?.triggerActorRef?.profileId" :options="releaseProfileOptions" :aria-label="isFioniReleaseSourceLocked(agent) ? '菲欧妮异放来源' : '异放倍率方案'" @update:value="updateReleaseProfile(String($event))" />
                 </div>
               </div>
               <div v-if="isReleaseSettlement(selectedEvent) && !isVelinaRelease && !releaseSourceReadOnly" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="release-snapshot">

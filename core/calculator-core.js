@@ -67,6 +67,7 @@ import {
     isVelinaReleaseAgent,
     isReleaseSettlement,
     normalizeAnomalySourceSnapshot,
+    normalizeCinemaLevel,
     releaseFormulaStatDependencies,
     velinaReleaseSourceId,
     VELINA_RELEASE_SOURCES,
@@ -3496,7 +3497,8 @@ function anomalyReleaseEventData(event = {}, agent = {}, damageElement = "physic
     if (velina && !VELINA_RELEASE_SOURCES.some(source => source.value === requestedProfileId)) {
         throw new Error("维琳娜异放来源不存在。")
     }
-    const profile = anomalyReleaseProfile(agent, requestedProfileId, damageElement, options.cinemaLevel ?? 0)
+    const cinemaLevel = normalizeCinemaLevel(options.cinemaLevel ?? 0)
+    const profile = anomalyReleaseProfile(agent, requestedProfileId, damageElement, cinemaLevel)
     if (!profile) {
         throw new Error(`角色 ${agent.id ?? "unknown"} 暂不支持 ${damageElement} 属性异放。`)
     }
@@ -3510,6 +3512,7 @@ function anomalyReleaseEventData(event = {}, agent = {}, damageElement = "physic
     const releaseSkill = resolveReleaseSkillRef(catalog, agent, profile.releaseSkillRef ?? event.releaseSkillRef, options)
     return {
         profile,
+        cinemaLevel,
         coreScalingRow: corePassiveScalingRow(agent, options.coreSkillLevel),
         ...(releaseSkill ?? {}),
         releaseAnomalyCritDmgBonus: Number(profile.critDmgBonus ?? 0),
@@ -3610,6 +3613,7 @@ function normalizeAnomalyDamageEvent(event = {}, agent = {}, catalog = {}, index
             tickIntervalSeconds: Math.max(0, Number(event.tickIntervalSeconds ?? 0)),
             ...(release ? {
                 releaseProfile: release.profile,
+                cinemaLevel: release.cinemaLevel,
                 releaseCoreScalingRow: release.coreScalingRow,
                 ...(release.releaseSkillRef ? { releaseSkillRef: release.releaseSkillRef } : {}),
                 ...(release.releaseSkillSource ? { releaseSkillSource: release.releaseSkillSource } : {}),
@@ -3654,6 +3658,7 @@ function normalizeAnomalyDamageEvent(event = {}, agent = {}, catalog = {}, index
         tickIntervalSeconds: Math.max(0, Number(effect.tickIntervalSeconds ?? 0)),
         ...(release ? {
             releaseProfile: release.profile,
+            cinemaLevel: release.cinemaLevel,
             releaseCoreScalingRow: release.coreScalingRow,
             ...(release.releaseSkillRef ? { releaseSkillRef: release.releaseSkillRef } : {}),
             ...(release.releaseSkillSource ? { releaseSkillSource: release.releaseSkillSource } : {}),
@@ -4365,6 +4370,7 @@ function releaseBreakdownForEvent(event, panel = {}, outOfCombatPanel = panel, r
         originalBaseMultiplier: Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0),
         trigger: { inCombatPanel: panel, outOfCombatPanel },
         releaseModifiers,
+        cinemaLevel: event.cinemaLevel,
         coreScalingRow: event.releaseCoreScalingRow,
         releaseSkillMultiplier: event.releaseSkillMultiplier,
         event,
@@ -4384,6 +4390,7 @@ function releaseCritRateBonusForEvent(event, panel = {}, outOfCombatPanel = pane
     }
     return Math.max(0, evaluateReleaseExpression(event.releaseProfile.critRateBonusExpression, {
         trigger: { inCombatPanel: panel, outOfCombatPanel },
+        cinemaLevel: event.cinemaLevel,
         coreScalingRow: event.releaseCoreScalingRow,
         event,
         eventElement: event.damageElement,
@@ -6589,6 +6596,7 @@ function compileDamageScoreEvent(event = {}) {
         usesDefaultProcCount: event.usesDefaultProcCount === true,
         anomalyVariant: event.anomalyVariant ?? "normal",
         releaseProfile: event.releaseProfile ?? null,
+        cinemaLevel: event.cinemaLevel,
         releaseCoreScalingRow: event.releaseCoreScalingRow ?? null,
         releaseSkillMultiplier: Number(event.releaseSkillMultiplier ?? 0),
         releaseAnomalyCritDmgBonus: releaseAnomalyCritDmgBonusForEvent(event),
@@ -9488,6 +9496,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     tickMultiplier: event.tickMultiplier,
                     elapsedSeconds: event.elapsedSeconds,
                     releaseProfile: event.releaseProfile,
+                    cinemaLevel: event.cinemaLevel,
                     releaseCoreScalingRow: event.releaseCoreScalingRow,
                     releaseSkillMultiplier: event.releaseSkillMultiplier,
                     releaseAnomalyCritDmgBonus: event.releaseAnomalyCritDmgBonus,
@@ -9849,6 +9858,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                                 inCombatPanel: formulaInCombatIntervalPanel,
                                 outOfCombatPanel: formulaOutOfCombatIntervalPanel,
                             },
+                            cinemaLevel: event.cinemaLevel,
                             coreScalingRow: event.releaseCoreScalingRow,
                             releaseSkillMultiplier: event.releaseSkillMultiplier,
                             releaseModifiers: {
@@ -9887,6 +9897,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                                         inCombatPanel: formulaInCombatIntervalPanel,
                                         outOfCombatPanel: formulaOutOfCombatIntervalPanel,
                                     },
+                                    cinemaLevel: event.cinemaLevel,
                                     coreScalingRow: event.releaseCoreScalingRow,
                                     releaseSkillMultiplier: event.releaseSkillMultiplier,
                                     event,

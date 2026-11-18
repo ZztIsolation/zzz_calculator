@@ -6,23 +6,13 @@ Language: [简体中文](README.zh-CN.md)
 
 ## Upload Update Summaries
 
-- **2026-10-28 — Workbench Buff and event interactions and the Buff picker (#111)**: in-battle buffs are collapsible and grouped by source, the event summary is collapsible, the scheme source uses a segmented control, and the Buff picker adds filtering, per-tab selected counts and a fixed frame; no layout or calculation change.
-- **2026-10-25 — Navigation, settings and result-area organization (#99–#102)**: a navigation indicator with narrow-screen local scrolling, account cards with filter chips and a danger zone, a reworked workbench result area with skill presets, and a substat marginal-gain chart.
-- **2026-10-24 — Local data tools and optimizer experience (#91–#98)**: complete personal backup and restore, ordinary import undo, optimizer results restored after refresh, Drive Disc pagination, and optimizer preference semantics (an explicit empty main-stat list means unrestricted; manual and legacy two-piece values are preserved).
-- **2026-10-16 — Defense Battle 3.2 phase-three Buffs and default selection**: added Mingfeng Cidian, Qinyin Gongzhen and Shana Rongguang, and made Defense Battle the default when both modes have the same current version and phase.
-- **2026-10-13 — Optimizer scheme locking and teammate source protection**: added one-click full-scheme locking with stable Drive Disc ordering and separated administrator defaults, Enka imports and user overrides.
-- **2026-10-11 — Ellen modeling and default rotations**: added Ellen’s skills, Potential growth, default team and reference rotations, together with the Polar Metal four-piece freeze-trigger coverage.
-- **2026-10-10 — Nangong Yu and recent catalog updates**: added Nangong Yu modeling and source data, with skill, anomaly-settlement and maintenance-catalog integration.
-- **2026-10-09 — Adaptive teammate menu**: position and size the teammate menu within available space, with a fixed category column and independently scrolling characters on narrow and short viewports.
-- **2026-10-08 — Documentation and character-authoring guide**: separated current specifications from archived evidence, corrected stale role/default/deployment statements, and documented the workflow learned from Aria, Sigrid, Soldier 11, Vivian, Claret, Pyrois and Velina.
-- **2026-10-07 — Catalog assets**: added and verified current W-Engine records and content-versioned thumbnails.
-- **2026-10-04 — Web/runtime hardening**: preserved Scanner settings across web elevation retries and revalidated compact catalog responses with ETags.
-- **2026-10-03 — Production recovery controls**: bounded deployment phases, audit evidence and recovery diagnostics without changing the normal exact-SHA promotion boundary.
-- **2026-10-02 — Enka teammate Buff sync**: connected showcase imports to native teammate Buff configuration while preserving manual selections, source details, loadouts and retryable save conflicts.
-- **2026-10-02 — Defense Battle 3.2 phase-two Field Buffs**: added the three phase-two Field Buff records for Sharp, elemental, triggered DEF reduction and stun vulnerability effects, with unsupported mechanics kept descriptive.
-- **2026-10-01 — Velina Wind Anomaly modeling**: added separate Wind Anomaly, Turbulence and Release semantics, confirmed multiplier data, maintenance controls, Enka mapping and editable default recommendations.
+- **2026-11-18 — Documentation overhaul**: AGENTS.md gained a project overview and a task routing table; character-specific docs moved under `docs/characters/`; the regression contract was cut to cross-character invariants; a periodic catalog maintenance handbook was added; committed investigation artifacts were removed. No calculation, catalog, deployment or user-data behavior changed.
+- **2026-11-06 — Critical Assault 3.3 phase-two bosses and Field Buffs**: added the phase-two Field Buffs, four encounters and three local boss icons; unsupported mechanics remain descriptive, and the maintenance-page adjustment is preserved as saved.
+- **2026-11-03 — Nekomata and Asaba Harumasa temporarily hidden**: their models, skills, Buffs, icons, Enka mappings and maintenance entries remain, but they stay out of the workbench, optimizer and Enka choice lists until review is complete; Evelyn remains visible.
+- **2026-11-01 — Completed Evelyn skill multiplier catalog**: filled the Basic, Dodge, Assist and Basic Special multiplier tables under the current complete-skill model boundary.
+- **2026-10-31 — Defense Battle 3.3 phase-one Field Buffs**: added three Field Buffs while retaining the catalog rule that Defense Battle is shown first when both modes share the current version and phase.
 
-Older release and implementation history is in the [archived summaries](docs/archive/) and the [current changelog](docs/changelog.md).
+Older release and implementation history is in the [archived summaries](docs/archive) and the [current changelog](docs/changelog.md).
 
 ## Architecture
 
@@ -92,16 +82,6 @@ ZZZ Calculator is independent and is not affiliated with or endorsed by Enka.Net
 
 ## Documentation
 
-- [Documentation index](docs/README.md)
-- [Character authoring and maintenance guide](docs/character-authoring-guide.md)
-- [Modeling specification](docs/modeling.md)
-- [Long-term regression contract](docs/regression-contract.md)
-- [Frontend layout contract](docs/frontend-layout-contract.md)
-- [Pyrois modeling](docs/pyrois-modeling.md)
-- [Wind/anomaly modeling](docs/wind-anomaly-modeling.md)
-- [Luminescence score modeling](docs/luminescence-modeling.md)
-- [Production deployment runbook](docs/production-deployment-runbook.md)
-- [Current changelog](docs/changelog.md)
-- [Archived evidence](docs/archive/)
+- [Documentation index](docs/README.md): task-oriented index of all current specifications, character notes, deployment guides, and archived evidence.
 
 All calculator models, public data, frontend/backend code, examples, tests and release scripts are maintained in this repository. See [AGENTS.md](AGENTS.md) for the project entry point used by coding assistants.

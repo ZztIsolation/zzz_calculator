@@ -1,0 +1,25 @@
+# 薇薇安（`vivian`）
+
+| 项目 | 内容 |
+| --- | --- |
+| 游戏 ID | `1331` |
+| 首页与优化器 | 可见 |
+| 实现核对 | 2026-11-18；基准提交 `9d51640c23697a849bdd3674b7f645a30c9f76b0` |
+| 验证入口 | `npm run test:vivian-damage`；[优化器回归](../../tests/optimizer.test.js)；[构筑状态](../../webapp/src/stores/build.ts) |
+
+## 验收边界
+
+- 说明型核心被动必须以 `scope: "inCombat"` 的 `agent:vivian.corePassive` 条目保留官方机制描述，并在可见描述中列出 F 级六属性每 10 点异常精通的具体异放系数：以太 `6.15%`、电 `3.20%`、火 `8%`、物理 `0.75%`、冰 `1.08%`、风 `0.32%`。
+- 该条目的 `effects` 与 `buffModifiers` 均为空，结构化 `corePassiveScaling` 表仍是唯一计算来源。
+- 单次异放目标必须为一个 `kind: "anomaly"`、`settlementType: "release"` 的以太 `corruption` 单跳事件，`triggerActorRef` 与 `anomalySource.actorRef` 都指向薇薇安。
+- 2 影必须保存一条严格限定为异放结算的 `releaseProficiencyYieldBonus=30` 规则；它只令异常精通换算乘 `1.3`，不得放大原异常基底、普通属性异常、紊乱或其他伤害乘区。
+- 无管理员循环时，工作台只生成一个非管理员异放事件；6 影特殊异放最高 5 倍仍等待独立事件变体。
+
+- 队友条目（ID `vivian.additional.corruption_damage`、`vivian.cinema_1.prophecy_vulnerability`）只含对全队生效的部分：额外能力使全队侵蚀的属性异常伤害与紊乱伤害各 +12%（仅作用于侵蚀基底），影画一使处于预言下的目标受到的所有属性异常伤害与紊乱伤害 +16%（同属异常增伤乘区，不是异放专属）。触发条件由选中该 Buff 表示已满足；独立算例见 `npm run test:teammate-team-effects`。
+
+## 制作教训
+
+- 初版问题：既有角色的管理员循环模式不能直接套用到单次自源异放；普通计算一致也不能保证严格优化的候选集合完整。
+- 后续修正：使用目标明确的非管理员单事件 fallback；二影只修饰精通转换；严格搜索保留合法候选并用独立穷举核对。
+- 可复用原则：先锁定要优化什么，再决定录入范围和默认配置；独立验证完整结果集。管理员默认循环并非必填，不要为了“内容完整”制造无依据的整套循环。
+- 历史提交：`22b74a4 → a90cc35`。

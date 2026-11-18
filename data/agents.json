@@ -3534,7 +3534,7 @@
       "specialty": "anomaly",
       "faction": "达识结社",
       "images": {
-        "portrait": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/22/15559334/13b7b06627a8a99ffdf1f397b1daf7d1_5495460923605178593.png",
+        "portrait": "/assets/agents/remielle_dan.png",
         "source": "https://baike.mihoyo.com/zzz/wiki/content/2076/detail?mhy_presentation_style=fullscreen"
       },
       "level60": {
@@ -6460,7 +6460,7 @@
                       "kind": "specific",
                       "agentSkillId": "claret",
                       "categoryId": "chain",
-                      "skillType": "chain",
+                      "skillType": "ultimate",
                       "moveId": "ultimate_hundred_hammers"
                     }
                   ]
@@ -7610,7 +7610,7 @@
         "levels13to16": "cross-checked-release-3.0.0-16735318-and-Honey-Hunter/Fandom; explicit values, not extrapolated",
         "level60Stats": "official base 849 ATK / 5% CRIT; core F adds 75 ATK / 14.4% CRIT separately",
         "cinema6": "unrevealed-not-modeled",
-        "modelingNotes": "docs/pyrois-modeling.md"
+        "modelingNotes": "docs/characters/pyrois.md"
       },
       "hidden": false,
       "importantSubStats": [
@@ -8254,9 +8254,8 @@
       ],
       "faction": "刑侦特勤组",
       "images": {
-        "icon": "/assets/agents/jane_doe.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/16/15559334/671b9f8d9227c19355e2eceb9f23ef28_7055750575833971395.png",
-        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+        "portrait": "/assets/agents/jane_doe.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/16/15559334/671b9f8d9227c19355e2eceb9f23ef28_7055750575833971395.png"
       },
       "level60": {
         "hpBase": 7788,
@@ -9490,7 +9489,7 @@
               "zhCN": "凛冬前兆"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "在[冲刺攻击：冰渊潜袭]中发动快速剪击命中敌人时，获得的[急冻充能]提升至3点；在[冲刺攻击：冰渊潜袭]中发动蓄力剪击命中敌人时，获得的[急冻充能]提升至6点；每消耗1点[急冻充能]，艾莲的暴击率提升2%，持续15秒，最多叠加6层，每层效果单独结算持续时间。"
             },
@@ -9528,7 +9527,7 @@
               "zhCN": "冰洋掠食者"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "发动第三段[普通攻击：急冻修剪法]后，可以直接衔接发动[强化特殊技：鲨卷风]；发动[强化特殊技]时，每拥有1点[急冻充能]，当前招式造成的暴击伤害提升20%，最多提升60%。"
             },
@@ -9575,7 +9574,7 @@
               "zhCN": "盛宴时分"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "发动[强化特殊技]、[连携技]或获得[快蓄]时，艾莲的穿透率提升20%，持续6秒，同时获得1层[盛宴]，[盛宴]最多叠加3层；拥有3层[盛宴]后，在[冲刺攻击：冰渊潜袭]中发动蓄力剪击命中敌人时，消耗所有[盛宴]，使当前招式造成的伤害提升250%。"
             },
@@ -10390,7 +10389,7 @@
             "description": {
               "zhCN": "[强化特殊技：相当沉重的爱意]或[普通攻击：可爱地雷飞天撞]命中敌人时，使敌人的全属性伤害抗性降低18%，持续40秒。"
             },
-            "defaultChecked": true,
+            "defaultChecked": false,
             "effects": [
               {
                 "id": "cinema1-all-res-reduction",
@@ -10421,7 +10420,7 @@
             "description": {
               "zhCN": "每层[颤音]使[核心被动：天才偶像]中[异放]的伤害比例额外提升10%；[额外能力：天使队长]提供的失衡易伤倍率额外提升30%；操作中的角色[连携技]重击命中同时处于属性异常和失衡状态下的敌人时，会对敌人触发[极性紊乱]，对目标造成原本[紊乱]效果25%的伤害，敌人在同一失衡期间仅能触发一次该效果。"
             },
-            "defaultChecked": true,
+            "defaultChecked": false,
             "effects": [
               {
                 "id": "cinema2-stagger-stun-multiplier",
@@ -10452,7 +10451,7 @@
             "description": {
               "zhCN": "异常精通提升40点；[普通攻击：可爱地雷飞天撞]命中敌人造成的属性异常积蓄值提升35%。"
             },
-            "defaultChecked": true,
+            "defaultChecked": false,
             "effects": [
               {
                 "id": "cinema4-anomaly-proficiency",
@@ -10476,7 +10475,7 @@
             "description": {
               "zhCN": "南宫羽攻击造成的失衡值提升50%；敌人不处于失衡状态时，任意角色对其造成一次[异放]伤害或[紊乱]伤害、使其进入一次属性异常状态时会为其累计1层[颤音：改]，被[强化特殊技]或[普通攻击：可爱地雷飞天撞]重击命中时会累计1层[颤音：改]，被[终结技]重击命中时会累计2层[颤音：改]；[颤音：改]最多累计4层，当敌人进入失衡状态时，[颤音：改]会被全部清除，[颤音：改]被清除时，若敌人处于以太异常状态、电属性异常状态、火属性异常状态、物理属性异常状态、冰属性异常状态、风属性异常状态下，南宫羽会对目标造成一次[异放]伤害：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为800%/400%/1000%/70%/100%/40%，敌人身上每有1层[颤音：改]，该次[异放]的伤害比例额外提升25%；[颤音：改]与[颤音]无法相互叠加。"
             },
-            "defaultChecked": true,
+            "defaultChecked": false,
             "effects": [],
             "buffModifiers": []
           }
@@ -10526,7 +10525,7 @@
             "zhCN": "颤音：1层"
           },
           "default": false,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10604,7 +10603,7 @@
             "zhCN": "颤音：2层"
           },
           "default": false,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10682,7 +10681,7 @@
             "zhCN": "颤音：3层"
           },
           "default": false,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10760,7 +10759,7 @@
             "zhCN": "颤音：4层"
           },
           "default": true,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10838,7 +10837,7 @@
             "zhCN": "颤音改（六影）：1层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
@@ -10907,7 +10906,7 @@
             "zhCN": "颤音改（六影）：2层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
@@ -10976,7 +10975,7 @@
             "zhCN": "颤音改（六影）：3层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
@@ -11045,7 +11044,7 @@
             "zhCN": "颤音改（六影）：4层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
@@ -11197,9 +11196,8 @@
       ],
       "faction": "坎卜斯黑枝",
       "images": {
-        "icon": "/assets/agents/fioni.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/10/16/71319299/0c6fe6449ebd56b87745a332ade80e1f_5954047325411114795.png",
-        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/2216/detail?mhy_presentation_style=fullscreen"
+        "portrait": "/assets/agents/fioni.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/10/16/71319299/0c6fe6449ebd56b87745a332ade80e1f_5954047325411114795.png"
       },
       "level60": {
         "hpBase": 7673,
@@ -12289,7 +12287,7 @@
               "zhCN": "猎鸟技巧"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "从背后攻击命中敌人时，猫又无视目标16%物理伤害抗性；敌方处于失衡状态时，猫又对其的所有攻击均被视为背后攻击。"
             },
@@ -12346,7 +12344,7 @@
               "zhCN": "磨爪"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "发动[强化特殊技]时，猫又的暴击率提升7%，最多叠加2层，持续15秒，每层效果单独结算持续时间。"
             },
@@ -12397,7 +12395,7 @@
               "zhCN": "捕食者血统"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "发动[连携技]或[终结技]时，猫又的暴击伤害提升18%，最多叠加3层，退出接战状态时增益效果结束；猫又击败敌人时，该增益效果直接叠加至层数上限。"
             },
@@ -13774,7 +13772,7 @@
               "zhCN": "织梦"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "敌人进入[牵缠禁制]后，将被施加[禁锢]效果，伊芙琳攻击带有[禁锢]效果的敌人时，无视目标12%防御力。"
             },
@@ -13805,7 +13803,7 @@
               "zhCN": "赴火之舞"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "伊芙琳的攻击力提升15%；伊芙琳发动[普通攻击：绞勒式·I型]或[普通攻击：绞勒式·II型]时，将返还所消耗的[燎火]，25秒内最多触发一次；伊芙琳消耗[燎索点]发动[连携技：月辉丝·绊]时，招式的打断等级提升。"
             },
@@ -13830,7 +13828,7 @@
               "zhCN": "命运的弦音"
             },
             "scope": "inCombat",
-            "defaultChecked": true,
+            "defaultChecked": false,
             "description": {
               "zhCN": "发动[连携技]或[终结技]时，伊芙琳立刻获得等同于自身10%生命值上限的护盾，持有该护盾时，伊芙琳的暴击伤害提升40%。"
             },

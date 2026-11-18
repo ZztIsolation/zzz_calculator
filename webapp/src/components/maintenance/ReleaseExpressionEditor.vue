@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NInput, NInputNumber, NSelect } from "naive-ui"
+import { NButton, NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import { Plus, Trash2 } from "lucide-vue-next"
 import { option } from "./maintenance-options"
 
@@ -60,6 +60,21 @@ function addArgument() {
   props.node.args.push({ kind: "constant", value: 0, unit: "raw" })
   emit("change")
 }
+
+function setCinemaScaling(enabled: boolean) {
+  if (enabled) props.node.cinemaValues = Array(7).fill(props.node.value ?? 0)
+  else {
+    props.node.value = props.node.cinemaValues?.[0] ?? props.node.value
+    delete props.node.cinemaValues
+  }
+  emit("change")
+}
+
+function setCinemaValue(level: number, value: number | null) {
+  props.node.cinemaValues[level] = value
+  if (level === 0) props.node.value = value
+  emit("change")
+}
 </script>
 
 <template>
@@ -70,7 +85,8 @@ function addArgument() {
     </div>
 
     <div v-if="node.kind && !node.op" class="maintenance-inline-row release-expression-leaf">
-      <label v-if="node.kind === 'constant'" class="maintenance-field"><span>数值</span><NInputNumber v-model:value="node.value" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
+      <label v-if="node.kind === 'constant'" class="maintenance-switch-field"><span>按影画取值</span><NSwitch :value="node.cinemaValues !== undefined" :disabled="disabled" @update:value="setCinemaScaling" /></label>
+      <label v-if="node.kind === 'constant' && node.cinemaValues === undefined" class="maintenance-field"><span>数值</span><NInputNumber v-model:value="node.value" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
       <label v-if="node.kind === 'triggerStat'" class="maintenance-field"><span>面板</span><NSelect v-model:value="node.panel" :options="panelOptions" :disabled="disabled" @update:value="emit('change')" /></label>
       <label v-if="node.kind === 'triggerStat'" class="maintenance-field"><span>属性</span><NSelect v-model:value="node.stat" :options="statOptions" :disabled="disabled" @update:value="emit('change')" /></label>
       <label v-if="node.kind === 'coreSkillScaling'" class="maintenance-field"><span>倍率字段</span><NSelect filterable v-model:value="node.field" :options="coreFieldOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
@@ -81,6 +97,13 @@ function addArgument() {
       <label v-if="node.kind === 'condition'" class="maintenance-field"><span>不满足时</span><NInputNumber v-model:value="node.whenFalse" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>数值单位</span><NSelect v-model:value="node.unit" :options="unitOptions" :disabled="disabled" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>白盒展示</span><NSelect :value="node.whiteBoxRole ?? ''" :options="whiteBoxRoleOptions" :disabled="disabled" @update:value="node.whiteBoxRole = $event || undefined; emit('change')" /></label>
+    </div>
+
+    <div v-if="node.kind === 'constant' && !node.op && node.cinemaValues !== undefined" class="release-cinema-values">
+      <label v-for="level in 7" :key="level" class="maintenance-field">
+        <span>{{ level - 1 }}影数值</span>
+        <NInputNumber :value="node.cinemaValues?.[level - 1]" :disabled="disabled" :step="0.01" :aria-label="`${level - 1}影数值`" @update:value="setCinemaValue(level - 1, $event)" />
+      </label>
     </div>
 
     <div v-if="node.op" class="release-expression-args">
@@ -98,4 +121,5 @@ function addArgument() {
 .release-expression-head, .release-expression-leaf { align-items: end; }
 .release-expression-args { display: grid; gap: 8px; }
 .release-expression-arg { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4px; }
+.release-cinema-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); gap: 8px; min-width: 0; }
 </style>
