@@ -42,7 +42,7 @@ Vue 3 + 共享计算核心的绝区零工具：角色面板与伤害快照（含
 
 | 任务 | 判断信号 | 先读 | 按需读 | 一般不必读 |
 | --- | --- | --- | --- | --- |
-| **A. 角色与计算**：新增/修订角色、专武、队友 Buff；公式、伤害域、优化器内核 | `data/agents.json`、`agent_skills.json`、`core/`、`webapp/src/workers/`、角色相关测试 | [建模说明](docs/modeling.md)；[回归契约](docs/regression-contract.md)的“计算与 Buff”“目录与维护”“优化器”节；新增或修订角色再读[角色制作指南](docs/character-authoring-guide.md) | **仅当改动涉及某角色时**读 [docs/characters/](docs/characters/README.md) 下对应文件（新增角色先看其中的 `_template.md`） | 布局契约、部署文档 |
+| **A. 角色与计算**：新增/修订角色、专武、队友 Buff；公式、伤害域、优化器内核 | `data/agents.json`、`agent_skills.json`、`core/`、`webapp/src/workers/`、角色相关测试 | [建模说明](docs/modeling.md)；[回归契约](docs/regression-contract.md)的“计算与 Buff”“目录与维护”“优化器”节；新增或修订角色再读[角色建模手册](docs/character-modeling-handbook.md)（写法与交付包）和[角色制作指南](docs/character-authoring-guide.md)（流程） | **仅当改动涉及某角色时**读 [docs/characters/](docs/characters/README.md) 下对应文件（新增角色先看其中的 `_template.md`） | 布局契约、部署文档 |
 | **B. 周期目录维护**：每期危局/防卫战的场地 Buff 与 Boss、新音擎、新驱动盘套装 | `data/combat_buffs.json`、`bosses.json`、`w_engines.json`、`drive_disc_sets.json` | [周期目录维护手册](docs/catalog-maintenance.md) | 回归契约的“目录与维护”节；建模说明的“效果、来源与目标” | 角色文件（除非涉及）、布局、部署 |
 | **C. 界面与本地功能**：前端界面与交互、维护页界面、存储/备份/导入/仓库、扫描器与 Enka | `webapp/src/` 下的 `components/`、`views/`、`styles/`、`runtime/`、`stores/`，以及 `config/*manifest`、`core/enka-import` | 界面读[布局契约](docs/frontend-layout-contract.md)；存储、备份、导入、仓库、扫描器读[本地数据](docs/local-data.md) | 回归契约的“目录与维护”（维护页）、“本地数据与账号”节 | 角色文件、部署文档 |
 | **D. 发布与部署**：CI/CD、控制面、恢复 | `.github/workflows/`、`deploy/`、部署相关脚本 | [发布手册](docs/production-deployment-runbook.md) | [部署管理器说明](deploy/production/README.md)、[恢复手册](deploy/production/RECOVERY.md)、回归契约的“路由与发布”节 | 其余全部 |
@@ -57,6 +57,7 @@ Vue 3 + 共享计算核心的绝区零工具：角色面板与伤害快照（含
 | [docs/README.md](docs/README.md) | 文档分工、头部格式标准、更新规则、历史档案索引 |
 | [docs/modeling.md](docs/modeling.md) | 通用计算语义：面板、效果与目标、乘区归属、事件、伤害域、紊乱与乱流、接口状态 |
 | [docs/regression-contract.md](docs/regression-contract.md) | 跨角色必须保持的不变量与测试入口（计算、维护、本地数据、优化器、发布） |
+| [docs/character-modeling-handbook.md](docs/character-modeling-handbook.md) | 角色建模写法：交付包清单、命名约定、原文句式到数据结构的对照、专武与 Enka、询问边界 |
 | [docs/character-authoring-guide.md](docs/character-authoring-guide.md) | 角色制作的六阶段流程与历史案例原则 |
 | [docs/characters/](docs/characters/README.md) | 每个角色的专属规则、默认意图、验收边界与已知缺陷（低优先级） |
 | [docs/catalog-maintenance.md](docs/catalog-maintenance.md) | 场地 Buff、Boss、音擎、套装的日常维护流程与必须同步的测试 |
