@@ -4,6 +4,13 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-18 — 蕾米埃尔头像改用本地资源
+
+- 问题：蕾米埃尔·丹的角色头像仍指向官方远程链接，未使用仓库已有的本地头像和缩略图；手册误记为本地资源缺失。
+- 变化：重新下载官方头像，确认其 SHA-256 与已提交的 `webapp/public/assets/agents/remielle_dan.png` 一致；将角色的 `images.portrait` 改为 `/assets/agents/remielle_dan.png`，与队友条目复用同一资源；重新生成缩略图，并移除手册中已解决的偏差。
+- 关键边界：原图为 300×300 PNG，缩略图为 192×192 WebP；重新生成后的图片、清单和内容哈希均无变化。保留官方来源链接，不改变角色机制或计算配置。
+- 验证：本地 `test:repository-integrity`（199 项目录资源）、`test:maintenance-validation`、`test:remielle-teammate-buffs`、`test:luminescence` 与 `build:webapp` 通过；构建内缩略图检查通过（177 张），并查看生成的缩略图确认内容完整。未运行浏览器端到端测试，不代表线上验收。
+
 ## 2026-11-18 — 手册偏差处理与三个队友条目
 
 - 问题：手册第十一节列出的偏差：dodgeCounter、assistAttack、dashAttack、exSpecial 标签在 20 个招式上漏标（`dodgeCounter` 晚于 7 个旧角色加入且未回填，其余是新角色没有按既有写法补标），以这些标签为目标的音擎与套装增伤会漏算；简和菲欧妮的头像写在 `images.icon`，维护页编辑器绑定 `portrait`；菲欧妮、薇薇安、克拉蕾的全队效果没有队友条目（原先的测试和文档明确写“不建立灼蚀队友 Buff”，现按用户决定改为必须建立）。

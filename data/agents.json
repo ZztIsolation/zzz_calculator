@@ -3534,7 +3534,7 @@
       "specialty": "anomaly",
       "faction": "达识结社",
       "images": {
-        "portrait": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/22/15559334/13b7b06627a8a99ffdf1f397b1daf7d1_5495460923605178593.png",
+        "portrait": "/assets/agents/remielle_dan.png",
         "source": "https://baike.mihoyo.com/zzz/wiki/content/2076/detail?mhy_presentation_style=fullscreen"
       },
       "level60": {
