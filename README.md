@@ -6,6 +6,12 @@ Language: [简体中文](README.zh-CN.md)
 
 ## Upload Update Summaries
 
+- **2026-11-18 — Documentation entry points and temporary-artifact hygiene**: removed committed investigation artifacts, made the README point to the complete documentation index, and synchronized the current-document full-review baseline; no calculation, catalog, deployment or user-data behavior changed.
+- **2026-11-06 — Critical Assault 3.3 phase-two bosses and Field Buffs**: added the phase-two Field Buffs, four encounters and three local boss icons; unsupported mechanics remain descriptive, and the maintenance-page adjustment is preserved as saved.
+- **2026-11-03 — Nekomata and Asaba Harumasa temporarily hidden**: their models, skills, Buffs, icons, Enka mappings and maintenance entries remain, but they stay out of the workbench, optimizer and Enka choice lists until review is complete; Evelyn remains visible.
+- **2026-11-01 — Completed Evelyn skill multiplier catalog**: filled the Basic, Dodge, Assist and Basic Special multiplier tables under the current complete-skill model boundary.
+- **2026-10-31 — Defense Battle 3.3 phase-one Field Buffs**: added three Field Buffs while retaining the catalog rule that Defense Battle is shown first when both modes share the current version and phase.
+- **2026-10-29 — Release hardening**: protected pending IndexedDB personal-backup recovery, added real-browser backup/restore regression coverage, and derived the workbench sticky offset from the topbar variable.
 - **2026-10-28 — Workbench Buff and event interactions and the Buff picker (#111)**: in-battle buffs are collapsible and grouped by source, the event summary is collapsible, the scheme source uses a segmented control, and the Buff picker adds filtering, per-tab selected counts and a fixed frame; no layout or calculation change.
 - **2026-10-25 — Navigation, settings and result-area organization (#99–#102)**: a navigation indicator with narrow-screen local scrolling, account cards with filter chips and a danger zone, a reworked workbench result area with skill presets, and a substat marginal-gain chart.
 - **2026-10-24 — Local data tools and optimizer experience (#91–#98)**: complete personal backup and restore, ordinary import undo, optimizer results restored after refresh, Drive Disc pagination, and optimizer preference semantics (an explicit empty main-stat list means unrestricted; manual and legacy two-piece values are preserved).
@@ -92,16 +98,6 @@ ZZZ Calculator is independent and is not affiliated with or endorsed by Enka.Net
 
 ## Documentation
 
-- [Documentation index](docs/README.md)
-- [Character authoring and maintenance guide](docs/character-authoring-guide.md)
-- [Modeling specification](docs/modeling.md)
-- [Long-term regression contract](docs/regression-contract.md)
-- [Frontend layout contract](docs/frontend-layout-contract.md)
-- [Pyrois modeling](docs/pyrois-modeling.md)
-- [Wind/anomaly modeling](docs/wind-anomaly-modeling.md)
-- [Luminescence score modeling](docs/luminescence-modeling.md)
-- [Production deployment runbook](docs/production-deployment-runbook.md)
-- [Current changelog](docs/changelog.md)
-- [Archived evidence](docs/archive/)
+- [Documentation index](docs/README.md): task-oriented index of all current specifications, character notes, deployment guides, and archived evidence.
 
 All calculator models, public data, frontend/backend code, examples, tests and release scripts are maintained in this repository. See [AGENTS.md](AGENTS.md) for the project entry point used by coding assistants.

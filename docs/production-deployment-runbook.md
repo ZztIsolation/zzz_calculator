@@ -1,6 +1,6 @@
 # ZZZ Calculator 生产发布手册
 
-状态：当前生产操作入口。核对日期：2026-10-29；基准提交：`106959f1bad3e84a741a9d64dec893187bea0e62`。
+状态：当前生产操作入口。核对日期：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`。
 
 本文只描述当前 `main` → `deploy` → production 流程。旧手动切换、历史迁移和事故时序保存在 [归档发布手册](archive/production-deployment-runbook-before-2026-10-08.md)；恢复操作见 [恢复手册](../deploy/production/RECOVERY.md)，部署控制面安装见 [管理器说明](../deploy/production/README.md)。文档本身不授权发布，也不包含密钥。
 

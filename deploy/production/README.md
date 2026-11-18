@@ -1,6 +1,6 @@
 # Calculator production deploy manager
 
-This document describes the installed deployment control plane. It is not the normal release checklist; use [the repository release runbook](../../docs/production-deployment-runbook.md) for candidate freezing, CI/artifact checks and owner-dispatched promotion. Use [RECOVERY.md](RECOVERY.md) for bounded recovery. Current-source check: 2026-10-08, commit `6355fbd310cc5836aff0e78bc3fb46e68a5356f8`.
+This document describes the installed deployment control plane. It is not the normal release checklist; use [the repository release runbook](../../docs/production-deployment-runbook.md) for candidate freezing, CI/artifact checks and owner-dispatched promotion. Use [RECOVERY.md](RECOVERY.md) for bounded recovery. Current-source check: 2026-11-18, commit `9d51640c23697a849bdd3674b7f645a30c9f76b0`.
 
 ## Control-plane responsibilities
 

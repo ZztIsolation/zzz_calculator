@@ -1,7 +1,7 @@
 # Calculator Modeling
 
-Status: current specification. Checked on 2026-10-08 against commit
-`6355fbd310cc5836aff0e78bc3fb46e68a5356f8` (local source, not a production audit).
+Status: current specification. Checked on 2026-11-18 against commit
+`9d51640c23697a849bdd3674b7f645a30c9f76b0` (local source, not a production audit).
 
 This document owns shared model semantics. Start character work with the
 [authoring guide](character-authoring-guide.md); find acceptance invariants in the

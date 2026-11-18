@@ -1,8 +1,0 @@
-const fs = require('fs')
-const f = JSON.parse(fs.readFileSync(process.env.TEMP + '/fioni_nanoka.json', 'utf8'))
-console.log('stats', JSON.stringify(f.stats))
-console.log('extra_level', JSON.stringify(f.extra_level).slice(0, 3000))
-console.log('passive keys', Object.keys(f.passive || {}))
-console.log(JSON.stringify(f.passive, null, 2).slice(0, 8000))
-console.log('talent keys', Object.keys(f.talent || {}))
-console.log(JSON.stringify(f.talent, null, 2).slice(0, 5000))

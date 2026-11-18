@@ -1,8 +1,14 @@
 # 当前变更日志
 
-状态：当前发布和实现摘要入口。核对日期：2026-10-29；基准提交：`106959f1bad3e84a741a9d64dec893187bea0e62`。
+状态：当前发布和实现摘要入口。核对日期：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`。
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
+
+## 2026-11-18 — 文档入口与临时产物治理
+
+- 变化：移出已提交的 `tmp/` 和根目录 `.tmp_*` 调查产物并加入忽略规则；双语 README 改为只链接完整的文档索引；现行文档统一记录本次全文静态核对的日期和基准提交，角色资料日期与部署控制面详细期限仍由各自主文档维护。
+- 关键边界：不改变计算、目录、部署流程或用户数据；保留历史归档，不把过程报告迁入现行规范；用户可见的现行功能摘要与详细变更仍以对应主文档为准。
+- 验证：本地运行 `npm run test:repository-integrity`、`node scripts/validate-deployment-config.js` 与 `git diff --check`；这些检查不代表远端 CI 或生产验收。
 
 ## 2026-11-06 — 危局强袭战 3.3 第二期 Boss 与场地 Buff
 
@@ -12,6 +18,8 @@
 - 验证：本地运行 `npm run test:field-buffs`、`npm run test:boss-catalog`、`npm run test:maintenance-validation`、`npm run test:repository-integrity`（`ok (199 catalog assets verified)`，较基线 196 项恰为新增三张头像）、`npm run test:percent-sanity`、`npm run test:skill-targets`（技能目标总数 118→121，新增岚劫普通攻击与锋蚀特殊技目标）、`npm run test:catalog-loader`、`npm run test:effect-rule-targets` 均通过；`npm run build:webapp` 通过，`BuffPickerModal.test.ts` 71 项通过（真实目录默认 `critical_assault|3.3|2`、三张场地 Buff 渲染顺序，以及切回 `defense_v5|3.3|1` 与 `critical_assault|3.2|2`）；8790 冒烟验证 `/api/health`、`/`、`/api/catalog` 与新增头像均 200。随后已切换为 8787 本地预览服务（`/api/health` 200、`/` 200、目录数据含本期四条敌情与三条场地 Buff、新增头像 200）供确认。以上均为本地检查，不代表远端 CI 或生产验收；用户确认后推送 `main` 并按发布手册经 CI 与 Promote 晋级，远端结果以实际 CI/CD evidence 为准。
 
 ## 2026-11-03 — 暂时隐藏猫又与浅羽悠真
+
+- 发布/部署同步：控制面审计超时由 30 秒调整为 90 秒，清理宽限由 15 秒调整为 30 秒；恢复流程 runner 总预算同步为 125 秒（120 秒执行加 5 秒终止）。详细期限只维护在[部署控制面说明](../deploy/production/README.md)和[恢复手册](../deploy/production/RECOVERY.md)。
 
 - 问题：11-01 重建 PR81 时将尚未核对完毕的[猫又](nekomata-modeling.md)、[浅羽悠真](harumasa-modeling.md)与已交付的[伊芙琳](evelyn-modeling.md)一并写入 `main`；前台工作台因此可选中未完成核对的角色。
 - 变化：仅将两人目录记录改为 `hidden: true`，沿用维护页「首页/优化器显示」开关。模型、技能、Buff、头像、Enka 映射和测试算例保留；伊芙琳保持可见。

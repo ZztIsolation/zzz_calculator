@@ -1,6 +1,6 @@
 # Recover a frozen production candidate without restarting the live service
 
-Status: current bounded recovery guide. Checked 2026-10-08 against commit `6355fbd310cc5836aff0e78bc3fb46e68a5356f8`. Keep `PRODUCTION_CD_ENABLED=false` during diagnosis and control-plane installation; this gate prevents promotion, not Calculator service execution. Do not rerun an old production job just to obtain new workflow code.
+Status: current bounded recovery guide. Checked 2026-11-18 against commit `9d51640c23697a849bdd3674b7f645a30c9f76b0`. Keep `PRODUCTION_CD_ENABLED=false` during diagnosis and control-plane installation; this gate prevents promotion, not Calculator service execution. Do not rerun an old production job just to obtain new workflow code.
 
 Use [the release runbook](../../docs/production-deployment-runbook.md) for normal promotion and [the manager contract](README.md) for command deadlines and evidence. The 2026-10-02 incident narrative is preserved in [the archive](../../docs/archive/deploy-recovery-2026-10-02.md).
 
