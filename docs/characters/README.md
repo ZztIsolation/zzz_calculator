@@ -13,12 +13,12 @@
 | `aria` | 爱芮 | 1501 | 可见 | [aria.md](aria.md) | `test:aria-damage` |
 | `asaba_harumasa` | 浅羽悠真 | 1201 | **隐藏** | [asaba_harumasa.md](asaba_harumasa.md) | `test:pr81-characters` |
 | `claret` | 克拉蕾·弗林特 | 1611 | 可见 | [claret.md](claret.md)（含锐化伤害域） | `test:sharp-damage` |
-| `ellen_joe` | 艾莲 | 1191 | 可见 | [ellen_joe.md](ellen_joe.md) | `tests/ellen-integration.test.js`（未接入 `npm test`） |
+| `ellen_joe` | 艾莲 | 1191 | 可见 | [ellen_joe.md](ellen_joe.md) | `test:ellen-integration` |
 | `evelyn_chevalier` | 伊芙琳 | 1321 | 可见 | [evelyn_chevalier.md](evelyn_chevalier.md) | `test:pr81-characters` |
 | `fioni` | 菲欧妮 | 1641 | 可见 | [fioni.md](fioni.md) | `test:fioni-damage` |
 | `hoshimi_miyabi` | 星见雅 | 1091 | 可见 | 无专属规则，以数据为准 | — |
 | `jane_doe` | 简·杜 | 1261 | 可见 | [jane_doe.md](jane_doe.md) | `test:jane-damage` |
-| `nangongyu` | 南宫羽 | 1511 | 可见 | [nangongyu.md](nangongyu.md)（**含已知缺陷**） | 无专属伤害测试 |
+| `nangongyu` | 南宫羽 | 1511 | 可见 | [nangongyu.md](nangongyu.md) | `test:nangongyu-damage` |
 | `nekomata` | 猫又 | 1021 | **隐藏** | [nekomata.md](nekomata.md) | `test:pr81-characters` |
 | `pyrois` | 佩洛伊斯 | 1551 | 可见 | [pyrois.md](pyrois.md) | `test:pyrois-damage` |
 | `remielle_dan` | 蕾米埃尔·丹 | 1581 | 可见 | [remielle_dan.md](remielle_dan.md)（队伍异常评分） | `test:luminescence`、`test:remielle-teammate-buffs` |

@@ -26,6 +26,7 @@
 - 紊乱与乱流（语义见[建模说明](modeling.md#紊乱与乱流)）：按属性归属过滤，非风角色可添加乱流，风角色不能添加乱流或紊乱，紊乱不得使用风化；`elapsedSeconds` 的步长、保存归一化和计算精度读取目录项 `tickIntervalSeconds`，存储不得按基础时长截断。
 - 异放保存为独立 `settlementType: "release"`，通用事件携带 `triggerActorRef`、倍率方案和唯一 `anomalySource`；新保存不得出现 `anomalyVariant: "release"` 或普通异常触发次数，旧事件与旧纯异放规则自动升级。当前角色作为来源读取实时面板，外部来源使用含角色、配置哈希、捕获时间、面板和修正参数的冻结快照，只有刷新才更新；敌人防御、抗性和事件失衡保持实时；不得实现 A+B 联合驱动盘搜索。
 - 异放区间上界：固定套装异放评分内核只有在区间上界已实现时才能声明 `releaseIntervalBound: true`，该标记由 `compileForSetCounts()` 原样透传给严格优化器；缺少标记的回退路径必须返回无限上界并禁止剪枝。“初始异常掌控→异常暴击率”的 clamp 公式经白名单解析器证明单调后才可参与；其他动态公式、动态局外属性要求或无法证明的区间必须回退，并以 `releaseBoundFallbackReason`（`fixed-kernel-unavailable`、`dynamic-formula-unsupported`、`dynamic-out-of-combat-requirement`、`interval-bound-unsafe`）标明。该性能修复不得改变伤害语义。
+- 异放影画语义见[建模说明](modeling.md#伤害与评分域)；最低影画必须同时约束方案列表、维护事件校验和实际计算，七档常量必须在普通、预览、白盒、编译及区间路径保持一致。入口：`test:nangongyu-damage`、`test:maintenance-validation` 与[浏览器回归](../webapp/e2e/nangongyu-release.e2e.ts)。
 - 锋御域由 `core/sharpDamage.js` 统一处理，规则见[克拉蕾](characters/claret.md)。
 - 默认 Buff、影画 Buff、用户手动取消项和 runtime 输入分别保存；Buff 弹窗只编辑草稿，确认后才应用，取消必须无副作用。
 - 工作台自定义 Buff 只允许新建面向用户的精简白名单：六属性伤害加成必须分别保留；六属性版贯穿增伤、属性暴击伤害、属性无视防御、属性减抗和属性抗性无视不得出现在候选项中；“异常掌控超过 140 时每点转异常精通”和“初始异常掌控超过 100 时每点转异常暴击率”不得向用户开放（后者在维护端也只能用于“异常目标 + 异放”）。维护端必须继续提供全部明确属性字段和阈值类型，计算核心及存量自定义 Buff 不得因用户白名单收窄而丢失兼容。

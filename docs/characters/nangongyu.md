@@ -6,7 +6,7 @@
 | 首页与优化器 | 可见 |
 | 资料来源 | 见下文“来源”；资料核对日期 2026-10-10 |
 | 实现核对 | 2026-11-18；基准提交 `9d51640c23697a849bdd3674b7f645a30c9f76b0` |
-| 验证入口 | 无专属伤害测试；[技能目标](../../tests/skill-targets.test.js)与[共享战斗](../../tests/shared-combat.test.js)间接覆盖。**已知缺陷见下文，现有测试不覆盖** |
+| 验证入口 | `npm run test:nangongyu-damage`；[浏览器回归](../../webapp/e2e/nangongyu-release.e2e.ts) |
 
 ## 来源
 
@@ -39,7 +39,7 @@ A/C/E各增加12点基础掌控，B/D/F各增加25点基础攻击。满核心白
 ## 颤音异放
 
 异放事件可以选择1～4层颤音，以及六影1～4层颤音改。
-常规颤音默认4层；当前六影方案在0影仍可选择，门槛未生效，见[已知缺陷](#已知缺陷)。
+常规颤音默认4层；六影颤音改方案仅在6影开放。工作台自定义异放的“倍率方案”可切换层数与已解锁方案，管理员默认仍是单次四层核心颤音。
 
 | 原异常属性 | 核心基础比例 | 六影颤音改基础比例 |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ A/C/E各增加12点基础掌控，B/D/F各增加25点基础攻击。满核心白
 | 风 | 36% | 40% |
 
 采用公式：`原异常单次倍率 × 属性比例 × (1 + 颤音层数 × 每层提升)`。
-目录意图为常规每层25%、二影及以上核心颤音每层35%，四层分别乘2和2.4；但当前运行时只读取常量 `value: 25`，四层在各影画均乘2，未应用二影成长。
+常规每层25%、二影及以上核心颤音每层35%，四层分别乘2和2.4；满核心自身侵蚀单跳的异放基础倍率分别为 `0.625 × 7.2 × 2 = 9` 和 `0.625 × 7.2 × 2.4 = 10.8`。
 六影颤音改仍每层25%，二影条款只修饰核心被动中的颤音异放。
 “比例额外提升”的乘法解释作为明确项目假设保留，尚未通过独立游戏实测确认。
 不要把720%与四层100%直接相加，也不要再额外乘触发者南宫羽的精通。
@@ -59,20 +59,11 @@ A/C/E各增加12点基础掌控，B/D/F各增加25点基础攻击。满核心白
 异放使用原异常来源面板。自身侵蚀用当前南宫羽实时面板；冰底等外部来源需要选择实际来源并保存冻结快照。
 优化期间外部快照不随南宫羽换盘更新；当前模型不进行全队联合优化或积蓄贡献自动加权。
 
-目录常量节点保存了七档 `cinemaValues`，但当前求值器不读取该字段，不能声称普通或编译评分已按影画物化。
-维护页的最低影画控件读写 `minimumCinemaLevel`；常量编辑器没有 `cinemaValues` 成长控件。
+常量成长与最低影画的通用语义见[建模说明](../modeling.md#伤害与评分域)。维护页可通过“按影画取值”编辑0–6影数值。
 
 ## 已知缺陷
 
-- **六影门槛未生效**：`data/agents.json` 的南宫羽八个方案使用 `minCinemaLevel`，其中四个 `cinema6_tremolo_*` 为6；代码只读取 `minimumCinemaLevel`（同文件仅菲欧妮方案使用该字段）。[方案筛选](../../core/anomalyRelease.js) 的 `anomalyReleaseProfiles` 和[事件校验](../../core/maintenanceValidation.js) 均因此将南宫羽方案门槛视为0。
-  复现：在仓库根目录运行下方只读命令，0影返回的列表仍包含四个 `cinema6_tremolo_*`。工作台选择南宫羽、0影，编辑异放事件时也使用该方案筛选入口。
-- **二影常量成长未生效**：常量求值及区间求值只读取 `node.value`，不读取 `cinemaValues`。复现：运行下方命令，四层核心方案的层数因子在0影和2影都输出2，未达到目录二影意图的2.4。此处比较的是层数因子，不是叠加其他影画 Buff 后的总伤害。
-
-```sh
-node --input-type=module -e "import fs from 'node:fs'; import { anomalyReleaseProfiles, evaluateReleaseExpression } from './core/anomalyRelease.js'; const a=JSON.parse(fs.readFileSync('data/agents.json','utf8')).agents.find(a=>a.id==='nangongyu'); console.log(anomalyReleaseProfiles(a,0).map(p=>p.id)); const factor=a.anomalyReleaseProfiles.find(p=>p.id==='core_tremolo_4').expression.args[1]; for(const cinemaLevel of [0,2]) console.log(cinemaLevel,evaluateReleaseExpression(factor,{cinemaLevel}));"
-```
-
-以上为代码与目录不一致的已知缺陷，本次仅修正文档，不修改数据或实现，也不把这些行为当作应长期保持的机制。
+此前的六影门槛字段不一致、二影常量成长无人读取两项缺陷已修复，修复与实际验证记录见[变更日志](../changelog.md)。专项回归必须保持：0–5影不能选择或计算颤音改，2影核心颤音采用35%，6影颤音改仍采用25%；直伤、普通属性异常和紊乱不受这项常量成长影响。
 
 ## 技能与默认目标
 
@@ -91,4 +82,4 @@ node --input-type=module -e "import fs from 'node:fs'; import { anomalyReleasePr
 - 极性紊乱复用已有25%紊乱事件，跨角色原异常面板的紊乱自动继承尚不支持，不能把冰底直接用南宫羽面板计算。
 - 自动积蓄、失衡生成与延长、重拍、舞力全开、颤音触发先后和次数限制不模拟，需按实际轴配置。
 - 二影连携额外极性紊乱与六影异放不自动生成，按实际发生事件录入。
-- 当前已有自动测试：`tests/skill-targets.test.js` 遍历当前技能/效果目录校验目标，`tests/shared-combat.test.js` 显式检查南宫羽队友 Buff 名称和顺序。它们不能证明上述影画缺陷已修复，也不是完整的南宫羽伤害或优化器验收。
+- [专项测试](../../tests/nangongyu-damage.test.js)覆盖影画门槛、独立倍率算例、外部冻结来源、普通/白盒/编译/固定评分、区间上界以及独立穷举Top 10；[浏览器测试](../../webapp/e2e/nangongyu-release.e2e.ts)覆盖预览持久化、维护保存回读和真实Worker。它们验证当前快照模型，不证明触发时间轴或游戏内乘法解释。
