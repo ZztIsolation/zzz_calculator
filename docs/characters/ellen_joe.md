@@ -1,9 +1,13 @@
-# 艾莲模型
+# 艾莲（`ellen_joe`）
 
-来源：用户指定的 [Nanoka 艾莲页](https://zzz.nanoka.cc/character/1191)，
-结构化版本 `3.3.4+19304006`，读取日期 2026-10-10。
-原始快照见 [source JSON](sources/ellen-nanoka-3.3.4+19304006.json)。
-角色 ID `ellen_joe`；Enka 游戏 ID `1191`；专武深海访客 `zzz_wiki_225`。
+| 项目 | 内容 |
+| --- | --- |
+| 游戏 ID | `1191` |
+| 首页与优化器 | 可见 |
+| 专武 | 深海访客（`zzz_wiki_225`） |
+| 资料来源 | [Nanoka 艾莲页](https://zzz.nanoka.cc/character/1191)，结构化版本 `3.3.4+19304006`，读取日期 2026-10-10；原始快照 [source JSON](../sources/ellen-nanoka-3.3.4+19304006.json) |
+| 实现核对 | 2026-11-18；基准提交 `9d51640c23697a849bdd3674b7f645a30c9f76b0` |
+| 验证入口 | `node tests/ellen-integration.test.js`（未接入 `npm test`）；[store 测试](../../webapp/src/stores/ellen-integration.test.ts)；[浏览器测试](../../webapp/e2e/ellen-integration.e2e.ts) |
 
 ## 默认计算目标
 
@@ -90,4 +94,4 @@ P0所有已录入招式仍可手动选择；本全物理队不满足原版额外
 双大喧响获取和动画可行性；本模型只为所列艾莲直伤事件评分。
 没有把琉音、千夏自身伤害计入艾莲的盘子目标。
 
-当前存在 [Node 集成测试](../tests/ellen-integration.test.js)，可用 `node tests/ellen-integration.test.js` 单独运行，但未接入根 `package.json` 的脚本链，`npm test` 不运行该文件。另有前端 store 测试与浏览器测试；测试文件存在不等于本次已执行。历史维护保存回读和构建记录不作为当前验收，本次未进行游戏实测。
+当前存在 [Node 集成测试](../../tests/ellen-integration.test.js)，可用 `node tests/ellen-integration.test.js` 单独运行，但未接入根 `package.json` 的脚本链，`npm test` 不运行该文件。另有前端 store 测试与浏览器测试；测试文件存在不等于本次已执行。历史维护保存回读和构建记录不作为当前验收，本次未进行游戏实测。

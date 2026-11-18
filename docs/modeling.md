@@ -16,14 +16,14 @@ This document owns shared model semantics. Start character work with the
   direct, Sheer, Sharp, Attribute Anomaly, Disorder, Release and Turbulence damage,
   reusable skill groups, Cinema and Potential-dependent configurations.
 - Luminescence has a separate team-comparison score, not an actual damage event
-  that can be added to rotation damage. See its [model](luminescence-modeling.md).
+  that can be added to rotation damage. See its [model](characters/remielle_dan.md).
 - Energy, Decibels, animation time, resource transitions, anomaly buildup and
   automatic Buff uptime are not simulated. Retain such mechanics in descriptions
   without translating them into unsupported damage effects.
-- [core](../core/) owns portable calculation, normalization, validation and search.
+- [core](../core) owns portable calculation, normalization, validation and search.
   The browser calculates locally and runs heavy optimization in a Worker.
-- [browser runtime](../webapp/src/runtime/) adapts catalogs, persistence, imports
-  and Scanner communication. [backend](../backend/) serves catalogs/assets,
+- [browser runtime](../webapp/src/runtime) adapts catalogs, persistence, imports
+  and Scanner communication. [backend](../backend) serves catalogs/assets,
   local maintenance, Enka proxying and bounded diagnostics. Production does not
   accept inventories for server-side calculation.
 
@@ -130,7 +130,7 @@ default-target flat ATK or Attribute-Anomaly CRIT Rate. The ATK phase runs befor
 damage formulas; target-specific CRIT remains an event modifier and never changes
 ordinary panel CRIT. Unsupported dependencies and outputs fail validation. Fixed
 scoring uses the existing dense fallback when a specialized scalar/bound is not
-available. See [Jane's model](jane-modeling.md) for the character-specific rules.
+available. See [Jane's model](characters/jane_doe.md) for the character-specific rules.
 
 ## Events, groups and defaults
 
@@ -145,12 +145,12 @@ Self in-combat formulas may produce this skill-targeted modifier from final
 ordinary panel CRIT Rate, with both source and result using `storedPercent`.
 Event-targeted CRIT does not feed the source. Candidate scoring reevaluates the
 formula; unsupported scalar kernels use dense scoring, and unproven dynamic
-formulas disable monotonic pruning. See [Evelyn](evelyn-modeling.md) and
+formulas disable monotonic pruning. See [Evelyn](characters/evelyn_chevalier.md) and
 [character regressions](../tests/pr81-characters.test.js).
 
 The explicit `followUp` skill tag denotes authored follow-up attacks. Skill-tag
 targets use OR matching; damage descriptions alone do not establish this tag.
-See [Nekomata's classification boundary](nekomata-modeling.md#驱动盘与分类边界).
+See [Nekomata's classification boundary](characters/nekomata.md#驱动盘与分类边界).
 
 A skill-backed event selects an authored row. This Pyrois Ultimate event contains
 the body only, without an implicit Assault Directive:
@@ -213,8 +213,8 @@ relevant topic or regression clause, instead of duplicating templates. See
 | Attribute Anomaly | Attribute, anomaly basis, proc count and matching anomaly effects |
 | Disorder | Original non-Wind anomaly and remaining-time model; does not inherit all Attribute Anomaly bonuses/critical zones |
 | Release | [anomalyRelease.js](../core/anomalyRelease.js) resolves source/trigger ownership and unit-aware expressions without double-counting effects |
-| Turbulence | Non-Wind base, explicit elapsed time and the [Wind contract](wind-anomaly-modeling.md), not a Wind character's panel |
-| Luminescence | [Separate comparison score](luminescence-modeling.md) and objective |
+| Turbulence | Non-Wind base, explicit elapsed time and the [Wind contract](characters/velina.md), not a Wind character's panel |
+| Luminescence | [Separate comparison score](characters/remielle_dan.md) and objective |
 
 Sharp white-box output keeps ordinary and Sharp-specific damage bonuses separate.
 Ordinary CRIT DMG and laceration damage remain separate stats.
@@ -227,7 +227,7 @@ build picker or joint A+B optimization.
 
 Aria's player editor constrains the source to her own Corruption. Velina uses
 `releaseSource` and omits redundant generalized fields; see the
-[Wind topic](wind-anomaly-modeling.md). Fixed Release multipliers replace the anomaly
+[Wind topic](characters/velina.md). Fixed Release multipliers replace the anomaly
 multiplier basis, rather than blindly multiplying final damage.
 
 ### Anomaly crit outcomes

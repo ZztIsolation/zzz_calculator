@@ -1,12 +1,16 @@
-# 猫又参考模型
+# 猫又（`nekomata`）
 
-资料核对日期：2026-10-13。本地新增，资料版本 `3.3.12+19520738`。实现核对：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`。
-
-迁移核对：2026-11-01，基于 main `b857be0` 重建。保留 PR81 后续分支 `58cfc0b` 的来源快照和已确认配置；本次未更新游戏资料版本。当前实现验证见[变更日志](changelog.md)。
+| 项目 | 内容 |
+| --- | --- |
+| 游戏 ID | `1021` |
+| 首页与优化器 | **隐藏**（`hidden: true`），核对完成前不出现在工作台、优化器和 Enka 可选目录；专武保持可见，维护页仍可编辑 |
+| 资料来源 | Nanoka 资料版本 `3.3.12+19520738`，资料核对日期 2026-10-13；见下文“来源与默认目标” |
+| 实现核对 | 2026-11-18；基准提交 `9d51640c23697a849bdd3674b7f645a30c9f76b0` |
+| 验证入口 | `npm run test:pr81-characters`；[store 测试](../../webapp/src/stores/pr81-characters.test.ts) |
 
 ## 来源与默认目标
 
-- [Nanoka角色页](https://zzz.nanoka.cc/character/1021)、[结构化角色资料](https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1021.json)。原始抓取保存在[来源快照](sources/nekomata-nanoka-3.3.12+19520738.json)。
+- [Nanoka角色页](https://zzz.nanoka.cc/character/1021)、[结构化角色资料](https://static.nanoka.cc/zzz/3.3.12+19520738/zh/character/1021.json)。原始抓取保存在[来源快照](../sources/nekomata-nanoka-3.3.12+19520738.json)。
 - [驱动盘数据](https://static.nanoka.cc/zzz/3.3.12+19520738/equipment.json)。头像使用 Nanoka `IconRole11.webp`，独立于机制数据核对。
 - 用户确认：60级、0影、潜能6、核心F、最终技能12级、精1钢铁肉垫。参考组合为失衡内1次终结技、2次强化特殊技、3套完整普攻，加10次超凶爪印。没有确认队友，因此不预载队友增益。
 - 核心增伤和肉球突袭按已铺垫且全程覆盖计算；专武背击增伤默认满覆盖，仍可单独调整。

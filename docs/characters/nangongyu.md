@@ -1,12 +1,18 @@
-# 南宫羽本地建模
+# 南宫羽（`nangongyu`）
 
-本地新增角色，资料核对日期：2026-10-10。角色 ID：`nangongyu`，游戏 ID：`1511`。
+| 项目 | 内容 |
+| --- | --- |
+| 游戏 ID | `1511` |
+| 首页与优化器 | 可见 |
+| 资料来源 | 见下文“来源”；资料核对日期 2026-10-10 |
+| 实现核对 | 2026-11-18；基准提交 `9d51640c23697a849bdd3674b7f645a30c9f76b0` |
+| 验证入口 | 无专属伤害测试；[技能目标](../../tests/skill-targets.test.js)与[共享战斗](../../tests/shared-combat.test.js)间接覆盖。**已知缺陷见下文，现有测试不覆盖** |
 
 ## 来源
 
 - [Nanoka 角色页](https://zzz.nanoka.cc/character/1511)
 - [中文结构化数据，3.3.4+19304006](https://static.nanoka.cc/zzz/3.3.4+19304006/zh/character/1511.json)
-- [本次原始数据快照](sources/nangongyu-nanoka-3.3.4+19304006.json)
+- [本次原始数据快照](../sources/nangongyu-nanoka-3.3.4+19304006.json)
 
 数据版本标签不等同于正式服版本声明。采用该快照中的南宫羽条目，未做游戏内独立实测。
 
@@ -58,7 +64,7 @@ A/C/E各增加12点基础掌控，B/D/F各增加25点基础攻击。满核心白
 
 ## 已知缺陷
 
-- **六影门槛未生效**：`data/agents.json` 的南宫羽八个方案使用 `minCinemaLevel`，其中四个 `cinema6_tremolo_*` 为6；代码只读取 `minimumCinemaLevel`（同文件仅菲欧妮方案使用该字段）。[方案筛选](../core/anomalyRelease.js) 的 `anomalyReleaseProfiles` 和[事件校验](../core/maintenanceValidation.js) 均因此将南宫羽方案门槛视为0。
+- **六影门槛未生效**：`data/agents.json` 的南宫羽八个方案使用 `minCinemaLevel`，其中四个 `cinema6_tremolo_*` 为6；代码只读取 `minimumCinemaLevel`（同文件仅菲欧妮方案使用该字段）。[方案筛选](../../core/anomalyRelease.js) 的 `anomalyReleaseProfiles` 和[事件校验](../../core/maintenanceValidation.js) 均因此将南宫羽方案门槛视为0。
   复现：在仓库根目录运行下方只读命令，0影返回的列表仍包含四个 `cinema6_tremolo_*`。工作台选择南宫羽、0影，编辑异放事件时也使用该方案筛选入口。
 - **二影常量成长未生效**：常量求值及区间求值只读取 `node.value`，不读取 `cinemaValues`。复现：运行下方命令，四层核心方案的层数因子在0影和2影都输出2，未达到目录二影意图的2.4。此处比较的是层数因子，不是叠加其他影画 Buff 后的总伤害。
 

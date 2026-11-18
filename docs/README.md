@@ -11,17 +11,17 @@
 | 安装、运行、了解功能 | [中文 README](../README.zh-CN.md)、[English README](../README.md) | 用户概览、最近十五个更新日期、运行命令；不复制详细公式和发布操作 |
 | 新增或修订角色 | [角色制作与维护指南](character-authoring-guide.md) | 六阶段流程、交付模板、七个案例及维护偏好 |
 | 理解通用计算与数据结构 | [建模说明](modeling.md) | 面板、效果、事件、存储和接口状态 |
-| 简·杜与潜能影像 | [简专题](jane-modeling.md) | 实时精通、狂热归属、默认配置、潜能和来源 |
+| 简·杜与潜能影像 | [简专题](characters/jane_doe.md) | 实时精通、狂热归属、默认配置、潜能和来源 |
 | 检查必须保持的行为 | [长期回归契约](regression-contract.md) | 计算、角色、维护、存储、优化及发布不变量和测试入口 |
-| 佩洛伊斯 | [角色专题](pyrois-modeling.md) | 资料版本、四分支假设、当前技能组与默认配置 |
-| 艾莲 | [角色专题](ellen-modeling.md) | 潜能增强、风暴潮共享层数、体型霜锋与琉音＋千夏参考轴 |
-| 南宫羽 | [角色专题](nangongyu-modeling.md) | 核心成长、颤音异放与个人默认目标 |
-| 猫又 | [角色专题](nekomata-modeling.md) | 原版/潜能普攻组、爪印与固定失衡组合；当前隐藏首页/优化器 |
-| 浅羽悠真 | [角色专题](harumasa-modeling.md) | 终结技本体与散华、强化技及定向增益；当前隐藏首页/优化器 |
-| 伊芙琳 | [角色专题](evelyn-modeling.md) | 完整技能倍率表、普攻火伤约定及连携/终结技门槛 |
-| 菲欧妮 | [角色专题](fioni-modeling.md) | 灼蚀异常暴击、焚罪异放与默认单次异放 |
-| 风属性异常与维琳娜 | [风属性专题](wind-anomaly-modeling.md) | 风化、乱流、异放、来源、公式和默认配置 |
-| 蕾米埃尔·丹评分 | [评分专题](luminescence-modeling.md) | 恒定权重近似、正式输入、兼容和评分边界 |
+| 佩洛伊斯 | [角色专题](characters/pyrois.md) | 资料版本、四分支假设、当前技能组与默认配置 |
+| 艾莲 | [角色专题](characters/ellen_joe.md) | 潜能增强、风暴潮共享层数、体型霜锋与琉音＋千夏参考轴 |
+| 南宫羽 | [角色专题](characters/nangongyu.md) | 核心成长、颤音异放与个人默认目标 |
+| 猫又 | [角色专题](characters/nekomata.md) | 原版/潜能普攻组、爪印与固定失衡组合；当前隐藏首页/优化器 |
+| 浅羽悠真 | [角色专题](characters/asaba_harumasa.md) | 终结技本体与散华、强化技及定向增益；当前隐藏首页/优化器 |
+| 伊芙琳 | [角色专题](characters/evelyn_chevalier.md) | 完整技能倍率表、普攻火伤约定及连携/终结技门槛 |
+| 菲欧妮 | [角色专题](characters/fioni.md) | 灼蚀异常暴击、焚罪异放与默认单次异放 |
+| 风属性异常与维琳娜 | [风属性专题](characters/velina.md) | 风化、乱流、异放、来源、公式和默认配置 |
+| 蕾米埃尔·丹评分 | [评分专题](characters/remielle_dan.md) | 恒定权重近似、正式输入、兼容和评分边界 |
 | 本地个人备份与恢复 | [本地数据工具](local-data-tools.md) | 完整备份、预览、事务回滚及坏库存恢复边界 |
 | 表单和弹窗布局 | [前端布局契约](frontend-layout-contract.md) | 尺寸、滚动、可见性；保存行为引用回归契约 |
 | 驱动盘仓库性能 | [分页与缓存说明](drive-disc-performance.md) | 分页、代理人预设筛选、缓存边界与验证入口 |

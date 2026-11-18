@@ -21,7 +21,7 @@
 
 - 发布/部署同步：控制面审计超时由 30 秒调整为 90 秒，清理宽限由 15 秒调整为 30 秒；恢复流程 runner 总预算同步为 125 秒（120 秒执行加 5 秒终止）。详细期限只维护在[部署控制面说明](../deploy/production/README.md)和[恢复手册](../deploy/production/RECOVERY.md)。
 
-- 问题：11-01 重建 PR81 时将尚未核对完毕的[猫又](nekomata-modeling.md)、[浅羽悠真](harumasa-modeling.md)与已交付的[伊芙琳](evelyn-modeling.md)一并写入 `main`；前台工作台因此可选中未完成核对的角色。
+- 问题：11-01 重建 PR81 时将尚未核对完毕的[猫又](characters/nekomata.md)、[浅羽悠真](characters/asaba_harumasa.md)与已交付的[伊芙琳](characters/evelyn_chevalier.md)一并写入 `main`；前台工作台因此可选中未完成核对的角色。
 - 变化：仅将两人目录记录改为 `hidden: true`，沿用维护页「首页/优化器显示」开关。模型、技能、Buff、头像、Enka 映射和测试算例保留；伊芙琳保持可见。
 - 关键边界：不撤回角色内容，不隐藏专武钢铁肉垫、残心青囊；维护页仍可编辑。工作台、优化器和 Enka 导入不再列出这两人，已保存的浏览器配置不会删除。
 - 验证：见本次交付说明。提交进入 `main` 后按发布手册走 Promote，不直接 push `deploy`。
@@ -29,13 +29,13 @@
 ## 2026-11-01 — 补全伊芙琳技能倍率表
 
 - 变化：补齐普通攻击、闪避攻击、支援和普通特殊技，共14个带倍率表的招式、42行数值；目录仅保存核对后的最终1–16级数值，现有四个招式的ID及倍率保持兼容。
-- 范围：遵循[伊芙琳专题](evelyn-modeling.md)的普攻火伤约定；不新增技能组、重复状态倍率、六影追击事件或相关Buff。保留当前单次终结技默认目标及人工维护的角色描述。
+- 范围：遵循[伊芙琳专题](characters/evelyn_chevalier.md)的普攻火伤约定；不新增技能组、重复状态倍率、六影追击事件或相关Buff。保留当前单次终结技默认目标及人工维护的角色描述。
 - 验证：完整 `npm test` 通过（前端79个文件、1041项），前端构建通过；专项覆盖最终倍率、伤害属性、Buff排除目标、独立算例、分段合计、编译/固定评分、独立穷举Top 10及Node Worker。Playwright在隔离数据副本中验证技能资料保存/刷新回读，以及工作台普攻总倍率选择与刷新恢复；实际构建的浏览器Worker通过新增招式组合Top 10、取消及复用检查。均为本地验证。
 
 ## 2026-11-01 — 基于当前 main 重建 PR81 三角色分支
 
 - 问题：PR81 后续分支 `58cfc0b` 落后于当前 main，包含旧异放接口和过时的目录测试基线，不能整体覆盖。
-- 变化：以 main `b857be0` 为基线建立 `codex/pr81-characters-refresh`，迁入[猫又](nekomata-modeling.md)、[浅羽悠真](harumasa-modeling.md)、[伊芙琳](evelyn-modeling.md)及技能、默认目标、Buff、三把专武关联、头像/缩略图和 Enka 映射；接入直伤技能倍率乘算与如影相随定向两件套。保留原作者 George0590 与 GuanshanJoy 的贡献归属。
+- 变化：以 main `b857be0` 为基线建立 `codex/pr81-characters-refresh`，迁入[猫又](characters/nekomata.md)、[浅羽悠真](characters/asaba_harumasa.md)、[伊芙琳](characters/evelyn_chevalier.md)及技能、默认目标、Buff、三把专武关联、头像/缩略图和 Enka 映射；接入直伤技能倍率乘算与如影相随定向两件套。保留原作者 George0590 与 GuanshanJoy 的贡献归属。
 - 关键边界：按 ID 比较确认已有角色、技能记录保持不变，装备只修改三把专武和如影相随；未迁入旧南宫羽异放改造，未改变当前菲欧妮及 Release 接口。保留三角色已有来源版本、固定状态假设和未建模范围，不模拟时间轴或自动资源收支；没有推送、合并或生产发布。
 - 验证：本地 `npm test` 全部通过（webapp 79 个文件、1041 项测试），`npm run build:webapp`、缩略图校验通过。新增三角色独立算例、作用/排除目标、普通/白盒/compiled/indexed/dense/固定套装评分、独立穷举 Top 10（含不足十套）、Node Worker、维护清洗及 Enka 解析映射检查；补充 Enka 检查后再次运行三角色专项通过。
 - 浏览器验收：Playwright CLI 使用独立会话与隔离目录副本，验证三个角色维护修改保存/刷新回读/恢复名称、工作台选择及刷新恢复、1440px 和 390px 页面无横向溢出；实际构建 Worker 的三个角色 Top 10、进度、取消和复用通过。截图与执行记录保存在本地 `output/playwright/`、`output/pr81-browser/`，不进入发布目录；这些结果不代表远端 CI 或线上验收。
@@ -122,7 +122,7 @@
 ## 2026-10-24 — 菲欧妮精准优化剪枝修复
 
 - 问题：默认异放事件叠加初始异常掌控→异常暴击率 clamp 公式后，固定套装 objective 内核无法给出异放区间上界，`releaseIntervalBound=false`，精准优化退化为全枚举；真实库存 283,708 组合实测约 186s。
-- 变化：新增 `compileInitialMasteryAnomalyCritFormula` 白名单解析器，仅编译可证明单调的 `clamp(base + max(x - threshold, 0) * rate, 0, cap)`；固定套装 objective 内核以区间上界纳入该项，`releaseIntervalBound` 可为 true；严格优化器 metrics 新增 `releaseIntervalBoundEnabled` 与 `releaseBoundFallbackReason` 诊断。机制见[菲欧妮专题](fioni-modeling.md#优化器)，验收边界见[回归契约](regression-contract.md#优化器)。
+- 变化：新增 `compileInitialMasteryAnomalyCritFormula` 白名单解析器，仅编译可证明单调的 `clamp(base + max(x - threshold, 0) * rate, 0, cap)`；固定套装 objective 内核以区间上界纳入该项，`releaseIntervalBound` 可为 true；严格优化器 metrics 新增 `releaseIntervalBoundEnabled` 与 `releaseBoundFallbackReason` 诊断。机制见[菲欧妮专题](characters/fioni.md#优化器)，验收边界见[回归契约](regression-contract.md#优化器)。
 - 关键边界：只支持上述可证明形状，其他动态公式或无法证明的区间继续返回无限上界并全枚举；伤害语义不变，Top 10 与 `exact-legacy` 全等，`scoredCombinationCount + prunedBySuperBound === estimatedCombinationCount`。
 - 验证：`npm test` 全部通过（含菲欧妮、固定评分、Worker、优化器与 WebApp 883 项）；`npm run build:server` 通过并生成绑定当前 SHA 的服务器制品。当前仍需通过远端 CI/CD 后才能视为生产发布。
 
@@ -147,12 +147,12 @@
 
 ## 2026-10-11 — 艾莲默认轴重复事件聚合
 
-- 变化：终结技与急冻普攻组各合并为次数2，潜能轴冰刃浪组为次数2、霜锋为次数3；强化E两招与连携保持独立。默认轴语义与边界见[艾莲专题](ellen-modeling.md)。
+- 变化：终结技与急冻普攻组各合并为次数2，潜能轴冰刃浪组为次数2、霜锋为次数3；强化E两招与连携保持独立。默认轴语义与边界见[艾莲专题](characters/ellen_joe.md)。
 - 验证：艾莲专项测试核对P0/P1/P6事件计数、原顺序轴与聚合轴总伤害等价，以及普通/编译评分一致。已有用户自定义轴不强制迁移；未部署。
 
 ## 2026-10-10 — 艾莲、潜能成长与参考循环
 
-- 变化：新增艾莲角色及1–16级技能倍率，接入核心暴伤、潜能风暴潮叠层/阈值、体型霜锋、琉音＋千夏默认队友、参考循环、专武覆盖率和Enka映射；详见[角色专题](ellen-modeling.md)。
+- 变化：新增艾莲角色及1–16级技能倍率，接入核心暴伤、潜能风暴潮叠层/阈值、体型霜锋、琉音＋千夏默认队友、参考循环、专武覆盖率和Enka映射；详见[角色专题](characters/ellen_joe.md)。
 - 关键边界：默认0影、P6、大体型，所有参考伤害事件处于失衡。双大为明确事件，资源、喧响、时间和自动Buff覆盖率不作模拟；盘子列表仅为搜索候选。已有保存的队友选择优先，其他角色维护记录保持原样。
 - 验证：本地维护接口保存回读及WebApp构建完成；未执行自动测试、浏览器回归或游戏实测。PR分支构建结果在提交说明中单独记录。
 

@@ -1,8 +1,14 @@
-# 佩洛伊斯建模依据
+# 佩洛伊斯（`pyrois`）
 
-状态：现行角色专题。核对日期：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`。
+| 项目 | 内容 |
+| --- | --- |
+| 游戏 ID | `1551`；Enka 映射 `1551 → pyrois` 已在映射快照中 |
+| 首页与优化器 | 可见 |
+| 资料来源 | 见下文“来源与数据边界”；[来源 fixture](../../tests/fixtures/pyrois-source-values.json) |
+| 实现核对 | 2026-11-18；基准提交 `9d51640c23697a849bdd3674b7f645a30c9f76b0` |
+| 验证入口 | `npm run test:pyrois-damage`；[前端状态回归](../../webapp/src/stores/pyrois-modeling.test.ts) |
 
-本专题只记录佩洛伊斯的来源、当前目录结构和已确定的直伤快照边界。通用数据与事件规则见[建模说明](modeling.md)，制作经验见[角色指南](character-authoring-guide.md)。
+本专题只记录佩洛伊斯的来源、当前目录结构和已确定的直伤快照边界。通用数据与事件规则见[建模说明](../modeling.md)，制作经验见[角色指南](../character-authoring-guide.md)。
 
 ## 来源与数据边界
 
@@ -55,7 +61,7 @@
 
 日冕遗蜕的通用20%暴击率对强攻角色生效；以太抗性无视通过 `requirement.agentIds: ["pyrois"]` 限制在佩洛伊斯。空白名单/未配置不额外限制，非法非数组输入由维护校验拒绝。
 
-核心成长、Buff选择器和维护页读取同一套核心成长表。目录目前要求核心被动四分支统一选用，不应通过旧的分支Buff ID建立多个可独立关闭的伪选项。当前 Enka 映射快照已包含 `1551 → pyrois`；实际导入仍由 [data/enka_zzz_mapping.json](../data/enka_zzz_mapping.json) 和 [entity-mapping.js](../core/enka-import/entity-mapping.js)共同决定。
+核心成长、Buff选择器和维护页读取同一套核心成长表。目录目前要求核心被动四分支统一选用，不应通过旧的分支Buff ID建立多个可独立关闭的伪选项。当前 Enka 映射快照已包含 `1551 → pyrois`；实际导入仍由 [data/enka_zzz_mapping.json](../../data/enka_zzz_mapping.json) 和 [entity-mapping.js](../../core/enka-import/entity-mapping.js)共同决定。
 
 ## 验证入口
 
@@ -64,3 +70,10 @@
 - `npm run build:webapp`：确认目录和前端维护结构能够构建。
 
 测试通过只能证明当前实现满足测试契约；来源假设和目录默认仍需按本专题与当前 `data/agents.json` 复核。
+
+## 制作教训
+
+- 初版问题：四分支都有倍率并不代表 Buff 归属、默认条件和技能组合正确；初始样例与后来维护方案不同，说明也曾落后于数据。
+- 后续修正：四分支统一核心被动，明确快照条件，补全描述；技能组和默认循环按维护结果收敛，另补展柜映射。
+- 可复用原则：先做效果归属表，并检查额外攻击是否真的在组内。旧 ID 带有 `with_directive` 也不能代替读取子事件；旧技能 Buff 选择迁移到核心被动。
+- 历史提交：`febfc44 → 91d2854`、`080ad12`。
