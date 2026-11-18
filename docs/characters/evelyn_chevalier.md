@@ -39,7 +39,7 @@
 
 ## 80%门槛的共享语义
 
-使用技能目标字段 `skillMultiplierScaleBonus`，通用公式与计算路径约束见[建模说明](../modeling.md#direct-skill-multiplier-scaling)。Buff卡片以“达到80%时，原倍率提升至125%”展示门槛和当前是否触发；原始公式只保留在白盒与维护审计中。
+使用技能目标字段 `skillMultiplierScaleBonus`，通用公式与计算路径约束见[建模说明](../modeling.md#直伤技能倍率乘算)。Buff卡片以“达到80%时，原倍率提升至125%”展示门槛和当前是否触发；原始公式只保留在白盒与维护审计中。
 
 伊芙琳的来源为最终局内面板暴击率，受限公式 `clamp(floor(x / threshold), 0, 1) * rate`，threshold=80、rate=25，输入与输出均使用百分比数值。来源不包含招式定向暴击率，且不会反向修改暴击面板，因此没有面板反馈循环。
 

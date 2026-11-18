@@ -94,4 +94,4 @@ manifest / tree / rollback evidence：
 未通过项与授权边界：
 ```
 
-具体门禁由[回归契约](regression-contract.md#发布前验收)、`.github/workflows/`和`node scripts/validate-deployment-config.js`共同定义。静态校验不触发部署。
+具体门禁由[回归契约](regression-contract.md#验收要求)、`.github/workflows/`和`node scripts/validate-deployment-config.js`共同定义。静态校验不触发部署。

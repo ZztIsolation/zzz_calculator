@@ -1,159 +1,99 @@
-# Calculator Modeling
+# 建模说明
 
-Status: current specification. Checked on 2026-11-18 against commit
-`9d51640c23697a849bdd3674b7f645a30c9f76b0` (local source, not a production audit).
+状态：现行规范。核对日期：2026-11-18；基准提交：`9d51640c23697a849bdd3674b7f645a30c9f76b0`（本地源码静态核对，不是生产审计）。
 
-This document owns shared model semantics. Start character work with the
-[authoring guide](character-authoring-guide.md); find acceptance invariants in the
-[regression contract](regression-contract.md). The
-[earlier model](archive/modeling-before-2026-10-08.md) is historical evidence.
+本文档维护通用模型语义，回答“模型怎么算”。必须保持的行为和测试入口见[回归契约](regression-contract.md)；新增角色先读[角色制作指南](character-authoring-guide.md)；角色专属内容见[角色文档索引](characters/README.md)。[整理前建模说明](archive/modeling-before-2026-10-08.md)只是历史证据。
 
-## Scope and architecture
+## 范围与架构
 
-- Agent base panels use authored level-60 data. A damage-event level parameter does
-  not replace those base stats with arbitrary-level progression.
-- The calculator evaluates selected events and condition snapshots. It supports
-  direct, Sheer, Sharp, Attribute Anomaly, Disorder, Release and Turbulence damage,
-  reusable skill groups, Cinema and Potential-dependent configurations.
-- Luminescence has a separate team-comparison score, not an actual damage event
-  that can be added to rotation damage. See its [model](characters/remielle_dan.md).
-- Energy, Decibels, animation time, resource transitions, anomaly buildup and
-  automatic Buff uptime are not simulated. Retain such mechanics in descriptions
-  without translating them into unsupported damage effects.
-- [core](../core) owns portable calculation, normalization, validation and search.
-  The browser calculates locally and runs heavy optimization in a Worker.
-- [browser runtime](../webapp/src/runtime) adapts catalogs, persistence, imports
-  and Scanner communication. [backend](../backend) serves catalogs/assets,
-  local maintenance, Enka proxying and bounded diagnostics. Production does not
-  accept inventories for server-side calculation.
+- 角色基础面板使用人工维护的 60 级数据。伤害事件的等级参数不会把基础面板替换成任意等级的成长。
+- 计算器评估选定的事件和条件快照，支持直伤、命破（Sheer）、锋御（Sharp）、属性异常、紊乱、异放（Release）、乱流（Turbulence）、可复用技能组，以及依赖影画和潜能的配置。
+- 流明（Luminescence）是独立的队伍比较评分，不是可加入循环伤害的实际伤害事件，见[蕾米埃尔·丹](characters/remielle_dan.md)。
+- 不模拟能量、喧响值、动画时间、资源转换、异常积蓄和自动 Buff 覆盖率。这类机制保留在描述里，不要翻译成模型不支持的伤害效果。
+- [core](../core) 承载可跨平台复用的计算、规范化、校验和搜索；浏览器本地计算，重优化在 Worker 中运行。
+- [浏览器运行时](../webapp/src/runtime)适配目录、持久化、导入和扫描器通信；[backend](../backend) 提供目录与资源、本地维护、Enka 代理和有限诊断。生产不接收用户库存做服务端计算。
 
-## Data ownership
+## 数据归属
 
-| Data | Authoritative input and consumer |
+| 数据 | 权威输入与消费者 |
 | --- | --- |
-| Agent panels, Core/Cinema/Potential effects, groups and defaults | [agents.json](../data/agents.json), [Core scaling](../core/corePassiveScaling.js), [Potential scaling](../core/potentialVision.js) |
-| Skill categories, explicit types/tags, moves and level rows | [agent_skills.json](../data/agent_skills.json), [skill targets](../core/skillTargets.js) |
-| W-Engine effects and refinement values | [w_engines.json](../data/w_engines.json) |
-| Drive Disc set effects | [drive_disc_sets.json](../data/drive_disc_sets.json) |
-| Attribute, Disorder and Turbulence definitions | [anomaly_effects.json](../data/anomaly_effects.json) |
-| Teammate and field Buffs | [combat_buffs.json](../data/combat_buffs.json) |
-| Stable Boss identity and versioned encounters | [bosses.json](../data/bosses.json) |
-| Enka identities/equipment | [mapping snapshot](../data/enka_zzz_mapping.json), [adapter](../core/enka-import/entity-mapping.js) |
-| Accounts, inventory and loadouts | Browser IndexedDB `zzz-calculator-user-store` and existing localStorage fallback; [adapter](../webapp/src/runtime/local-store.js) |
-| Build/optimizer selections | Browser stores and existing versioned localStorage payloads; [build](../webapp/src/stores/build.ts), [optimizer](../webapp/src/stores/optimizer.ts) |
+| 角色面板、核心/影画/潜能效果、技能组与默认配置 | [agents.json](../data/agents.json)、[核心成长](../core/corePassiveScaling.js)、[潜能成长](../core/potentialVision.js) |
+| 技能大类、显式类型与标签、招式和等级倍率行 | [agent_skills.json](../data/agent_skills.json)、[技能目标](../core/skillTargets.js) |
+| 音擎效果与精炼数值 | [w_engines.json](../data/w_engines.json) |
+| 驱动盘套装效果 | [drive_disc_sets.json](../data/drive_disc_sets.json) |
+| 属性异常、紊乱、乱流定义 | [anomaly_effects.json](../data/anomaly_effects.json) |
+| 队友 Buff 与场地 Buff | [combat_buffs.json](../data/combat_buffs.json) |
+| Boss 稳定身份与分版本敌情 | [bosses.json](../data/bosses.json) |
+| Enka 身份与装备 | [映射快照](../data/enka_zzz_mapping.json)、[适配器](../core/enka-import/entity-mapping.js) |
+| 账号、库存和配装 | 浏览器 IndexedDB `zzz-calculator-user-store` 与既有 localStorage fallback；[适配器](../webapp/src/runtime/local-store.js) |
+| 构筑与优化器选择 | 浏览器 store 与既有带版本的 localStorage 载荷；[build](../webapp/src/stores/build.ts)、[optimizer](../webapp/src/stores/optimizer.ts) |
 
 角色的 `preferredDriveDiscs.defaultFourPieceBuffRuntimeInputs` 保存推荐 4 件套的优化器手动触发快照，键使用现有的 `driveDisc4pc:<setId>.self/team`，效果项只保存明确维护的 `stacks` 与 `coverage`。它只作为用户首次初始化优化器时的基础值；用户已有的运行时字段优先，普通工作台 Buff 仍读取驱动盘规则自身默认值。
 
-Local maintenance writes catalog JSON. Saving does not commit a record or update
-production. Packaging uses committed tracked files: reconcile intentional catalog
-edits, including deletions, before assembling a release. Legacy server inventory
-files are not the browser inventory source.
+本地维护写入目录 JSON。保存不等于提交，也不会更新生产。打包使用已提交的受跟踪文件：组装发布前要先核对有意的目录修改（包括删除）。旧的服务端库存文件不是浏览器库存来源。
 
-The Node service exposes `/api/catalog` and projected `/api/meta`. The Pages
-builder emits static catalog/config from the same data. A stale service or static
-build can still show an older catalog; verify the actual consumer.
+Node 服务提供 `/api/catalog` 和投影后的 `/api/meta`；Pages 构建器用同一份数据生成静态目录和配置。过期的服务或静态构建仍可能显示旧目录，需要核对实际消费者。
 
-## Panels and units
+## 面板与单位
 
-1. Build base stats from the agent, matching W-Engine base stat and Core nodes.
-   Total Base ATK includes all three; Armorer Base DEF follows the same rule.
-   W-Engines declare exactly one positive `atkBase` or `defBase`.
-2. Apply unconditional equipment, set and out-of-combat effects. Do not double-count
-   Core additions already included in a source's displayed panel.
-3. Derive the in-combat panel and event modifiers from selected effects.
-   `outOfCombatStat` reads the finished panel automatically; external teammate
-   inputs remain independent snapshots.
-4. Evaluate candidate-dependent formulas for each candidate panel. Compile an
-   expression once where supported, not its value with an absent candidate.
-5. Preserve calculation precision. Formatting and important-stat highlights do
-   not change values, optimizer weights, sorting or formula semantics.
+1. 由角色、匹配的音擎基础属性和核心节点建立基础面板。总基础攻击力包含三者；锋御的基础防御力遵循同一规则。音擎恰好声明一个为正的 `atkBase` 或 `defBase`。
+2. 应用无条件的装备、套装和局外效果。不要重复计入已包含在来源展示面板里的核心加成。
+3. 由选定效果推导局内面板和事件修正。`outOfCombatStat` 自动读取完成的面板；外部队友输入保持独立快照。
+4. 对每组候选面板求值依赖候选的公式。在支持的地方一次性编译表达式，而不是在候选缺失时把它编译成数值。
+5. 保留计算精度。格式化和重要属性高亮不改变数值、优化权重、排序或公式语义。
 
-Catalog values, panel decimals, percentage points and formula units are different
-representations. Use stat metadata and the formula `valueUnit`/source-unit contract;
-never apply one universal percentage conversion. Core growth comes from structured
-scaling rather than parsed description text.
+目录值、面板小数、百分点和公式单位是不同的表示。使用属性元数据和公式的 `valueUnit`/来源单位约定，不要套用统一的百分比换算。核心成长来自结构化成长表，而不是解析描述文本。
 
-Anomaly Mastery percentage and flat additions occupy separate buckets. Display
-rounding does not mean every dependent formula uses a rounded value: Aria's Release
-ratio and Cinema 1 conversion have different rounding rules. Consult their
-regression clauses before reusing a conversion.
+异常掌控的百分比与固定点数不共用累加桶：核心技固定加成属于角色白值，局外 `anomalyMastery` 百分比乘白值，局内百分比乘局外面板，`anomalyMasteryFlat` 最后相加。显示取整不代表所有依赖公式都使用取整值：各取整点由使用它的公式单独规定，复用转换前先看对应角色文件和回归条款。
 
-## Effects, sources and targets
+## 效果、来源与目标
 
-Effects retain their ownership: Core Passive, Additional Ability, Cinema,
-move-sourced Buff, W-Engine, set, teammate, field or Boss. Move-sourced Buffs use
-`combatBuffs.skillBuffs[]` with a valid current-agent skill-category reference,
-optionally narrowed to a move, plus a name, description and explicit default state.
-They are not a generic container for any
-effect mentioning a move.
+效果保留自己的归属：核心被动、额外能力、影画、招式来源 Buff、音擎、套装、队友、场地或 Boss。招式来源 Buff 使用 `combatBuffs.skillBuffs[]`：必须有名称、描述、布尔默认状态，以及引用当前角色技能目录/大类的 `sourceSkillRef`，可进一步限定到某个招式（省略 `moveId` 表示目录级来源）；不得携带倍率行或引用其他角色。前台把它归入“自身 Buff”，以 `agent:<角色>.skill.<Buff>` 作为选择和运行时键。它不是任何提到招式的效果的通用容器。
 
-| Concern | Current rule |
+| 关注点 | 当前规则 |
 | --- | --- |
-| Fixed, stacked, derived and formula rules | Reuse [shared effects](../core/shared-combat.js) and [formula evaluation](../core/effectFormula.js); reference Core/Potential scaling |
-| General panel/global effects | Use the default target and correct scope/stat semantics |
-| Skill targets | Explicit skill type, legal tags, or character/category/move/row; `ultimate` differs from `chain` even when they share a level table |
-| Anomaly targets | Specify one or more settlement types; `attribute`, `turbulence`, and `release` may share a rule, while omitted/empty effect whitelist means all effects of the selected settlements and canonical saves omit empty whitelists |
-| Requirements | Attribute, specialty, exclusions, agent identity and event conditions restrict only their rule |
-| Coverage | Per effect rule; catalog/runtime `0..1`, maintenance percentages. Absent coverage means 100% and ignores injected overrides |
-| Stacks | Shared controls retain shared identity; `activationStacks` thresholds are not extra unconditional effects |
-| Buff modifiers | Modify a referenced rule once; an absent source Buff cannot produce an independent modifier benefit |
-| Duration/cooldown | Descriptive or explicit formula parameters, not automatically derived uptime |
+| 固定、叠层、派生和公式规则 | 复用[共享效果](../core/shared-combat.js)和[公式求值](../core/effectFormula.js)；引用核心/潜能成长 |
+| 通用面板/全局效果 | 使用默认目标，并遵守正确的 scope 与属性语义 |
+| 技能目标 | 显式技能类型、合法标签，或角色/大类/招式/行；`ultimate` 与 `chain` 即使共用等级表也不同 |
+| 异常目标 | 指定一个或多个结算类型；`attribute`、`turbulence`、`release` 可共用一条规则；缺省或空的异常白名单表示所选结算的全部异常，规范保存时省略空白名单 |
+| 条件约束 | 属性、特性、排除、角色身份和事件条件只约束自己所在的规则 |
+| 覆盖率 | 按单条效果规则配置；目录/运行时用 `0..1`，维护页用百分比。缺省按 100% 计算并忽略注入的覆盖 |
+| 叠层 | 共享控件保留共享身份；`activationStacks` 阈值不是额外的无条件效果 |
+| Buff 修饰器 | 只修饰所引用的规则一次；来源 Buff 不存在时，修饰器不能独立产生收益 |
+| 持续时间与冷却 | 是描述或显式公式参数，不自动推导覆盖率 |
 
-Self effects may specify `requirement.minPotentialLevel` / `maxPotentialLevel`.
-Potential materialization filters inactive rules before panel/event compilation;
-it does not prevent selecting authored moves at P0. Dynamic `valueSource` supports
-fixed and stacked rules. For ordinary stacks the resolved value is the per-stack
-value; with `activationStacks` it is the fixed activated amount. A P0 compatibility
-value of zero is valid when its structured scaling source is present.
+自身效果可以设置 `requirement.minPotentialLevel` / `maxPotentialLevel`。潜能物化在面板和事件编译前过滤未生效的规则，不阻止在 P0 选择已录入招式。动态 `valueSource` 支持固定和叠层规则：普通叠层的解析值是每层值；带 `activationStacks` 时是固定的激活量。结构化成长来源存在时，P0 兼容值可以是 0。
 
-`dmgBonus` enters the damage-bonus zone; `skillMultiplierBonus` adds to the selected
-skill multiplier. PEN Ratio, DEF Ignore and DEF reduction remain separate.
-Evaluate per-hit modifiers before aggregating nonlinear target factors. Descriptions
-preserve triggers, scope and level values; calculation reads structured data.
+### 乘区归属
 
-New maintenance data uses explicit targets, not `appliesTo` or move-ID prefixes.
-Runtime compatibility remains. Lossless migrations normalize old values;
-unsupported filters must produce actionable maintenance errors rather than silently
-broaden the effect. Maintenance's supported fields are broader than the player
-custom-Buff whitelist.
+- `dmgBonus` 进入增伤乘区；`skillMultiplierBonus` 直接加到所选技能倍率；穿透率、无视防御和降防相互独立。逐击修正先于非线性的目标因子聚合；描述保留触发、范围和等级值，计算读取结构化数据。
+- 事件级 `penRatio`（技能目标）与面板穿透率相加：`降防后的防御 × (1 - 面板穿透率 - 事件穿透率) - 穿透值`，不得转换为无视防御或敌方降防。白盒必须能审计面板值与事件定向值。
+- 默认作用域的 `anomalyDamageBonus` 进入属性异常、异放和耀变的同一异常增伤乘区，不作用于紊乱；紊乱只读取 `disorderDamageBonus`。异常增伤乘区与通用 `dmgBonus` 分离。
+- 精确指定属性异常的 `anomalyDamageBonus` 与防御修正作为原异常来源规则，由异放继承一次；显式异放规则是触发侧额外规则，两者不得因目录重复录入而双算；继承不得扩大到紊乱或耀变。不新增异放专属增伤字段。
+- `alienationCoefficientBonus` 是不向玩家自定义 Buff 菜单开放的内部事件修正，独立形成 `1 + 加成/100` 的异化乘区；属性异常、异放和紊乱乘入该区，异放只从原异常来源（实时数据或外部冻结快照）继承，触发者侧不得重复乘算。耀变评分使用其专用异化公式。具体角色验收见[蕾米埃尔·丹](characters/remielle_dan.md)。
+- `stunDmgMultiplierBonusCapAlways` 表示捕获的失衡易伤“加成上限”而非固定增伤：匹配事件无论是否失衡，都按 `min(目标配置失衡倍率 + 失衡倍率加算, 1 + 上限)` 计算。未失衡事件不应用普通失衡易伤，但仍应用 `stunDmgMultiplierBonusAlways`。
+- 伤害事件的 `damageRatioPct` 同时作用于白盒、快速总伤、编译评分和固定套装优化路径；普通事件管理不显示该技术比例输入，但维护端、存量载荷和计算语义保留。`damageBasis: anomalyProficiency` 的直伤不随攻击力变化。
+- 六种 `*CritDmg` 属性暴击伤害只增加同属性直伤和贯穿伤害的暴击伤害；六种 `*DefIgnore` 只增加同属性事件的无视防御。两组类型覆盖标量、编译、稠密优化器和白盒，不影响其他属性或异常专用暴击乘区。
 
-### Core-sourced formula parameters
+新的维护数据使用显式目标，不再使用 `appliesTo` 或招式 ID 前缀。运行时保留兼容；可无损迁移的旧值被规范化，无法无损转换的筛选必须产生可操作的维护错误，不能悄悄放宽效果范围。维护页支持的字段比玩家自定义 Buff 白名单更宽。
 
-Formula rules can bind declared numeric parameters to Core scaling with
-`formula.parameterSources`. The initial row remains the persisted compatibility
-value; maintenance synchronizes it, while runtime materializes the selected Core
-level. Only Core Passive and skill-sourced self Buffs can declare these sources,
-with a complete initial/A-F table and no conflicting refinement binding.
+### 核心来源的公式参数
 
-In-combat self formulas can convert finalized Anomaly Proficiency into
-default-target flat ATK or Attribute-Anomaly CRIT Rate. The ATK phase runs before
-damage formulas; target-specific CRIT remains an event modifier and never changes
-ordinary panel CRIT. Unsupported dependencies and outputs fail validation. Fixed
-scoring uses the existing dense fallback when a specialized scalar/bound is not
-available. See [Jane's model](characters/jane_doe.md) for the character-specific rules.
+公式规则可以用 `formula.parameterSources` 把声明的数值参数绑定到核心成长。初始行保留为持久化的兼容值；维护页同步它，运行时物化所选核心等级。只有核心被动和技能来源的自身 Buff 能声明这类来源，且必须带完整的初始与 A–F 表，不能与精炼绑定冲突。
 
-## Events, groups and defaults
+局内自身公式可以把完成后的异常精通转换为默认目标的固定攻击力，或属性异常暴击率。攻击力阶段先于伤害公式运行；目标定向的暴击率保持为事件修正，不改变普通面板暴击率。不支持的依赖和输出在校验时失败；固定评分在专用标量或上界不可用时使用既有的 dense 回退。角色专属规则见[简·杜](characters/jane_doe.md)。
 
-### Direct skill multiplier scaling
+## 事件、技能组与默认值
 
-Skill-targeted `skillMultiplierScaleBonus` uses stored percentage points and
-applies only to direct damage. For authored multiplier M, scale bonus s (converted
-to decimal), and additive multiplier b, the result is `max(0, M * (1 + s) + b)`.
-It does not multiply b or enter the ordinary damage-bonus zone.
+### 直伤技能倍率乘算
 
-Self in-combat formulas may produce this skill-targeted modifier from final
-ordinary panel CRIT Rate, with both source and result using `storedPercent`.
-Event-targeted CRIT does not feed the source. Candidate scoring reevaluates the
-formula; unsupported scalar kernels use dense scoring, and unproven dynamic
-formulas disable monotonic pruning. See [Evelyn](characters/evelyn_chevalier.md) and
-[character regressions](../tests/pr81-characters.test.js).
+技能目标的 `skillMultiplierScaleBonus` 使用存储的百分点，只作用于直伤。设人工倍率为 M、乘算加成为 s（换算为小数）、加算倍率为 b，结果为 `max(0, M × (1 + s) + b)`；它不乘 b，也不进入普通增伤乘区。
 
-The explicit `followUp` skill tag denotes authored follow-up attacks. Skill-tag
-targets use OR matching; damage descriptions alone do not establish this tag.
-See [Nekomata's classification boundary](characters/nekomata.md#驱动盘与分类边界).
+自身局内公式可以由最终的普通面板暴击率产生这个技能目标修正，来源和结果都使用 `storedPercent`；事件目标的暴击率不作为来源。候选评分会重新求值该公式，不支持的标量内核使用 dense 评分，无法证明的动态公式会关闭单调剪枝。见[伊芙琳](characters/evelyn_chevalier.md)和[角色回归测试](../tests/pr81-characters.test.js)。
 
-A skill-backed event selects an authored row. This Pyrois Ultimate event contains
-the body only, without an implicit Assault Directive:
+显式的 `followUp` 技能标签表示人工标注的追加攻击。技能标签目标使用 OR 匹配；仅凭伤害描述不能确立该标签，见[猫又的分类边界](characters/nekomata.md#驱动盘与分类边界)。
+
+技能来源事件选择一条人工维护的倍率行。下面这个佩洛伊斯终结技事件只含本体，不含隐含的突袭训令：
 
 ```json
 {
@@ -170,124 +110,109 @@ the body only, without an implicit Assault Directive:
 }
 ```
 
-- Current build skill levels are final levels; do not apply Cinema level additions
-  twice. They override stale event level snapshots.
-- `stunned` belongs to each event and defaults to true when absent. Group reference
-  state propagates to children; target configuration has no global stun switch.
-- A generated total is one stored/UI event but expands source rows for hit-sensitive
-  nonlinear effects. Aggregate multiplier additions count once, not once per child.
-  See [Sigrid tests](../tests/sigrid-damage.test.js).
-- Group names describe actual children. Group repetition has no maximum; real row
-  limits validate each group's child before repeated groups are aggregated.
-- `defaultCalculationConfig` is authored content, not a simulation. Cinema resolution
-  selects the highest configured threshold not above the selected level; matching
-  Potential variants resolve before Cinema variants.
-- Every authored move/group remains selectable at P0. Potential controls numerical
-  scaling; P0 does not receive P2-P6 Buff values.
-- Workbench loads administrator configurations as runtime `adminDefault`; user
-  custom configurations retain separate persistence semantics.
-- Optional `defaultTeammates` applies only when a character has no saved teammate
-  picker or explicit Buff selection. It selects the two authored teammates and
-  their Buffs up to the authored Cinema levels. Saved empty selections are also
-  authoritative. Defaults do not grant teammate equipment or infer uptime.
-  Teammate state uses the precedence **manual user edits > complete Enka import >
-  administrator default**. A complete Enka snapshot may update fields that have no
-  manual override; ordinary refresh never replaces a manual field. Legacy saved
-  teammate states without provenance are treated as user-owned and are not adopted
-  automatically by Enka.
-- Characters may intentionally omit administrator defaults and groups. Vivian's
-  profile-aware single Release fallback is such a case, not missing content.
+- 当前构筑的技能等级是最终等级，不要重复叠加影画等级加成；它们覆盖存量事件中的过期等级快照。
+- `stunned` 属于每个事件，缺失时默认 `true`；技能、贯穿、异常、紊乱和技能组引用都必须有。技能组引用展开时覆盖全部组内事件。目标配置不再保存全局失衡开关；旧非管理员存档按“事件显式值、旧目标值、默认 true”迁移，管理员默认循环始终以管理员事件配置为准。
+- 生成的总倍率事件在存储和界面上是一个事件，但对依赖命中段的非线性效果会展开来源行；聚合的倍率加算只计一次，不是每个子段一次。见[希格莉德测试](../tests/sigrid-damage.test.js)。
+- 技能组名称描述其实际子事件。技能组重复没有上限；真实的倍率行上限（`eventCountRange.max`）先验证每组的子事件，再聚合重复的组。
+- `defaultCalculationConfig` 是人工维护的内容，不是模拟。影画解析选择不超过所选影画的最高已配置阈值；匹配的潜能变体先于影画变体解析。
+- 每个已录入的招式/技能组在 P0 都可选。潜能只控制数值成长，P0 不获得 P2–P6 的 Buff 数值。
+- 工作台把管理员配置载入为运行态 `adminDefault`（资料中的 `custom/single/sheer/anomaly` 模式载入时统一转换，这样同一角色切换影画才会刷新到对应的最高可用变体）；用户自定义配置保持独立的持久化语义。
+- 可选的 `defaultTeammates` 只在角色没有保存过队友选择器或显式 Buff 选择时生效，选取两名人工维护的队友及其不超过人工维护影画的 Buff；保存过的空选择同样具有权威性。默认值不授予队友装备，也不推断覆盖率。队友状态的优先级是 **用户手动修改 > 完整 Enka 导入 > 管理员默认**：完整 Enka 快照可以更新没有手动覆盖的字段，普通刷新绝不替换手动字段；没有来源标记的旧队伍按用户配置处理，不会被 Enka 自动采用。
+- 角色可以有意省略管理员默认和技能组。薇薇安的按方案单次异放 fallback 就是这种情况，不是内容缺失。
 
-The catalog owns current defaults. Describe exact maintained values only in the
-relevant topic or regression clause, instead of duplicating templates. See
-[group expansion](../core/calculationSkillGroups.js) and
-[default resolution](../core/defaultCalculationConfig.js).
+目录拥有当前默认值。具体的人工维护数值只在相关专题或回归条款里描述，不要在模板里复制。见[技能组展开](../core/calculationSkillGroups.js)和[默认值解析](../core/defaultCalculationConfig.js)。
 
-## Damage and score domains
+## 伤害与评分域
 
-| Domain | Boundary and implementation |
+| 域 | 边界与实现 |
 | --- | --- |
-| Direct | [Calculator core](../core/calculator-core.js) applies the authored basis and standard factors; attack-type `pierce` metadata does not select Sheer |
-| Sheer | Dedicated force-basis semantics, not renamed ordinary ATK damage |
-| Sharp | `armorer` / `kind: sharp` select DEF basis and up to two critical trials; [sharpDamage.js](../core/sharpDamage.js) owns the formula. Ordinary CRIT Rate feeds Sharp with its profile cap; ordinary direct/Sheer critical probability caps at 100% |
-| Attribute Anomaly | Attribute, anomaly basis, proc count and matching anomaly effects |
-| Disorder | Original non-Wind anomaly and remaining-time model; does not inherit all Attribute Anomaly bonuses/critical zones |
-| Release | [anomalyRelease.js](../core/anomalyRelease.js) resolves source/trigger ownership and unit-aware expressions without double-counting effects |
-| Turbulence | Non-Wind base, explicit elapsed time and the [Wind contract](characters/velina.md), not a Wind character's panel |
-| Luminescence | [Separate comparison score](characters/remielle_dan.md) and objective |
+| 直伤 | [计算核心](../core/calculator-core.js)应用人工维护的基础和标准因子；攻击类型 `pierce` 元数据不会选择命破 |
+| 命破 | 专用的贯穿力基础语义，不是改名的普通攻击力伤害 |
+| 锋御 | `armorer` / `kind: sharp` 选择防御力基础和最多两次暴击判定；公式由 [sharpDamage.js](../core/sharpDamage.js) 负责。普通暴击率以角色的上限喂给锋御；普通直伤/命破的暴击概率上限为 100%。详见[克拉蕾](characters/claret.md) |
+| 属性异常 | 属性、异常基础、触发次数和匹配的异常效果 |
+| 紊乱 | 原非风异常和剩余时间模型，不继承全部属性异常的增伤/暴击区 |
+| 异放 | [anomalyRelease.js](../core/anomalyRelease.js) 解析来源/触发者归属和带单位的表达式，且不重复计入效果 |
+| 乱流 | 非风基础、显式已流逝时间，使用非风角色自己的面板，见下节 |
+| 流明 | [独立的比较评分](characters/remielle_dan.md)及其目标 |
 
-Sharp white-box output keeps ordinary and Sharp-specific damage bonuses separate.
-Ordinary CRIT DMG and laceration damage remain separate stats.
+锋御白盒把普通增伤和锋御专属增伤分开；普通暴击伤害与锐暴伤害是不同的属性。
 
-General Release events retain `triggerActorRef` and `anomalySource`. Current sources
-follow live build panels; external snapshots stay fixed during optimization.
-Calculate each contributor's complete nonlinear anomaly unit before combining
-contributions. Representable ownership does not establish a complete cross-agent
-build picker or joint A+B optimization.
+通用异放事件保留 `triggerActorRef` 和 `anomalySource`。当前来源跟随实时构筑面板，外部快照在优化期间保持固定。每个贡献者先计算完整的非线性异常单元，再合并；能表示归属不等于存在完整的跨角色配装选择器或 A+B 联合优化。固定异放倍率替换异常倍率基础，而不是盲目乘到最终伤害上。
 
-Aria's player editor constrains the source to her own Corruption. Velina uses
-`releaseSource` and omits redundant generalized fields; see the
-[Wind topic](characters/velina.md). Fixed Release multipliers replace the anomaly
-multiplier basis, rather than blindly multiplying final damage.
+爱芮的玩家编辑器把来源限定为她自己的侵蚀，见[爱芮](characters/aria.md)；维琳娜使用 `releaseSource` 并省略冗余的通用字段，见[维琳娜](characters/velina.md)。
 
-### Anomaly crit outcomes
+### 紊乱与乱流
 
-[anomalyCrit.js](../core/anomalyCrit.js) supports `expected`, `crit` and `nonCrit`;
-an absent or unknown mode normalizes to `expected`. Supported events have
-`kind: "anomaly"` and settlement type omitted, `attribute`, `release` or
-`turbulence`; Disorder is not supported.
+- 非风属性异常 A 与非风属性异常 B 连续触发时结算紊乱，紊乱基于先触发的 A。
+- 风化与任意非风属性异常连续触发时结算乱流，不结算紊乱；乱流基于非风属性异常，顺序只通过该异常的剩余时间影响 `T`。
+- 风化仍可作为普通属性异常事件。风属性角色不能添加乱流或紊乱，紊乱目录不能选择风化。
 
-Finite CRIT Rate is clamped to 0–1 and finite CRIT DMG to a nonnegative value;
-non-finite inputs become zero. With effective rate r > 0 and damage d > 0,
-the multipliers are `1 + r * d`, `1 + d` and `1`, respectively. Unsupported
-events or a zero rate/damage always use multiplier 1, even when `crit` was
-requested. `resolveAnomalyCritState` preserves the normalized requested mode
-but reports effective mode `nonCrit` when CRIT is unavailable.
+乱流事件只保存非风基底异常、已流逝时间、次数和失衡状态：
 
-`anomalyDamageVariants` returns no variants when CRIT is unavailable; otherwise
-each mode reports single damage as base single damage times its multiplier,
-and final damage as single damage times event count.
+```json
+{
+  "kind": "anomaly",
+  "settlementType": "turbulence",
+  "anomalyEffect": "burn",
+  "elapsedSeconds": 0,
+  "count": 1,
+  "stunned": true
+}
+```
 
-## Optimization and persistence
+它不保存风化来源、第二异常、来源面板快照、剩余时间、待确认倍率或特殊形态。正式伤害使用当前非风属性角色的面板；维琳娜作为队友只通过已选择的队友 Buff 提供乱流倍率、乱流增伤和抗性无视。异常代理人的完整组队伤害不在本模型内。
 
-Strict optimization uses the same event semantics as normal calculation. Preserve
-Top 10 IDs, stable order and numeric tolerance, not merely the top score. Bounds
-need proof and exhaustive small-space checks; unsupported fast paths fall back
-safely. Node workers and the browser Worker have separate execution adapters.
+`T` 是应用持续时间延长后的非风异常剩余时间。新事件 `elapsedSeconds=0`，默认吃满 `floor(T)`。`elapsedSeconds` 的编辑步长、保存归一化和计算精度读取所选目录项的 `tickIntervalSeconds`（目录默认：火和以太 0.5 秒，物理、冰、电和烈霜 1 秒；未知旧异常回退 0.5 秒）；任意输入按最近的对应间隔归一化，例如 1 秒类事件的 `4.5` 秒归一化为 `5` 秒，目录自定义的 `0.25` 秒事件按 `0.25` 秒归一化。
 
-Preserve user choices, unknown compatible fields and account boundaries. A failed
-read is not an empty store. New catalog defaults must not replace saved custom
-configurations. Agent revisions, three-way draft merging and per-agent history
-protect maintenance; see [maintenance invariants](regression-contract.md#维护功能).
+事件存储不得按基础时长截断，因为最终计算可能叠加异常持续时间延长。目录倍率预览按基础持续时间夹紧；最终计算按“基础持续时间 + 当前命中的 `anomalyDurationBonusSeconds`”夹紧，并重算剩余时间、跳数和倍率。
 
-## API status
+| 基底 | 固定倍率 | 时间项 |
+| --- | ---: | ---: |
+| 强击 | 800% | `floor(T) × 7.5%` |
+| 碎冰 | 1300% | `floor(T) × 7.5%` |
+| 灼烧 | 900% | `floor(T / 0.5) × 50%` |
+| 感电 | 650% | `floor(T) × 125%` |
+| 侵蚀 | 650% | `floor(T / 0.5) × 62.5%` |
+| 烈霜 | 0% | `floor(T) × 75%` |
 
-[Server routing](../backend/server.js) and the [Vue router](../webapp/src/router.ts)
-are the definitive implementation. This is a status map, not a duplicate schema.
+倍率目录是版本化的已确认资料；不再使用 pending 倍率或事件内手填固定倍率。
 
-| Interface | Status |
+乱流公式：`攻击区 × 乱流倍率 × 增伤区 × 异常精通区 × 防御区 × 抗性区 × 异常减易伤区 × 失衡易伤区 × 等级区 × （异常增伤区 + 乱流增伤区）× 异常暴击区 × 异常爆伤区`。
+
+紊乱只使用紊乱倍率、紊乱增伤和通用基础乘区，不读取通用异常增伤或异常暴击/爆伤。乱流按基底属性读取属性伤害和抗性，火乱流不能读取风属性伤害。
+
+### 异常三档结果
+
+[anomalyCrit.js](../core/anomalyCrit.js) 支持 `expected`、`crit` 和 `nonCrit`；缺省或未知模式规范化为 `expected`。支持的事件是 `kind: "anomaly"` 且结算类型缺省、`attribute`、`release` 或 `turbulence`；紊乱不支持。
+
+有限的暴击率被夹紧到 0–1，有限的暴击伤害被夹紧为非负；非有限输入按 0 处理。有效暴击率 r > 0 且伤害 d > 0 时，三档乘数分别为 `1 + r × d`、`1 + d` 和 `1`。不支持的事件，或暴击率/伤害为 0 时，即使请求 `crit` 也始终使用乘数 1。`resolveAnomalyCritState` 保留规范化后的请求模式，但在暴击不可用时报告有效模式为 `nonCrit`。
+
+`anomalyDamageVariants` 在暴击不可用时不返回任何变体；否则每档的单次伤害为基础单次伤害乘该档乘数，最终伤害为单次伤害乘事件次数。
+
+## 优化与持久化
+
+严格优化使用与普通计算相同的事件语义。要保持完整的 Top 10 ID、稳定顺序和数值容差，而不只是最高分。上界需要证明和小规模穷举核对；不支持的快速路径必须安全回退。Node worker 与浏览器 Worker 有各自独立的执行适配器。
+
+保留用户选择、未知的兼容字段和账号边界。读取失败不等于空存储。新的目录默认值不得替换已保存的自定义配置。角色版本号、三方草稿合并和按角色历史保护维护数据，见[回归契约的维护条款](regression-contract.md#目录与维护)。
+
+## 接口状态
+
+[服务端路由](../backend/server.js)和 [Vue 路由](../webapp/src/router.ts)才是权威实现。下表只是状态图，不是重复的 schema。
+
+| 接口 | 状态 |
 | --- | --- |
-| `GET /api/health`, `/api/meta`, `/api/catalog`, `/api/app-config` | Normal service/catalog interfaces |
-| `/api/enka/zzz/:uid` | Runtime-gated proxy; catalog presence alone does not establish mapping |
-| `/api/maintenance/*` | Local/explicitly enabled, origin-guarded; agent writes require revision conditions |
-| `/api/calculate/*`, `/api/analysis/*`, `/api/optimize/*` | Development/verification interfaces; production returns 403 |
-| `/api/accounts*`, `/api/user-drive-discs*` | Retired user-data APIs return 410; data belongs to browser storage |
-| Reservation/exclusion/loadout adapters | Some are development-only exceptions; production rejects retired user-data routes |
-| `/internal/scans` and diagnostics | Separately protected operational surface, not an inventory upload channel |
+| `GET /api/health`、`/api/meta`、`/api/catalog`、`/api/app-config` | 正常的服务/目录接口 |
+| `/api/enka/zzz/:uid` | 受运行配置门禁的代理；目录里存在角色不等于已有映射 |
+| `/api/maintenance/*` | 仅本地或显式启用，有来源（Origin）防护；角色写入需要版本号条件 |
+| `/api/calculate/*`、`/api/analysis/*`、`/api/optimize/*` | 开发/验证接口；生产返回 403 |
+| `/api/accounts*`、`/api/user-drive-discs*` | 已退役的用户数据接口返回 410；数据属于浏览器存储 |
+| 预约/排除/配装适配器 | 部分是仅开发的例外；生产拒绝已退役的用户数据路由 |
+| `/internal/scans` 与诊断 | 单独保护的运维入口，不是库存上传通道 |
 
-## Sources and verification
+## 来源与验证
 
-Pin official structured revisions. The Claret materializer is a specialized
-importer, not a safe way to regenerate maintained characters. Record source
-disagreements, supplementary levels and unsupported effects in topic/fixture data.
-The [authoring guide](character-authoring-guide.md#阶段一资料核对) owns that workflow.
+固定官方结构化资料的版本号。克拉蕾的物化脚本是专用导入器，不是重新生成人工维护角色的安全方式。来源分歧、补充等级和不支持的效果记录在专题或 fixture 数据里。该流程由[角色制作指南](character-authoring-guide.md#阶段一资料核对)维护。
 
-Formula changes require affected normal/white-box, compiled, dense, fixed-score,
-Worker and optimizer checks. UI changes require field/save/reload verification.
-Parity alone does not independently prove mechanic correctness. Use the
-[regression contract](regression-contract.md) and package scripts for acceptance.
+公式变更需要核对受影响的普通/白盒、compiled、dense、固定评分、Worker 和优化器路径；界面变更需要字段/保存/重载验证。路径一致本身不能独立证明机制正确。验收使用[回归契约](regression-contract.md)和 package 脚本。
 
-Still outside this model: arbitrary-level base-stat progression, automatic combat
-and resource timelines, full-team joint Drive Disc search, and explicitly unmodeled
-record effects. Implemented Cinema, conditional equipment, teammate/field Buffs,
-imports and mixed damage events are not deferred features.
+仍在本模型之外：任意等级的基础面板成长、自动的战斗和资源时间线、全队联合驱动盘搜索，以及明确未建模的记录效果。已实现的影画、条件装备、队友/场地 Buff、导入和混合伤害事件不属于延期功能。
