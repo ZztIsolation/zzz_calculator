@@ -12,10 +12,10 @@
 | `anby_demara` | 安比 | 1011 | **隐藏** | 无专属规则，以数据为准 | — |
 | `aria` | 爱芮 | 1501 | 可见 | [aria.md](aria.md) | `test:aria-damage` |
 | `asaba_harumasa` | 浅羽悠真 | 1201 | **隐藏** | [asaba_harumasa.md](asaba_harumasa.md) | `test:pr81-characters` |
-| `claret` | 克拉蕾·弗林特 | 1611 | 可见 | [claret.md](claret.md)（含锐化伤害域） | `test:sharp-damage` |
+| `claret` | 克拉蕾·弗林特 | 1611 | 可见 | [claret.md](claret.md)（含锐化伤害域） | `test:sharp-damage`、`test:teammate-team-effects` |
 | `ellen_joe` | 艾莲 | 1191 | 可见 | [ellen_joe.md](ellen_joe.md) | `test:ellen-integration` |
 | `evelyn_chevalier` | 伊芙琳 | 1321 | 可见 | [evelyn_chevalier.md](evelyn_chevalier.md) | `test:pr81-characters` |
-| `fioni` | 菲欧妮 | 1641 | 可见 | [fioni.md](fioni.md) | `test:fioni-damage` |
+| `fioni` | 菲欧妮 | 1641 | 可见 | [fioni.md](fioni.md) | `test:fioni-damage`、`test:teammate-team-effects` |
 | `hoshimi_miyabi` | 星见雅 | 1091 | 可见 | 无专属规则，以数据为准 | — |
 | `jane_doe` | 简·杜 | 1261 | 可见 | [jane_doe.md](jane_doe.md) | `test:jane-damage` |
 | `nangongyu` | 南宫羽 | 1511 | 可见 | [nangongyu.md](nangongyu.md) | `test:nangongyu-damage` |
@@ -25,7 +25,7 @@
 | `sigrid` | 希格莉德·德拉叙尔 | 1591 | 可见 | [sigrid.md](sigrid.md) | `test:sigrid-damage` |
 | `soldier_11` | 11号 | 1041 | 可见 | [soldier_11.md](soldier_11.md) | `test:soldier-11-damage` |
 | `velina` | 维琳娜·艾嘉德 | 1561 | 可见 | [velina.md](velina.md)（含风属性异常结算） | `test:velina-damage`、`test:velina-c6-damage`、`test:velina-optimizer`、`test:turbulence-damage` |
-| `vivian` | 薇薇安·班希 | 1331 | 可见 | [vivian.md](vivian.md) | `test:vivian-damage` |
+| `vivian` | 薇薇安·班希 | 1331 | 可见 | [vivian.md](vivian.md) | `test:vivian-damage`、`test:teammate-team-effects` |
 | `ye_shunguang` | 叶瞬光 | 1431 | 可见 | [ye_shunguang.md](ye_shunguang.md) | 无专属测试 |
 | `yixuan` | 仪玄 | 1371 | 可见 | 无专属规则，以数据为准 | — |
 

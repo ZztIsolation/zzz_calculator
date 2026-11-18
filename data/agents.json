@@ -8254,9 +8254,8 @@
       ],
       "faction": "刑侦特勤组",
       "images": {
-        "icon": "/assets/agents/jane_doe.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/16/15559334/671b9f8d9227c19355e2eceb9f23ef28_7055750575833971395.png",
-        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+        "portrait": "/assets/agents/jane_doe.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/16/15559334/671b9f8d9227c19355e2eceb9f23ef28_7055750575833971395.png"
       },
       "level60": {
         "hpBase": 7788,
@@ -11197,9 +11196,8 @@
       ],
       "faction": "坎卜斯黑枝",
       "images": {
-        "icon": "/assets/agents/fioni.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/10/16/71319299/0c6fe6449ebd56b87745a332ade80e1f_5954047325411114795.png",
-        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/2216/detail?mhy_presentation_style=fullscreen"
+        "portrait": "/assets/agents/fioni.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/10/16/71319299/0c6fe6449ebd56b87745a332ade80e1f_5954047325411114795.png"
       },
       "level60": {
         "hpBase": 7673,

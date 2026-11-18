@@ -4926,6 +4926,331 @@
         "icon": "/assets/agents/velina.png",
         "source": "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen"
       }
+    },
+    {
+      "id": "fioni",
+      "name": {
+        "zhCN": "菲欧妮"
+      },
+      "attribute": "fire",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/agents/fioni.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/10/16/71319299/0c6fe6449ebd56b87745a332ade80e1f_5954047325411114795.png"
+      },
+      "buffs": [
+        {
+          "id": "fioni.core.sear",
+          "source": {
+            "zhCN": "核心被动：涅槃（F）"
+          },
+          "description": {
+            "zhCN": "队伍中任意角色对敌人造成属性异常伤害时，会使其陷入[灼蚀]状态，持续20秒，重复触发刷新持续时间；[灼蚀]状态下的敌人受到属性异常伤害时有概率触发暴击，基础暴击率为30%，暴击伤害为25%（F级），若菲欧妮的初始异常掌控大于155点，每点超过的异常掌控会使得该效果的暴击率额外提升0.7%；当菲欧妮的初始异常掌控达到255点时，暴击率达到最大值。选中本 Buff 表示灼蚀状态已经满足。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "fioni_core_sear_crit_rate",
+              "type": "formula",
+              "target": {
+                "kind": "anomaly",
+                "settlementTypes": [
+                  "attribute",
+                  "turbulence",
+                  "release"
+                ]
+              },
+              "stat": "anomalyCritRate",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "菲欧妮初始异常掌控"
+                },
+                "defaultValue": 255,
+                "min": 0,
+                "max": 400
+              },
+              "formula": {
+                "expression": "clamp(30 + max(x - 155, 0) * 0.7, 0, 100)",
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "fioni_core_sear_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementTypes": [
+                  "attribute",
+                  "turbulence",
+                  "release"
+                ]
+              },
+              "stat": "anomalyCritDmg",
+              "mode": "flat",
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "fioni.additional.sear_crit_dmg",
+          "source": {
+            "zhCN": "额外能力：黑枝王牌"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他异常角色或同阵营角色时，灼蚀目标受到属性异常伤害的暴击伤害提升15%。选中本 Buff 表示触发条件已经满足。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "fioni_additional_sear_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementTypes": [
+                  "attribute",
+                  "turbulence",
+                  "release"
+                ]
+              },
+              "stat": "anomalyCritDmg",
+              "mode": "flat",
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "fioni.cinema_1.sear_crit_dmg",
+          "source": {
+            "zhCN": "影画一：痛觉残留与刺激游行"
+          },
+          "description": {
+            "zhCN": "[灼蚀]状态下的敌人受到属性异常伤害的暴击伤害额外提升25%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "fioni_cinema_1_sear_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementTypes": [
+                  "attribute",
+                  "turbulence",
+                  "release"
+                ]
+              },
+              "stat": "anomalyCritDmg",
+              "mode": "flat",
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "verification": {
+        "officialEntryId": "2216",
+        "officialVersion": "1792158014",
+        "modelingAssumptions": "核心 F；外部初始异常掌控默认 255（暴击率达到上限）；灼蚀状态与额外能力触发条件由选中该 Buff 表示已满足；菲欧妮自身的灼蚀伤害、影画二及以后仅作用于自身的效果不进入队友条目。"
+      }
+    },
+    {
+      "id": "vivian",
+      "name": {
+        "zhCN": "薇薇安·班希"
+      },
+      "attribute": "ether",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/agents/vivian.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1276/detail?mhy_presentation_style=fullscreen"
+      },
+      "buffs": [
+        {
+          "id": "vivian.additional.corruption_damage",
+          "source": {
+            "zhCN": "额外能力：预言之泪"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他[异常]角色或与自身属性相同的角色时触发：全队造成的[侵蚀]伤害和[侵蚀]状态被结算的[紊乱]伤害提升12%。选中本 Buff 表示触发条件已经满足。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "vivian_additional_corruption_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "corruption"
+                ]
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "value": 12,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "vivian_additional_corruption_disorder_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "disorder",
+                "anomalyEffects": [
+                  "corruption"
+                ]
+              },
+              "stat": "disorderDamageBonus",
+              "mode": "flat",
+              "value": 12,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "vivian.cinema_1.prophecy_vulnerability",
+          "source": {
+            "zhCN": "影画一：在春天走进果园"
+          },
+          "description": {
+            "zhCN": "处于[薇薇安的预言]下的目标受到的所有属性异常伤害和[紊乱]伤害提升16%。选中本 Buff 表示目标处于[薇薇安的预言]。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "vivian_cinema_1_attribute_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute"
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "value": 16,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "vivian_cinema_1_disorder_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "disorder"
+              },
+              "stat": "disorderDamageBonus",
+              "mode": "flat",
+              "value": 16,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "verification": {
+        "officialEntryId": "1276",
+        "officialVersion": "1781774238",
+        "modelingAssumptions": "额外能力与影画一的触发条件由选中该 Buff 表示已满足；薇薇安自身的异放、攻击力、以太伤害等效果不进入队友条目。"
+      }
+    },
+    {
+      "id": "claret",
+      "name": {
+        "zhCN": "克拉蕾·弗林特"
+      },
+      "attribute": "electric",
+      "specialty": "armorer",
+      "images": {
+        "icon": "/assets/agents/claret.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2145/detail?mhy_presentation_style=fullscreen"
+      },
+      "buffs": [
+        {
+          "id": "claret.additional.remnant_edge",
+          "source": {
+            "zhCN": "额外能力：血裔传承"
+          },
+          "description": {
+            "zhCN": "队伍中存在击破、其他锋御或同属性角色时触发；克拉蕾或队友造成毁伤后全队锋御进入残锋，锐暴伤害提升25%，持续40秒。选中本 Buff 表示毁伤已触发，仅对锋御角色生效。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "claret_additional_remnant_edge_laceration",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "lacerationDmg",
+              "mode": "flat",
+              "value": 25,
+              "requirement": {
+                "specialty": "armorer"
+              },
+              "durationSeconds": 40,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "verification": {
+        "officialEntryId": "2145",
+        "officialVersion": "1788411769",
+        "modelingAssumptions": "毁伤触发由选中该 Buff 表示已满足；效果只对锋御（armorer）主控生效；克拉蕾自身的锐化、毁伤和抗性无视等效果不进入队友条目。"
+      }
     }
   ],
   "fieldBuffs": [

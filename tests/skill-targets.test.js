@@ -190,11 +190,11 @@ for (const { target, path } of storedTargets) {
 assert.equal(moveCount, 247)
 assert.equal(rowCount, 586)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
-    dashAttack: 21,
-    assistAttack: 28,
-    exSpecial: 31,
+    dashAttack: 23,
+    assistAttack: 36,
+    exSpecial: 34,
     fireSuppression: 3,
-    dodgeCounter: 12,
+    dodgeCounter: 19,
 })
 // Field Buff imports add skill-scoped targets; keep the catalog total explicit.
 const expectedTargetCount = 121
@@ -270,6 +270,20 @@ for (const entry of skillCatalog) {
             const name = String(move.name?.zhCN ?? "")
             if (name.startsWith("终结技：")) {
                 assert.equal(move.skillType, "ultimate", `${entry.agentId}/${move.id} is named 终结技 but has skillType ${move.skillType}`)
+            }
+        }
+    }
+}
+// Move-name prefix -> skill tag (docs/character-modeling-handbook.md, "招式分类"). Tags are stored explicitly; this only checks catalog consistency.
+const PREFIX_TAGS = [["冲刺攻击：", "dashAttack"], ["强化特殊技：", "exSpecial"], ["快速支援：", "assistAttack"], ["支援突击：", "assistAttack"], ["闪避反击：", "dodgeCounter"]]
+for (const entry of skillCatalog) {
+    for (const category of entry.categories) {
+        for (const move of category.moves) {
+            const name = String(move.name?.zhCN ?? "")
+            for (const [prefix, tag] of PREFIX_TAGS) {
+                if (name.startsWith(prefix)) {
+                    assert.ok((move.skillTags ?? []).includes(tag), `${entry.agentId}/${move.id} is named ${prefix} but lacks the ${tag} tag`)
+                }
             }
         }
     }

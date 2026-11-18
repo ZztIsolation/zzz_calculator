@@ -21,7 +21,7 @@ function input(overrides={}) {return {...structuredClone(base),...overrides,dama
 function calc(overrides={}) {return calculateInCombatPanel(catalog,input(overrides))}
 const critAt = (mastery,core='F',extra={}) => calc({coreSkillLevel:core,driveDiscs:[{setId:'none',mainStat:{stat:'anomalyMasteryFlat',value:mastery-(core==='none'?116:116+12*Math.ceil(('ABCDEF'.indexOf(core)+1)/2))}}],...extra})
 for (const [kind,item] of [['agents',agent],['agentSkills',skills]]) assert.deepEqual(validateMaintenanceItem(kind,item,catalog),{ok:true,errors:[]})
-assert.ok(!catalog.teammateCombatBuffGroups.some(a=>a.id==='fioni'))
+assert.deepEqual(catalog.teammateCombatBuffGroups.find(a=>a.id==='fioni').buffs.map(b=>b.id),['fioni.core.sear','fioni.additional.sear_crit_dmg','fioni.cinema_1.sear_crit_dmg'])
 assert.equal(agent.defaultCalculationConfig.events.length,1)
 assert.equal(agent.defaultCalculationConfig.events[0].anomalyEffect,'burn')
 // Source numbers are independently extracted from the pinned official HTML cells.

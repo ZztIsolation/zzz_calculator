@@ -493,6 +493,9 @@
             },
             {
               "id": "dodge_counter_swallow",
+              "skillTags": [
+                "dodgeCounter"
+              ],
               "name": {
                 "zhCN": "闪避反击：燕袭"
               },
@@ -1440,6 +1443,9 @@
             },
             {
               "id": "dodge_counter_cold_sparrow",
+              "skillTags": [
+                "dodgeCounter"
+              ],
               "name": {
                 "zhCN": "闪避反击：寒雀"
               },
@@ -2138,6 +2144,9 @@
             },
             {
               "id": "dodge_counter_exorcising_strike",
+              "skillTags": [
+                "dodgeCounter"
+              ],
               "name": {
                 "zhCN": "闪避反击：除祟一击"
               },
@@ -3031,6 +3040,9 @@
             },
             {
               "id": "dodge_counter_sword_flash_rite",
+              "skillTags": [
+                "dodgeCounter"
+              ],
               "name": {
                 "zhCN": "闪避反击：剑闪之仪"
               },
@@ -3747,6 +3759,9 @@
             },
             {
               "id": "sliding_variation",
+              "skillTags": [
+                "dodgeCounter"
+              ],
               "name": {
                 "zhCN": "闪避反击：滑动变奏"
               },
@@ -3795,6 +3810,9 @@
           "moves": [
             {
               "id": "broken_dream",
+              "skillTags": [
+                "assistAttack"
+              ],
               "name": {
                 "zhCN": "快速支援：破碎幻梦"
               },
@@ -5034,7 +5052,9 @@
                 }
               ],
               "skillType": "dodge",
-              "skillTags": []
+              "skillTags": [
+                "dodgeCounter"
+              ]
             }
           ],
           "levelScale": "skill"
@@ -7640,7 +7660,9 @@
               "damageElement": "electric",
               "damageKind": "sharp",
               "damageBasis": "def",
-              "skillTags": [],
+              "skillTags": [
+                "dashAttack"
+              ],
               "rows": [
                 {
                   "id": "damage",
@@ -9433,7 +9455,9 @@
                   ]
                 }
               ],
-              "skillTags": []
+              "skillTags": [
+                "assistAttack"
+              ]
             },
             {
               "id": "defensive_assist_iron_guard",
@@ -10300,6 +10324,9 @@
           "moves": [
             {
               "id": "dash_attack",
+              "skillTags": [
+                "dashAttack"
+              ],
               "name": {
                 "zhCN": "冲刺攻击：踏风"
               },
@@ -10335,6 +10362,9 @@
             },
             {
               "id": "dodge_counter",
+              "skillTags": [
+                "dodgeCounter"
+              ],
               "name": {
                 "zhCN": "闪避反击：折云"
               },
@@ -10383,6 +10413,9 @@
           "moves": [
             {
               "id": "quick_support",
+              "skillTags": [
+                "assistAttack"
+              ],
               "name": {
                 "zhCN": "快速支援：紧急预案"
               },
@@ -10418,6 +10451,9 @@
             },
             {
               "id": "assist_assault",
+              "skillTags": [
+                "assistAttack"
+              ],
               "name": {
                 "zhCN": "支援突击：谈判技巧"
               },
@@ -10501,6 +10537,9 @@
             },
             {
               "id": "wind_cut_purify",
+              "skillTags": [
+                "exSpecial"
+              ],
               "name": {
                 "zhCN": "强化特殊技：风切变·扬清"
               },
@@ -10536,6 +10575,9 @@
             },
             {
               "id": "wind_cut_triple",
+              "skillTags": [
+                "exSpecial"
+              ],
               "name": {
                 "zhCN": "强化特殊技：风切变·三重绝息"
               },
@@ -10571,6 +10613,9 @@
             },
             {
               "id": "windstorm_eye",
+              "skillTags": [
+                "exSpecial"
+              ],
               "name": {
                 "zhCN": "强化特殊技：风切变·风暴眼"
               },
@@ -14020,7 +14065,9 @@
               },
               "damageElement": "ice",
               "skillType": "assist",
-              "skillTags": [],
+              "skillTags": [
+                "assistAttack"
+              ],
               "rows": [
                 {
                   "id": "damage",
@@ -15131,7 +15178,9 @@
               },
               "damageElement": "ether",
               "skillType": "assist",
-              "skillTags": [],
+              "skillTags": [
+                "assistAttack"
+              ],
               "rows": [
                 {
                   "id": "damage",
@@ -15912,7 +15961,9 @@
               },
               "skillType": "assist",
               "damageElement": "fire",
-              "skillTags": [],
+              "skillTags": [
+                "assistAttack"
+              ],
               "rows": [
                 {
                   "id": "damage",
@@ -17645,7 +17696,9 @@
               },
               "damageElement": "physical",
               "skillType": "assist",
-              "skillTags": [],
+              "skillTags": [
+                "assistAttack"
+              ],
               "rows": [
                 {
                   "id": "damage",

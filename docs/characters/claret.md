@@ -29,6 +29,10 @@
 - 人工删除的 3 影、5 影目录条目不得被导入器、合并或发布拆分恢复。
 - 终结技「血华誓·千锤百炼」（`ultimate_hundred_hammers`）保存为 `skillType: ultimate`、分类仍为 `chain`；影画四按招式 ID 精确指向它和连携技，与通用终结技、连携技增伤分开匹配。该招式曾误存为 `chain`，2026-11-18 修正，`test:skill-targets` 现检查所有“终结技：”招式的类型。
 
+## 队友条目
+
+- ID `claret.additional.remnant_edge`：残锋使全队锋御的锐暴伤害 +25%（持续 40 秒），带 `requirement.specialty: armorer`，只对锋御主控生效，非锋御主控（如佩洛伊斯）数值不变。目前目录里只有克拉蕾自己是锋御，所以该条目暂时没有可见的实际使用者；毁伤触发由选中该 Buff 表示已满足。独立算例见 `npm run test:teammate-team-effects`。
+
 ## 制作教训
 
 - 初版问题：专属字段过多、普通暴击率与锐化语义混用、局外属性和快速路径遗漏；发布拆分还曾漏带维护删除。

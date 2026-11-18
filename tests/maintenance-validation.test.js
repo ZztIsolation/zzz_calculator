@@ -670,6 +670,11 @@ assertInvalid("agents", {
         }],
     },
 }, "不能设为默认启用")
+// The maintenance editor binds the portrait path; agents must not carry the teammate-style icon field.
+for (const entry of JSON.parse(readFileSync(path.join(rootDir, "data", "agents.json"), "utf8")).agents) {
+    assert.ok(String(entry.images?.portrait ?? "").trim(), `${entry.id} must store images.portrait`)
+    assert.equal(entry.images.icon, undefined, `${entry.id} must not use images.icon`)
+}
 for (const entry of JSON.parse(readFileSync(path.join(rootDir, "data", "agents.json"), "utf8")).agents) {
     for (const buff of entry.combatBuffs?.cinemaBuffs ?? []) {
         assert.notEqual(buff.defaultChecked, true, `${entry.id} cinema ${buff.cinemaLevel} must not be default-enabled`)

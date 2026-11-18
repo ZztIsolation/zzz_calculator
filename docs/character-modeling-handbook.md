@@ -43,7 +43,7 @@
 | 专武 ID | `zzz_wiki_<官方词条ID>`；从旧语义 ID 迁移时把旧值放进 `legacyIds` | `zzz_wiki_2259`、`zzz_wiki_1908` |
 | 效果 ID | 语义化 kebab-case，形如 `<角色>-<来源>-<效果>`；不新建 `effect-1` 这类自动编号 | `fioni-core-anomaly-proficiency` |
 | 技能组 ID | 语义化 snake_case；`skill_group_<哈希>` 只由维护页生成，不手写 | `fire_suppression_string` |
-| 队友 Buff ID | `<角色ID>.<core\|additional\|cinema_N\|skill>.<效果>`，不使用 `buff_<哈希>` | `velina.cinema_1.turbulence_res_ignore` |
+| 队友 Buff ID | `<角色ID>.<core\|additional\|cinema_N\|skill>.<效果>`；已有的 `buff_<哈希>` 不改名，因为用户已保存的 Buff 选择按 ID 引用 | `velina.cinema_1.turbulence_res_ignore` |
 | Buff 名称 | `核心被动：<名>`、`额外能力：<名>`；影画 Buff 用 `cinemaName` 写影画名 | `核心被动：涅槃` |
 | 描述 | 逐字保留官方原文，数值档位用 `/` 连接；首行重复 Buff 名称 | 见 `fioni` 的 `corePassive` |
 | 影画用词 | 一律写“N影”“影画N”，不写“命”“N命” | `0影…`，不写 `0命…` |
@@ -71,7 +71,9 @@
 | 影画 N 的效果 | `cinemaBuffs[]`，只为有建模效果的影画建条目；不写 `defaultChecked: true` | 见下 |
 | 属性异常、异放、乱流 | `target.kind: anomaly` 的规则；异放表达式写在 `anomalyReleaseProfiles`，影画门槛用 `minimumCinemaLevel`，影画成长用 `cinemaValues` | `nangongyu`、`fioni`，语义见[建模说明](modeling.md#伤害与评分域) |
 | 能量、喧响、动画时间、异常积蓄等资源 | 不建模：只留在描述，并写进 `verification.unsupportedMechanics` | 见 `sigrid` 的 `verification` |
-| 全队、队伍中任意角色获得的效果 | 除写进本角色 Buff 外，还必须在 `teammates` 建条目，只放对队友生效的部分 | `jane_doe`、`velina` 的队友条目 |
+| 全队、队伍中任意角色获得的效果 | 除写进本角色 Buff 外，还必须在 `teammates` 建条目，只放对队友生效的部分 | `fioni`、`vivian`、`jane_doe`、`velina` 的队友条目 |
+| 依赖队友自身面板数值的效果（队友条目内） | `type: formula`，`source: { variable, label, defaultValue, min, max }`，默认取使效果达到上限的值，用户可改 | `jane_doe`（375）、`fioni`（255） |
+| 只对某类定位的主控生效 | 效果规则加 `requirement.specialty`（或 `excludedSpecialties`） | `claret` / `claret_additional_remnant_edge_laceration` |
 
 **核心、额外能力与影画的归属**
 
@@ -96,7 +98,7 @@
 
 火力镇压（`fireSuppression`）、追加攻击（`followUp`）是人工标注的专属标签：没有原文依据不得添加，原文已说明才标。一个招式同时属于两种机制时标两个标签（例如简的强化特殊技同时是 `exSpecial` 和 `dashAttack`）。
 
-**队友条目**：`teammates[]` 的 `id` 与角色 ID 相同，同时带 `name`、`attribute`、`specialty`、`images`；`buffs[]` 只保留对队友生效的效果，每条有 `id`、`source`、`description`、`scope`、`effects`、`buffModifiers`。角色自身 Buff 与队友条目里的效果必须口径一致，修改一处要同步另一处。
+**队友条目**：`teammates[]` 的 `id` 与角色 ID 相同，同时带 `name`、`attribute`、`specialty`、`images`（`images.icon` 指向与角色立绘相同的本地文件）；队友影画 Buff 的档位由 `source` 文本“影画N”或 ID 里的 `cinema_N` 识别，二者至少写一个；触发条件在描述末尾写“选中本 Buff 表示……已满足”；`buffs[]` 只保留对队友生效的效果，每条有 `id`、`source`、`description`、`scope`、`effects`、`buffModifiers`。角色自身 Buff 与队友条目里的效果必须口径一致，修改一处要同步另一处。
 
 ## 五、技能表
 
@@ -173,8 +175,8 @@
 
 ## 十一、已知偏差（待核实）
 
-下列现有数据与本手册不一致。它们是否有意，需要核实游戏语义后再决定，新角色不得照抄。
+下列现有数据与本手册不一致，新角色不得照抄；它们是否需要处理，核实后再决定。
 
-- **技能标签漏标**：`dodgeCounter` 缺 7 个角色（叶瞬光、星见雅、仪玄、爱丽丝、爱芮、希格莉德、维琳娜各 1 个招式）；`assistAttack` 缺 8 个招式（爱芮、佩洛伊斯、维琳娜 2、艾莲、南宫羽、菲欧妮、猫又）；`dashAttack` 缺克拉蕾 `dash_quench`、维琳娜 `dash_attack`；`exSpecial` 缺维琳娜 3 个。这会让以这些标签为目标的套装和音擎增伤漏算。
-- **队友条目缺失**：菲欧妮（灼蚀与异常暴伤）、克拉蕾（残锋）、薇薇安（全队侵蚀）有全队效果但没有条目；星见雅、爱丽丝按用户决定暂不建模。南宫羽的队友条目使用 `buff_<哈希>` ID，与第三节不一致。
-- **图片字段**：简和菲欧妮使用 `images.icon`，维护页编辑器绑定的是 `portrait`，需核实这两个角色在维护页的头像是否显示为空。
+- **队友条目缺失**：星见雅（影画一，全队属性异常积蓄效率 +20%）和爱丽丝（影画二，全队强击伤害 +15%）有全队效果但没有条目，按用户决定暂不建模。
+- **既有队友 Buff ID**：南宫羽使用 `buff_<哈希>` ID，蕾米埃尔使用 `core_passive`、`special` 等分类词，简使用 `core_insight` 一类 ID，与第三节的 `<core|additional|cinema_N|skill>` 形式不统一；已保存的 Buff 选择按 ID 引用，不得批量改名。
+- **头像不在本地**：蕾米埃尔·丹的 `images.portrait` 指向官方远程 URL，没有本地文件和缩略图。
