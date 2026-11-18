@@ -16,7 +16,7 @@ import {
     ELEMENT_DEF_IGNORE_STATS,
     ELEMENT_SHARP_DMG_STATS,
 } from "./effectRuleTargets.js"
-import { validateAnomalyReleaseProfile, VELINA_RELEASE_SOURCES } from "./anomalyRelease.js"
+import { minimumCinemaLevelForReleaseProfile, validateAnomalyReleaseProfile, VELINA_RELEASE_SOURCES } from "./anomalyRelease.js"
 import { damageSkillRowsWithGeneratedTotals } from "./skillMultiplierCandidates.js"
 import {
     isAllowedInCombatFormulaOutput,
@@ -68,6 +68,17 @@ export function applySystemManagedMaintenanceFields(value) {
         return value
     }
 
+    if (Array.isArray(value.anomalyReleaseProfiles)) {
+        for (const profile of value.anomalyReleaseProfiles) {
+            if (!profile || typeof profile !== "object" || Array.isArray(profile)) continue
+            if (profile.minCinemaLevel !== undefined
+                && (profile.minimumCinemaLevel === undefined || profile.minimumCinemaLevel === profile.minCinemaLevel)) {
+                profile.minimumCinemaLevel = profile.minCinemaLevel
+                delete profile.minCinemaLevel
+            }
+            // Conflicting aliases remain visible to validation; never silently choose one on save.
+        }
+    }
     if (Array.isArray(value.skillGroups)) {
         value.skillGroups.forEach(group => {
             if (group && typeof group === "object" && !Array.isArray(group)) {
@@ -2006,7 +2017,7 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
             if (!triggerAgent?.anomalyReleaseProfiles?.some(profile => profile?.id === profileId)) {
                 add(errors, `${path}.triggerActorRef.profileId`, "异放倍率方案不存在。")
             }
-            const minimumCinemaLevel = Number(releaseProfile?.minimumCinemaLevel ?? 0)
+            const minimumCinemaLevel = minimumCinemaLevelForReleaseProfile(releaseProfile)
             if (Number.isFinite(minimumCinemaLevel) && Number(context.cinemaLevel ?? 0) < minimumCinemaLevel) {
                 add(errors, `${path}.triggerActorRef.profileId`, `该异放方案仅在${minimumCinemaLevel}影及以上开放。`)
             }
@@ -2614,10 +2625,20 @@ function validateAnomalyReleaseProfiles(errors, profiles, context = {}, agentId 
         const id = String(profile?.id ?? "")
         if (ids.has(id)) add(errors, `${path}.id`, "同一角色的异放倍率方案 ID 不能重复。")
         ids.add(id)
-        if (profile?.minimumCinemaLevel !== undefined) {
-            const level = requireFinite(errors, profile.minimumCinemaLevel, `${path}.minimumCinemaLevel`)
+        if (profile?.minCinemaLevel !== undefined && profile?.minimumCinemaLevel !== undefined
+            && profile.minCinemaLevel !== profile.minimumCinemaLevel) {
+            add(errors, `${path}.minimumCinemaLevel`, "minimumCinemaLevel 与旧字段 minCinemaLevel 冲突，请统一最低影画。")
+        }
+        for (const field of ["minimumCinemaLevel", "minCinemaLevel"]) {
+            if (profile?.[field] === undefined) continue
+            if (profile[field] === null || typeof profile[field] === "boolean"
+                || (typeof profile[field] === "string" && !profile[field].trim())) {
+                add(errors, `${path}.${field}`, "最低影画必须是 0 到 6 的整数。")
+                continue
+            }
+            const level = requireFinite(errors, profile[field], `${path}.${field}`)
             if (Number.isFinite(level) && (!Number.isInteger(level) || level < 0 || level > 6)) {
-                add(errors, `${path}.minimumCinemaLevel`, "最低影画必须是 0 到 6 的整数。")
+                add(errors, `${path}.${field}`, "最低影画必须是 0 到 6 的整数。")
             }
         }
         if (profile?.releaseSkillRef !== undefined) {

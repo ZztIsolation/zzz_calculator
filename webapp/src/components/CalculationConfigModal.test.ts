@@ -735,6 +735,28 @@ describe("CalculationConfigModal", () => {
     expect(saved.events[0].procCount).toBeUndefined()
   })
 
+  it("updates Nangongyu's release preview and six-cinema choices with the current build", async () => {
+    const agent = (agentsData as any).agents.find((item: any) => item.id === "nangongyu")
+    const wrapper = mountModal({ agent, cinemaLevel: 0,
+      damageConfig: { ...clone(agent.defaultCalculationConfig), mode: "custom" },
+      releaseContext: { coreSkillLevel: "F" },
+    })
+    await openModal(wrapper)
+    const multiplier = () => document.body.querySelector('[data-layout-field="event-multiplier"]')?.textContent
+    expect(multiplier()).toContain("900%")
+    const choices = () => selectComponentWithOption(wrapper, "core_tremolo_4")!
+    expect(choices().props("options")).toHaveLength(4)
+    await wrapper.setProps({ cinemaLevel: 2 })
+    expect(multiplier()).toContain("1,080%")
+    await wrapper.setProps({ cinemaLevel: 6 })
+    expect(choices().props("options")).toHaveLength(8)
+    await choices().vm.$emit("update:value", "cinema6_tremolo_4")
+    await nextTick()
+    expect(multiplier()).toContain("1,000%")
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].triggerActorRef.profileId).toBe("cinema6_tremolo_4")
+  })
+
   it("shows Vivian's current in-combat proficiency as the release conversion source", async () => {
     const wrapper = mountModal({
       agent: vivian,

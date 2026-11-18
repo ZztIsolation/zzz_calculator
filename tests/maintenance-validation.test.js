@@ -1869,6 +1869,37 @@ const validReleaseAgent = {
     },
 }
 assertValid("agents", validReleaseAgent, validCalculationContext)
+for (const field of ["minimumCinemaLevel", "minCinemaLevel"]) {
+    const gated = structuredClone(validReleaseAgent)
+    gated.anomalyReleaseProfiles[0][field] = 6
+    assertInvalid("agents", gated, "仅在6影及以上开放", validCalculationContext)
+    const cleaned = cleanMaintenanceItem("agents", gated)
+    assert.equal(cleaned.anomalyReleaseProfiles[0].minimumCinemaLevel, 6)
+    assert.equal(cleaned.anomalyReleaseProfiles[0].minCinemaLevel, undefined)
+    assertInvalid("agents", cleaned, "仅在6影及以上开放", validCalculationContext)
+    gated.defaultCalculationConfig.events = [{ id: "base", kind: "direct", skillMultiplier: 100, count: 1, stunned: true }]
+    gated.defaultCalculationConfig.selectedEventId = "base"
+    gated.defaultCalculationConfig.variants = [{ cinemaLevel: 6, mode: "anomaly", events: [validReleaseEvent], selectedEventId: validReleaseEvent.id }]
+    assertValid("agents", gated, validCalculationContext)
+    for (const invalidLevel of [-1, 7, 1.5, null, "bad"]) {
+        gated.anomalyReleaseProfiles[0][field] = invalidLevel
+        assertInvalid("agents", gated, field, validCalculationContext)
+    }
+}
+const conflictingReleaseAgent = structuredClone(validReleaseAgent)
+Object.assign(conflictingReleaseAgent.anomalyReleaseProfiles[0], { minimumCinemaLevel: 0, minCinemaLevel: 6 })
+for (const draft of [conflictingReleaseAgent, cleanMaintenanceItem("agents", conflictingReleaseAgent)]) {
+    assertInvalid("agents", draft, "冲突", validCalculationContext)
+}
+const cinemaReleaseAgent = structuredClone(validReleaseAgent)
+const cinemaConstant = cinemaReleaseAgent.anomalyReleaseProfiles[0].expression.args[1]
+cinemaConstant.cinemaValues = [25, 25, 35, 35, 35, 35, 35]
+assertValid("agents", cinemaReleaseAgent, validCalculationContext)
+assert.deepEqual(cleanMaintenanceItem("agents", cinemaReleaseAgent).anomalyReleaseProfiles[0].expression, cinemaReleaseAgent.anomalyReleaseProfiles[0].expression)
+for (const invalidValues of [[25], null, [25, 25, 35, 35, 35, 35, null], [25, 25, 35, 35, 35, 35, Infinity], [25, 25, 35, 35, 35, 35, "35"]]) {
+    cinemaConstant.cinemaValues = invalidValues
+    assertInvalid("agents", cinemaReleaseAgent, "cinemaValues", validCalculationContext)
+}
 const cleanedReleaseAgent = cleanMaintenanceItem("agents", validReleaseAgent)
 assert.deepEqual(cleanedReleaseAgent.defaultCalculationConfig.events[0], validReleaseEvent)
 for (const critMode of ["expected", "crit", "nonCrit"]) {

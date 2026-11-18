@@ -166,10 +166,11 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseCo
         const agent = releaseContext.agent
             ?? (catalog?.agents ?? []).find(item => item?.id === event.triggerActorRef?.agentId)
         const profile = event.releaseProfile
-            ?? anomalyReleaseProfile(agent, event.triggerActorRef?.profileId, effect.element, releaseContext.cinemaLevel ?? 0)
+            ?? anomalyReleaseProfile(agent, event.triggerActorRef?.profileId, effect.element, releaseContext.cinemaLevel ?? event.cinemaLevel ?? 0)
         if (!profile) return null
         const skill = resolveReleaseSkillRef(catalog, agent, profile.releaseSkillRef ?? event.releaseSkillRef, releaseContext)
         return evaluateAnomalyReleaseProfile(profile, {
+            cinemaLevel: releaseContext.cinemaLevel ?? event.cinemaLevel ?? 0,
             originalBaseMultiplier: finiteNonNegative(effect.baseMultiplier, 0),
             trigger: {
                 inCombatPanel: releaseContext.inCombatPanel ?? {},

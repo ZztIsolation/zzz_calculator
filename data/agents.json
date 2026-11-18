@@ -7610,7 +7610,7 @@
         "levels13to16": "cross-checked-release-3.0.0-16735318-and-Honey-Hunter/Fandom; explicit values, not extrapolated",
         "level60Stats": "official base 849 ATK / 5% CRIT; core F adds 75 ATK / 14.4% CRIT separately",
         "cinema6": "unrevealed-not-modeled",
-        "modelingNotes": "docs/pyrois-modeling.md"
+        "modelingNotes": "docs/characters/pyrois.md"
       },
       "hidden": false,
       "importantSubStats": [
@@ -10526,7 +10526,7 @@
             "zhCN": "颤音：1层"
           },
           "default": false,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10604,7 +10604,7 @@
             "zhCN": "颤音：2层"
           },
           "default": false,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10682,7 +10682,7 @@
             "zhCN": "颤音：3层"
           },
           "default": false,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10760,7 +10760,7 @@
             "zhCN": "颤音：4层"
           },
           "default": true,
-          "minCinemaLevel": 0,
+          "minimumCinemaLevel": 0,
           "supportedElements": [
             "ether",
             "electric",
@@ -10838,7 +10838,7 @@
             "zhCN": "颤音改（六影）：1层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
@@ -10907,7 +10907,7 @@
             "zhCN": "颤音改（六影）：2层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
@@ -10976,7 +10976,7 @@
             "zhCN": "颤音改（六影）：3层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
@@ -11045,7 +11045,7 @@
             "zhCN": "颤音改（六影）：4层"
           },
           "default": false,
-          "minCinemaLevel": 6,
+          "minimumCinemaLevel": 6,
           "supportedElements": [
             "ether",
             "electric",
