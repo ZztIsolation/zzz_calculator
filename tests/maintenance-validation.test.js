@@ -655,6 +655,26 @@ assertValid("agents", {
         })),
     },
 })
+// Cinema Buffs are enabled by the selected cinema level; a default-enabled flag is a modeling error.
+assertInvalid("agents", {
+    ...validAgent,
+    combatBuffs: {
+        ...validAgent.combatBuffs,
+        cinemaBuffs: [{
+            cinemaLevel: 1,
+            cinemaName: { zhCN: "影画1名称" },
+            description: { zhCN: "影画1 Buff 描述" },
+            scope: "inCombat",
+            defaultChecked: true,
+            effects: [{ type: "fixed", stat: "atkFlat", value: 100, mode: "flat" }],
+        }],
+    },
+}, "不能设为默认启用")
+for (const entry of JSON.parse(readFileSync(path.join(rootDir, "data", "agents.json"), "utf8")).agents) {
+    for (const buff of entry.combatBuffs?.cinemaBuffs ?? []) {
+        assert.notEqual(buff.defaultChecked, true, `${entry.id} cinema ${buff.cinemaLevel} must not be default-enabled`)
+    }
+}
 const validSkillBuff = {
     id: "chain_tempering",
     name: { zhCN: "砥砺" },

@@ -13,6 +13,8 @@ export const AGENT_ID_OVERRIDES = Object.freeze({
   "1561": "velina",
   "1581": "remielle_dan",
   "1611": "claret",
+  "1041": "soldier_11",
+  "1591": "sigrid",
 })
 
 export const WENGINE_ID_OVERRIDES = Object.freeze({

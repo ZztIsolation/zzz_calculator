@@ -51,7 +51,9 @@
 - `anomalyEffects` 缺失或空数组表示命中该结算类型的全部具体异常，非空才是精确白名单，保存和 API 返回省略空数组；异放的筛选指原异常，不筛选触发者或倍率方案；切换异常目标的结算类型必须重置为全部，离开属性异常时清除异常形态；异放定向规则不得伪装为普通异常形态。
 - 校验上下文携带完整角色清单（维护页用目录角色并以当前草稿替换同一角色，保存接口用数据文件角色并以清理后的草稿替换），同一次保存中新增的异放方案必须能被引用。
 - 标签模式支持多选，同一规则的标签按 OR 匹配，不得与指定招式或通用大类混用；合法标签白名单以 [core/skillTargets.js](../core/skillTargets.js) 的 `SKILL_TAGS` 为准。维护页与自定义 Buff 不得显示或新建 `moveIdPrefixes`，自定义 Buff 不得暴露缺少异常目标选择的 `anomalyDurationBonusSeconds`。
-- 每个招式必须保存合法 `skillType`，可选 `skillTags` 只能来自白名单且不重复；类型和标签不得根据中文名称或 ID 推断；冲刺攻击属 `dodge`、强化特殊技属 `special`、支援攻击属 `assist`，连携技与终结技独立匹配；同一角色的一个类型不得拆到多个技能目录；已知旧 ID 前缀在工作台加载、运行时匹配和维护保存前自动迁移，未知前缀阻止保存并给出可操作错误。
+- 每个招式必须保存合法 `skillType`，可选 `skillTags` 只能来自白名单且不重复；类型和标签不得根据中文名称或 ID 推断；冲刺攻击属 `dodge`、强化特殊技属 `special`、支援攻击属 `assist`，连携技与终结技独立匹配；同一角色的一个类型不得拆到多个技能目录；已知旧 ID 前缀在工作台加载、运行时匹配和维护保存前自动迁移，未知前缀阻止保存并给出可操作错误。招式名以“终结技：”开头的招式必须保存 `skillType: ultimate`（分类仍可为 `chain`），由 `test:skill-targets` 作目录一致性检查，不作为运行时推断；写成 `chain` 会让通用终结技增伤漏算、通用连携技增伤误算。
+- 影画 Buff 由所选影画等级自动启用（工作台逐级加入不高于当前影画的条目），不读取 `defaultChecked`；维护校验拒绝 `defaultChecked: true`，维护页不提供该开关，`test:maintenance-validation` 同时检查现有目录。技能来源 Buff 才使用 `defaultChecked: true`；核心被动与额外能力缺省为启用。
+- 每个未隐藏的角色和音擎必须有 Enka 映射（`test:enka-import` 检查）；映射由 `scripts/update-enka-metadata.js` 在固定的 `ENKA_METADATA_COMMIT` 上生成，Enka 官方名与目录名不同的角色在 `core/enka-import/aliases.js` 登记覆盖，不手改生成文件。
 - 不得显示或新建旧“适用范围”、伤害类型、伤害属性或技能限定筛选；新保存的规则不含 `appliesTo`（技能范围用 `target.kind: "skill"`，异常范围用 `target.kind: "anomaly"`，属性限制用明确的属性类型，多属性效果拆成共享层数的多条规则）。运行时继续计算旧 `appliesTo` 浏览器状态；可无损转换的筛选在保存前迁移，`damageKinds`、`anomalyEffects` 等无法无损转换的筛选保留读取兼容但阻止落盘并提示重选。
 - 驱动盘 2 件套：普通面板型固定按局外面板效果校验，仅 `target.kind: "skill"` 的定向规则按局内事件增幅校验，凑齐后自动注入、不需活动 Buff ID；2 件套的非技能目标不得借伪造 `scope: "inCombat"` 写入事件规则。4 件套的 `selfBuff`/`teamBuff` 固定按局内 Buff 校验，无显式范围时必须允许技能增幅、事件增幅和 Buff 修饰器；清洗后的驱动盘数据省略 `scope` 与 `appliesToOutOfCombatPanel`。
 - 效果规则可独立保存条件、持续时间、冷却时间、覆盖率、层数、`requirement.specialty` 和 `requirement.attribute`；时间字段不得自动推算覆盖率，缺失按 100%；团队效果的 `exclusiveGroup` 保证同组只结算一次，当前装备者的原始朋克效果优先于外部队友副本，忽略明细说明同名去重原因。

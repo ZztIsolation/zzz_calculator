@@ -1,4 +1,4 @@
-export const ENKA_METADATA_COMMIT = "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554"
+export const ENKA_METADATA_COMMIT = "9780bb7dc728cf1862de8e080e9d56e60a7c496b"
 
 export const SKILL_INDEX_TO_CATEGORY = Object.freeze({
   0: "basic",

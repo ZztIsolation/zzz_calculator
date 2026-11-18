@@ -28,7 +28,7 @@ import { mapShowcaseToCatalog } from "../core/enka-import/entity-mapping.js"
 import { cinemaSkillBonus, parseEnkaShowcase } from "../core/enka-import/parse-enka.js"
 
 const mapping = JSON.parse(await readFile(new URL("../data/enka_zzz_mapping.json", import.meta.url), "utf8"))
-assert.equal(mapping.source.commit, "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554")
+assert.equal(mapping.source.commit, "9780bb7dc728cf1862de8e080e9d56e60a7c496b")
 const mappedEquipmentEntry = Object.entries(mapping.driveDiscEquipment)
   .find(([, entry]) => entry.rarity === "S" && entry.levelScale === 0.2)
 const [knownEquipmentId, knownEquipment] = mappedEquipmentEntry
@@ -129,7 +129,7 @@ assert.deepEqual(
 assert.ok(mapped.warnings.some(warning => /6号位.*未导入/.test(warning)))
 assert.notEqual(enkaDriveDiscId("1302309616", "7038"), enkaDriveDiscId("1300027938", "7038"))
 
-assert.deepEqual(mapping.agents["1261"], { id: "jane_doe", name: "简" })
+assert.deepEqual(mapping.agents["1261"], { id: "jane_doe", name: "简·杜" })
 const janeShowcase = mapShowcaseToCatalog(parseEnkaShowcase({ PlayerInfo: {
   ShowcaseDetail: { AvatarList: [makeAvatar(1261, { TalentLevel: 3 })] },
 } }), catalog, mapping, { uid: "test-jane-uid" })
@@ -147,6 +147,16 @@ assert.deepEqual(mapping.wEngines["14161"], { id: "zzz_wiki_2188", name: "猩红
 assert.deepEqual(mapping.wEngines["12016"], { id: "zzz_wiki_2190", name: "「月相」-弦" })
 assert.deepEqual(mapping.wEngines["13017"], { id: "zzz_wiki_2200", name: "喵运当头" })
 assert.deepEqual(mapping.wEngines["13021"], { id: "zzz_wiki_2189", name: "血髓秘匣" })
+assert.deepEqual(mapping.wEngines["14164"], { id: "zzz_wiki_2259", name: "涅槃初翎" })
+// Delivery contract: every visible catalog agent and W-Engine must be importable from an Enka showcase.
+{
+  const agentCatalog = JSON.parse(await readFile(new URL("../data/agents.json", import.meta.url), "utf8")).agents
+  const engineCatalog = JSON.parse(await readFile(new URL("../data/w_engines.json", import.meta.url), "utf8")).wEngines
+  const mappedAgentIds = new Set(Object.values(mapping.agents).map(item => item.id))
+  const mappedEngineIds = new Set(Object.values(mapping.wEngines).map(item => item.id))
+  assert.deepEqual(agentCatalog.filter(item => item.hidden !== true && !mappedAgentIds.has(item.id)).map(item => item.id), [])
+  assert.deepEqual(engineCatalog.filter(item => item.hidden !== true && !mappedEngineIds.has(item.id)).map(item => item.id), [])
+}
 const mappedPyrois = mapShowcaseToCatalog(
   parseEnkaShowcase({
     PlayerInfo: {
@@ -165,7 +175,7 @@ assert.equal(mappedPyrois.mappedAgents.length, 1)
 assert.equal(mappedPyrois.mappedAgents[0].agentId, "pyrois")
 assert.equal(mappedPyrois.mappedAgents[0].agentName, "佩洛伊斯")
 assert.equal(mappedPyrois.skippedAgents.length, 0)
-// Enka API-docs dc86b5d: avatar 1561 (Velina), signature WeaponId 14156.
+// Enka API-docs 9780bb7: avatar 1561 (Velina), signature WeaponId 14156.
 const mappedVelina = mapShowcaseToCatalog(
   parseEnkaShowcase({
     PlayerInfo: {

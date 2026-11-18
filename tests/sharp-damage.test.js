@@ -578,7 +578,7 @@ const chainWithoutCrimson = calculateInCombatPanel(catalog, {
             kind: "sharp",
             skillMultiplier: 1,
             damageElement: "electric",
-            skillSource: { skillType: "chain", moveId: "ultimate_hundred_hammers" },
+            skillSource: { skillType: "ultimate", moveId: "ultimate_hundred_hammers" },
             sharpScenario: { crimsonInscription: false, gashStacks: 3 },
             count: 1,
         }],

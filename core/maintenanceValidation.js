@@ -2575,6 +2575,9 @@ function validateCinemaBuffs(errors, cinemaBuffs, context = {}) {
         if (!hasText(buff?.description)) {
             add(errors, `${path}.description`, "Buff 描述必填。")
         }
+        if (buff?.defaultChecked !== undefined && buff.defaultChecked !== false) {
+            add(errors, `${path}.defaultChecked`, "影画 Buff 由所选影画等级决定是否生效，不能设为默认启用。")
+        }
         validateEffectSet(errors, buff, path, { requireRule: false, sourceType: "self", context })
     })
 }

@@ -4,6 +4,13 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-18 — 克拉蕾终结技类型、Enka 映射与影画默认启用修正
+
+- 问题：克拉蕾「终结技：血华誓·千锤百炼」的 `skillType` 误存为 `chain`，通用终结技增伤漏算、通用连携技增伤误算；菲欧妮专武（Enka 14164）及另外 28 个目录音擎没有 Enka 映射，Enka 导入时提示音擎无法映射；映射文件靠手工补丁维护，生成脚本在固定提交上无法重新生成（11号、希格莉德缺名称覆盖），简的映射名与目录名不一致；13 个影画 Buff 带有无效的 `defaultChecked: true`（运行时按影画等级自动启用，不读取该字段），维护页还提供了会误导的“默认启用”开关。
+- 变化：克拉蕾终结技改为 `ultimate`，影画四的精确目标和一处测试输入同步；`ENKA_METADATA_COMMIT` 升至 `9780bb7`，补两个名称覆盖后用 `update-enka-metadata.js` 重新生成（新增 29 个音擎映射，简的名称改为“简·杜”）；13 个影画 Buff 的 `defaultChecked` 改为 `false`，维护页移除影画 Buff 的“默认启用”开关，维护校验拒绝影画 Buff 的 `defaultChecked: true`。新增三项自动检查：“终结技：”招式类型、可见角色与音擎的 Enka 映射覆盖、目录中无默认启用的影画 Buff。
+- 关键边界：未改任何公式；影画 Buff 仍按所选影画等级自动启用。星见雅、爱丽丝以及薇薇安、克拉蕾、菲欧妮的全队效果尚未建立队友条目，另行处理。dodgeCounter、assistAttack、dashAttack、exSpecial 标签在部分角色招式上缺失，仍待核实游戏语义，本次未改。Enka 映射的生成输出会重排原先手写的角色条目顺序，语义差异只有简的名称。
+- 验证：完整 `npm test` 通过（前端 79 个文件、1043 项用例），`npm run build:webapp` 通过；`test:skill-targets`、`test:enka-import`、`test:enka-server`、`test:maintenance-validation` 含新增检查；未运行浏览器端到端测试，不代表线上验收。
+
 ## 2026-11-18 — 异放影画修复与回归入口补齐
 
 - 问题：南宫羽六影方案使用旧门槛字段，二影常量成长未进入公式求值；工作台缺少南宫羽层数方案选择器。佩洛伊斯元数据仍引用已移动文档，艾莲集成测试未进入默认测试链。

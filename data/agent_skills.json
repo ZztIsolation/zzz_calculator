@@ -8743,7 +8743,7 @@
               "description": {
                 "zhCN": "喧响等级达到[极]时，点发动：对前方敌人发动联系斩击，造成大量电属性伤害；发动期间，[猩红铭刻]持续时间不在减少，不会退出[猩红铭刻]状态；招式发动时，回复10点锐能；招式发动期间拥有无敌效果。"
               },
-              "skillType": "chain",
+              "skillType": "ultimate",
               "damageElement": "electric",
               "damageKind": "sharp",
               "damageBasis": "def",
