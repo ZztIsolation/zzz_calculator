@@ -11,7 +11,7 @@
 
 ## 来源与取值边界
 
-旧分支 `fb9bb2e` 的角色、专武和资源按条目导入，其他角色与队友的当前维护配置保留。来源快照见[官方角色](../sources/severian-official.json)、[官方专武](../sources/severian-weapon-official.json)和[Nanoka](../sources/severian-nanoka-3.4.3.json)。
+旧分支 `fb9bb2e` 的角色、专武和资源按条目导入，其他角色与队友的当前维护配置保留。来源快照见[官方角色](../sources/severian-official-1794906819.json)、[官方专武](../sources/severian-official-weapon-1794632419.json)和[Nanoka](../sources/severian-nanoka-3.4.3+20291004.json)。
 
 技能表按官方每个等级的带名称数值行提取：共13个带倍率招式、39行。强化特殊技三级“组合技失衡倍率”原格缺少百分号，仍按行名取402.8；不得误取下一行风刃的278.1。普攻第四段普通命中与极限闪避命中是互斥分支，后者单独列为替代招式，防止计算多段合计时重复求和。保留旧招式与已有倍率行ID；新增的段数按行选择，不创建管理员技能组。两个版本共享原招式描述，不自动判定闪避。
 
