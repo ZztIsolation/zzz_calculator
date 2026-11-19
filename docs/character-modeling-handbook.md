@@ -27,7 +27,7 @@
 | 队友条目 | `data/combat_buffs.json` 的 `teammates` | 凡有全队效果的角色必须建，规则见第四节末 | `test:shared-combat`、`test:maintenance-validation` |
 | Enka 映射 | `data/enka_zzz_mapping.json` | 由脚本生成，规则见第八节 | `test:enka-import`、`test:enka-server` |
 | 头像和缩略图 | `webapp/public/assets/agents/`、`thumbs/` | `images.portrait` 指向本地文件，缩略图随之生成 | `test:repository-integrity`、`build:webapp` |
-| 来源快照与 fixture | `docs/sources/`、`tests/fixtures/` | 官方结构化数据的原始快照，第九节 | 无 |
+| 来源快照与 fixture | `docs/sources/`、`tests/fixtures/` | 官方结构化数据的原始快照，第九节；快照必须登记到[来源快照索引](sources/README.md) | 无 |
 | 专属测试 | `tests/<角色>-damage.test.js`、`package.json` | 独立算例；脚本必须加入 `npm test` 链 | `npm test` |
 | 目录基线 | `tests/skill-targets.test.js` | 招式数、倍率行数、标签统计、目标数的写死基线随新角色手工更新 | `test:skill-targets` |
 | 角色文件 | `docs/characters/<角色ID>.md`、角色索引表 | 按[模板](characters/_template.md) | 无 |
@@ -161,7 +161,7 @@
 - 官方词条 ID、修订号、读取日期和来源 URL 必须记录；动态百科用 `entry_page` 接口读取结构化技能表，不从截图推测数值。
 - 官方接口请求带 `x-rpc-wiki_app: zzz`；响应必须同时核对词条ID与名称，防止不同游戏的同号词条混淆。游戏/Enka编号不得充当官方词条ID。
 - 公式录入前确认来源、输出、单位及依赖顺序均有消费者；面板节点成长与被动效果成长分别映射；影画按档位逐项核对名称与原文，不能复制邻档替代。描述只放来源原文或忠实缩减，未建模内容放角色专题与交付说明。
-- 来源快照放 `docs/sources/<角色>-nanoka-<版本>.json`，较大的来源数值放 `tests/fixtures/<角色>-source-values.json`。
+- 来源快照放 `docs/sources/`，命名与登记规则见[来源快照索引](sources/README.md)（新增快照必须同步该索引和角色文件的“资料来源”）；较大的来源数值放 `tests/fixtures/<角色>-source-values.json`。
 - `verification` 必含键：`officialEntryPageId`、`officialEntryVersion`、`level60Stats`（核对说明）、`acquiredAt`、`unsupportedMechanics`。有补充来源或特殊假设时再加，如 `defaultObjective`。
 - 调查脚本和中间产物放在被忽略的 `tmp/` 或 `.tmp_*`，不提交。
 
