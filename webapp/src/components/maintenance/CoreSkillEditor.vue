@@ -17,6 +17,7 @@ const coreStatOptions = [
 ]
 
 const PARAM_LABELS: Record<string, string> = {
+  critDmgPct: "核心暴击伤害%", dmgBonusPct: "核心伤害加成%", windTeammateDmgBonusPct: "同风队友条件伤害加成%",
   anomalyProficiencyFlat: "核心异常精通", searAnomalyCritDmgPct: "灼蚀异常暴伤%",
   selectedSkillCritDmgPct: "指定招式暴伤加成%",
   frostburnBreakAtkMultiplier: "霜灼·破伤害倍率%", teamAnomalyBuildupPct: "全队异常积蓄效率%",

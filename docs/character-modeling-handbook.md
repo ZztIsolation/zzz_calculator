@@ -106,6 +106,7 @@
 - 大类 `categories[].id` 取 `basic`、`dodge`、`assist`、`special`、`chain`；核心技、额外能力、影画里有独立伤害的招式才另加 `core_skill`、`additional_ability`、`cinema`。
 - 招式名写 `<类别>：<名称>`，类别词取自上面的前缀表；`id` 用 `<类别前缀>_<英文>` 的蛇形。
 - 等级范围：普通攻击等 1–16 级，默认 12；缺失的等级必须有明确来源，不外推。
+- 来源单元格含多段或多个参数时，按完整行名逐项提取并保留各级值；不得取首个数字或首个带 `%` 的值代替整个单元格。替代命中与普通命中分开表达，不能同时加入总倍率。
 - 倍率行：`kind` 取 `damageMultiplier`、`dazeMultiplier`、`energyCost`；行 ID 用 `damage`、`hit_N`、`daze`、`energy_cost` 等既有形态；`values` 保存为百分数数值（15.6 表示 15.6%）。
 - 基础：默认以攻击力为基础，不写 `damageBasis`；锋御用 `def`，命破用 `sheerForce`，以异常精通为基础的直伤用 `anomalyProficiency`。`damageElement` 必须写。
 - 同一 `skillType` 只能属于一个大类。
@@ -119,6 +120,7 @@
 - 技能组名称要描述其实际子事件，包含的连携、附带攻击和追击必须能从名称看出；一个方便的按钮不得改变机制。
 - 影画或潜能改变默认方案时，用 `variants`、`potentialVariants` 表达，不写多套互相冲突的默认。
 - 可以有意省略默认方案和技能组（薇薇安），不得为“内容完整”编造无依据的整套循环。
+- 新角色只有用户明确要求才创建技能组和管理员循环；缺省保持未配置，在角色专题说明。旧角色的既有方案按当前维护记录保留。
 - `defaultTeammates` 选两名人工确认的队友及其影画，只在用户没有保存过队友选择时生效，不授予队友装备。队友优先级为用户手动 > Enka 完整导入 > 管理员默认。
 
 ## 七、专武
@@ -157,6 +159,8 @@
 ## 九、来源与 verification
 
 - 官方词条 ID、修订号、读取日期和来源 URL 必须记录；动态百科用 `entry_page` 接口读取结构化技能表，不从截图推测数值。
+- 官方接口请求带 `x-rpc-wiki_app: zzz`；响应必须同时核对词条ID与名称，防止不同游戏的同号词条混淆。游戏/Enka编号不得充当官方词条ID。
+- 公式录入前确认来源、输出、单位及依赖顺序均有消费者；面板节点成长与被动效果成长分别映射；影画按档位逐项核对名称与原文，不能复制邻档替代。描述只放来源原文或忠实缩减，未建模内容放角色专题与交付说明。
 - 来源快照放 `docs/sources/<角色>-nanoka-<版本>.json`，较大的来源数值放 `tests/fixtures/<角色>-source-values.json`。
 - `verification` 必含键：`officialEntryPageId`、`officialEntryVersion`、`level60Stats`（核对说明）、`acquiredAt`、`unsupportedMechanics`。有补充来源或特殊假设时再加，如 `defaultObjective`。
 - 调查脚本和中间产物放在被忽略的 `tmp/` 或 `.tmp_*`，不提交。

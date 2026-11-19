@@ -291,7 +291,7 @@ function corePassiveScalingFieldOptions() {
   return [
     option("", "固定值"),
     ...fields.map(field => {
-      return option(field, `核心被动倍率 · ${({ searAnomalyCritDmgPct: "灼蚀异常暴伤%", anomalyProficiencyFlat: "异常精通", assaultCritRatePct: "强击基础暴击率%", assaultCritRatePerAnomalyProficiencyPct: "每点精通增加强击暴击率%" } as Record<string, string>)[field] ?? statLabel(field, props.catalog?.meta)}`)
+      return option(field, `核心被动倍率 · ${({ critDmgPct: "核心暴击伤害%", dmgBonusPct: "核心伤害加成%", windTeammateDmgBonusPct: "同风队友条件伤害加成%", searAnomalyCritDmgPct: "灼蚀异常暴伤%", anomalyProficiencyFlat: "异常精通", assaultCritRatePct: "强击基础暴击率%", assaultCritRatePerAnomalyProficiencyPct: "每点精通增加强击暴击率%" } as Record<string, string>)[field] ?? statLabel(field, props.catalog?.meta)}`)
     }),
   ]
 }

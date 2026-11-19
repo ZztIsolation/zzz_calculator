@@ -2783,7 +2783,7 @@ function dynamicFormulaTargetAppliesTo(rule = {}) {
     return rule.appliesTo ?? null
 }
 
-// The only panel-producing dynamic rule is AP -> ATK. Damage formulas then
+// Panel-producing dynamic rules convert AP or global CRIT Rate to ATK. Damage formulas then
 // read that updated panel, while target-specific crit stays in event modifiers.
 function resolveDynamicCombatFormulas(entries, panel, outOfCombatPanel) {
     if (!entries.length) return []
