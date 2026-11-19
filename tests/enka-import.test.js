@@ -148,6 +148,16 @@ assert.deepEqual(mapping.wEngines["12016"], { id: "zzz_wiki_2190", name: "「月
 assert.deepEqual(mapping.wEngines["13017"], { id: "zzz_wiki_2200", name: "喵运当头" })
 assert.deepEqual(mapping.wEngines["13021"], { id: "zzz_wiki_2189", name: "血髓秘匣" })
 assert.deepEqual(mapping.wEngines["14164"], { id: "zzz_wiki_2259", name: "涅槃初翎" })
+assert.deepEqual(mapping.agents["1631"], { id: "severian_lowell", name: "赛维里安·洛威尔" })
+assert.deepEqual(mapping.wEngines["14163"], { id: "zzz_wiki_2305", name: "禁罪囚笼" })
+const severianParsed = parseEnkaShowcase({ PlayerInfo: { ShowcaseDetail: {
+  AvatarList: [makeAvatar(1631, { Weapon: { Id: 14163, Level: 60, UpgradeLevel: 1 } })],
+} } })
+const hiddenSeverianCatalog = { agents: [{ id: "severian_lowell", hidden: true }], wEngines: [{ id: "zzz_wiki_2305", hidden: true }] }
+assert.equal(mapShowcaseToCatalog(severianParsed, hiddenSeverianCatalog, mapping).mappedAgents.length, 0)
+// Mapping is ready for a future explicit visibility change, without changing production visibility.
+const visibleSeverian = mapShowcaseToCatalog(severianParsed, { agents: [{ id: "severian_lowell" }], wEngines: [{ id: "zzz_wiki_2305" }] }, mapping)
+assert.equal(visibleSeverian.mappedAgents[0].wEngine.id, "zzz_wiki_2305")
 // Delivery contract: every visible catalog agent and W-Engine must be importable from an Enka showcase.
 {
   const agentCatalog = JSON.parse(await readFile(new URL("../data/agents.json", import.meta.url), "utf8")).agents

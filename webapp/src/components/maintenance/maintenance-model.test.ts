@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest"
 import combatBuffCatalog from "../../../../data/combat_buffs.json"
+import agentsCatalog from "../../../../data/agents.json"
 import { cloneForCreate, maskedPreview, prepareDraft } from "./maintenance-model"
 import {
   agentOptions, buffCandidates, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, effectSummary, EVENT_STATS, PANEL_STATS, statOptions,
 } from "./maintenance-options"
 
 describe("maintenance structured model", () => {
+  it("preserves Severian's global crit to attack conversion and its independent windows", () => {
+    const agent = agentsCatalog.agents.find(agent => agent.id === "severian_lowell")!
+    const draft = prepareDraft("agents", agent)
+    expect(draft.combatBuffs.additionalAbility.effects).toEqual(agent.combatBuffs.additionalAbility.effects.map(effect => ({ ...effect, scope: "inCombat" })))
+    expect(draft.combatBuffs.corePassive.effects).toEqual(agent.combatBuffs.corePassive.effects)
+    expect(prepareDraft("agents", JSON.parse(JSON.stringify(draft))).combatBuffs).toEqual(draft.combatBuffs)
+    expect(draft.hidden).toBe(true)
+  })
   it("preserves both disc defaults in drafts and previews readable set names", () => {
     const sets = [{ id: "four", name: { zhCN: "四件套甲" } }, { id: "energy", name: { zhCN: "充能套装" } }]
     const legacy = prepareDraft("agents", { preferredDriveDiscs: { defaultSetId: "four" } })

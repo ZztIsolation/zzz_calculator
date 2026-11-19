@@ -11,7 +11,7 @@
 
 ## 一、场地 Buff
 
-数据在 `data/combat_buffs.json` 的 `fieldBuffs`（当前 54 项）。
+数据在 `data/combat_buffs.json` 的 `fieldBuffs`；当前条目数以目录和 `test:field-buffs` 显式基线为准。
 
 **来源。** 近几期使用 nanoka 页面内嵌的来源 JSON（危局 `zzz.nanoka.cc/boss/<id>`，防卫战 `zzz.nanoka.cc/shiyu/<id>`）加用户提供的游戏内截图。把页面 URL、来源 JSON 的版本号和周期起止时间写进变更日志条目；逐字来源文本保留在记录的 `description`。
 

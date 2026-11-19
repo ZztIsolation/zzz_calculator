@@ -1,0 +1,327 @@
+{
+  "retcode": 0,
+  "message": "OK",
+  "data": {
+    "page": {
+      "id": "2305",
+      "name": "禁罪囚笼",
+      "desc": "禁罪囚笼,禁罪囚笼图鉴,禁罪囚笼数值,禁罪囚笼养成,禁罪囚笼素材,赛维里安培养,禁罪囚笼图片,禁罪囚笼介绍,绝区零禁罪囚笼,绝区零五星音擎,绝区零音擎,S级音擎,绝区零强攻音擎,绝区零音擎图鉴,赛维里安,强攻,绳网情报站,绝区零图鉴,绝区零百科",
+      "icon_url": "https://act-upload.mihoyo.com/nap-obc-indep/2026/11/01/102783578/3af6f5d5d33061990643d8f39630e6aa_4934489372467155380.png",
+      "header_img_url": "",
+      "modules": [
+        {
+          "name": "",
+          "is_poped": false,
+          "components": [
+            {
+              "component_id": "material_base_info",
+              "layout": "",
+              "data": "{\"img_source\":\"custom\",\"desc\":\"\",\"name\":\"禁罪囚笼\",\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2026/11/01/102783578/3af6f5d5d33061990643d8f39630e6aa_425088175777244403.png\",\"grade\":\"S\",\"grade_style\":\"color\"}\n",
+              "style": ""
+            }
+          ],
+          "id": "27",
+          "is_customize_name": true,
+          "is_abstract": false,
+          "is_show_switch": false,
+          "switch": false,
+          "desc": "",
+          "repeated": false,
+          "is_submodule": false,
+          "origin_module_id": "0",
+          "without_border": false,
+          "can_delete": false,
+          "is_hidden": false,
+          "rich_text_editing": false
+        },
+        {
+          "name": "",
+          "is_poped": false,
+          "components": [
+            {
+              "component_id": "map_desc",
+              "layout": "",
+              "data": "{\"tachieImage\":\"\",\"list\":[{\"tab_name\":\"音擎展示\",\"image\":\"https://act-upload.mihoyo.com/nap-obc-indep/2026/11/04/102783578/c6ce9bf36fc83302436c7ace9ec63db4_8431657068235708786.gif\"},{\"tab_name\":\"装备动画\",\"image\":\"https://act-upload.mihoyo.com/nap-obc-indep/2026/11/04/102783578/8502015df92f37221961e1ed62ba911e_801721245239002759.gif\"},{\"tab_name\":\"专属特效\",\"image\":\"https://act-upload.mihoyo.com/nap-obc-indep/2026/11/04/102783578/bc8093983f448ecf28cbf4765e600362_5439242976210959674.gif\"}]}\n",
+              "style": ""
+            }
+          ],
+          "id": "28",
+          "is_customize_name": true,
+          "is_abstract": false,
+          "is_show_switch": false,
+          "switch": false,
+          "desc": "",
+          "repeated": false,
+          "is_submodule": false,
+          "origin_module_id": "0",
+          "without_border": false,
+          "can_delete": false,
+          "is_hidden": false,
+          "rich_text_editing": false
+        },
+        {
+          "name": "",
+          "is_poped": false,
+          "components": [
+            {
+              "component_id": "role_ascension",
+              "layout": "",
+              "data": "{\"list\":[{\"attr\":[{\"key\":\"突破前基础\",\"value\":\"<p>基础攻击力+123</p>\"},{\"key\":\"突破后基础\",\"value\":\"<p>基础攻击力+166</p>\"},{\"key\":\"突破前高级\",\"value\":\"<p>暴击率+9.6%</p>\"},{\"key\":\"突破后高级\",\"value\":\"<p>暴击率+12.5%</p>\"}],\"link\":\"\",\"tab_name\":\"10突破\",\"materials\":[{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/06/29/141353238/5c4ad5b6f1c1fb6e2084a6c4f86d9378_4591862041268052632.png\",\"grade\":\"C\",\"ep_id\":49,\"link\":\"/zzz/wiki/content/49/detail?mhy_presentation_style=fullscreen\",\"amount\":4,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"强攻组件\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/284550490/0ce0ad220ef00d6e6a54ce7505b7b625_8229090426636670212.png\",\"grade\":\"C\",\"ep_id\":125,\"link\":\"/zzz/wiki/content/125/detail?mhy_presentation_style=fullscreen\",\"amount\":40,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"音擎蓄电池\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/16/76099754/bbba35cc2ec78e4aaebbd3f304c98805_1704795827495775305.png\",\"grade\":\"B\",\"ep_id\":16,\"link\":\"/zzz/wiki/content/16/detail?mhy_presentation_style=fullscreen\",\"amount\":12000,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"丁尼\"}]},{\"attr\":[{\"key\":\"突破前基础\",\"value\":\"<p>基础攻击力+241</p>\"},{\"key\":\"突破后基础\",\"value\":\"<p>基础攻击力+284</p>\"},{\"key\":\"突破前高级\",\"value\":\"<p>暴击率+12.5%</p>\"},{\"key\":\"突破后高级\",\"value\":\"<p>暴击率+15.4%</p>\"}],\"link\":\"\",\"tab_name\":\"20突破\",\"materials\":[{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/06/29/141353238/5241db6304c121feda2141ae326bf70a_8621932386292056530.png\",\"grade\":\"B\",\"ep_id\":50,\"link\":\"/zzz/wiki/content/50/detail?mhy_presentation_style=fullscreen\",\"amount\":12,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"增强型强攻组件\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/284550490/0ce0ad220ef00d6e6a54ce7505b7b625_8229090426636670212.png\",\"grade\":\"C\",\"ep_id\":125,\"link\":\"/zzz/wiki/content/125/detail?mhy_presentation_style=fullscreen\",\"amount\":160,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"音擎蓄电池\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/16/76099754/bbba35cc2ec78e4aaebbd3f304c98805_1704795827495775305.png\",\"grade\":\"B\",\"ep_id\":16,\"link\":\"/zzz/wiki/content/16/detail?mhy_presentation_style=fullscreen\",\"amount\":28000,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"丁尼\"}]},{\"attr\":[{\"key\":\"突破前基础\",\"value\":\"<p>基础攻击力+359</p>\"},{\"key\":\"突破后基础\",\"value\":\"<p>基础攻击力+402</p>\"},{\"key\":\"突破前高级\",\"value\":\"<p>暴击率+15.4%</p>\"},{\"key\":\"突破后高级\",\"value\":\"<p>暴击率+18.2%</p>\"}],\"link\":\"\",\"tab_name\":\"30突破\",\"materials\":[{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/06/29/141353238/5241db6304c121feda2141ae326bf70a_8621932386292056530.png\",\"grade\":\"B\",\"ep_id\":50,\"link\":\"/zzz/wiki/content/50/detail?mhy_presentation_style=fullscreen\",\"amount\":20,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"增强型强攻组件\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/284550490/0ce0ad220ef00d6e6a54ce7505b7b625_8229090426636670212.png\",\"grade\":\"C\",\"ep_id\":125,\"link\":\"/zzz/wiki/content/125/detail?mhy_presentation_style=fullscreen\",\"amount\":400,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"音擎蓄电池\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/16/76099754/bbba35cc2ec78e4aaebbd3f304c98805_1704795827495775305.png\",\"grade\":\"B\",\"ep_id\":16,\"link\":\"/zzz/wiki/content/16/detail?mhy_presentation_style=fullscreen\",\"amount\":60000,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"丁尼\"}]},{\"attr\":[{\"key\":\"突破前基础\",\"value\":\"<p>基础攻击力+477</p>\"},{\"key\":\"突破后基础\",\"value\":\"<p>基础攻击力+520</p>\"},{\"key\":\"突破前高级\",\"value\":\"<p>暴击率+18.2%</p>\"},{\"key\":\"突破后高级\",\"value\":\"<p>暴击率+21.1%</p>\"}],\"link\":\"\",\"tab_name\":\"40突破\",\"materials\":[{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/06/29/141353238/e870272323f5403e3e2c927c11c79545_5209923297699128081.png\",\"grade\":\"A\",\"ep_id\":51,\"link\":\"/zzz/wiki/content/51/detail?mhy_presentation_style=fullscreen\",\"amount\":10,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"特化型强攻组件\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/284550490/0ce0ad220ef00d6e6a54ce7505b7b625_8229090426636670212.png\",\"grade\":\"C\",\"ep_id\":125,\"link\":\"/zzz/wiki/content/125/detail?mhy_presentation_style=fullscreen\",\"amount\":900,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"音擎蓄电池\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/16/76099754/bbba35cc2ec78e4aaebbd3f304c98805_1704795827495775305.png\",\"grade\":\"B\",\"ep_id\":16,\"link\":\"/zzz/wiki/content/16/detail?mhy_presentation_style=fullscreen\",\"amount\":100000,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"丁尼\"}]},{\"attr\":[{\"key\":\"突破前基础\",\"value\":\"<p>基础攻击力+595</p>\"},{\"key\":\"突破后基础\",\"value\":\"<p>基础攻击力+638</p>\"},{\"key\":\"突破前高级\",\"value\":\"<p>暴击率+21.2%</p>\"},{\"key\":\"突破后高级\",\"value\":\"<p>暴击率+24%</p>\"}],\"link\":\"\",\"tab_name\":\"50突破\",\"materials\":[{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/06/29/141353238/e870272323f5403e3e2c927c11c79545_5209923297699128081.png\",\"grade\":\"A\",\"ep_id\":51,\"link\":\"/zzz/wiki/content/51/detail?mhy_presentation_style=fullscreen\",\"amount\":20,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"特化型强攻组件\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/284550490/0ce0ad220ef00d6e6a54ce7505b7b625_8229090426636670212.png\",\"grade\":\"C\",\"ep_id\":125,\"link\":\"/zzz/wiki/content/125/detail?mhy_presentation_style=fullscreen\",\"amount\":1500,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"音擎蓄电池\"},{\"img\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/16/76099754/bbba35cc2ec78e4aaebbd3f304c98805_1704795827495775305.png\",\"grade\":\"B\",\"ep_id\":16,\"link\":\"/zzz/wiki/content/16/detail?mhy_presentation_style=fullscreen\",\"amount\":200000,\"updated\":false,\"card_style\":\"\",\"status\":\"Online\",\"nickname\":\"丁尼\"}]}]}\n",
+              "style": ""
+            }
+          ],
+          "id": "30",
+          "is_customize_name": true,
+          "is_abstract": false,
+          "is_show_switch": false,
+          "switch": false,
+          "desc": "",
+          "repeated": false,
+          "is_submodule": false,
+          "origin_module_id": "0",
+          "without_border": false,
+          "can_delete": false,
+          "is_hidden": false,
+          "rich_text_editing": false
+        },
+        {
+          "name": "",
+          "is_poped": false,
+          "components": [
+            {
+              "component_id": "double_col_table",
+              "layout": "",
+              "data": "{\"tables\":[{\"tab_name\":\"默认标题\",\"header\":[\"推荐代理人\",\"推荐理由\"],\"row\":[[\"<p><span class=\\\"custom-entry-wrapper\\\" data-entry-id=\\\"2217\\\" data-entry-ratio=\\\"big\\\" data-entry-img=\\\"https://act-upload.mihoyo.com/nap-obc-indep/2026/09/12/7519560/a29aba4e4b4aa11928d8b54f24eedb17_4947925534088175936.png?x-oss-process=image/resize,m_fill,w_180,h_180,limit_0\\\" data-entry-name=\\\"赛维里安·洛威尔\\\" data-entry-link=\\\"/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen\\\" data-entry-grade=\\\"S\\\" data-entry-channel-style=\\\"avatar\\\" data-entry-desc=\\\"\\\" data-entry-status=\\\"Online\\\"><a href=\\\"/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen\\\" target=\\\"_blank\\\" class=\\\"wiki-editor-client__entry\\\"><span class=\\\"wiki-editor-client__entry-subscript\\\"><span class=\\\"wiki-editor-client__entry-subscript__image\\\"><img src=\\\"https://act-upload.mihoyo.com/nap-obc-indep/2026/09/12/7519560/a29aba4e4b4aa11928d8b54f24eedb17_4947925534088175936.png?x-oss-process=image/resize,m_fill,w_180,h_180,limit_0\\\"><span class=\\\"wiki-editor-client__entry-subscript__rank-S\\\"></span></span><span class=\\\"wiki-editor-client__entry-subscript__name\\\">赛维里安·洛威尔</span></span></a></span></p>\",\"<p>S级强攻音擎，高级属性提供百分比暴击率加成，可以提高强攻代理人的爆发上限。</p><p>音擎效果无条件提供20%的暴击率，以及只要普攻命中，即可获得10%的攻击力提升，同时还能使代理人造成的伤害，无视目标15%的风属性伤害抗性；持续16秒。</p><p>对于赛维里安来说，禁罪囚笼通过提供大量的暴击率加成，满足其核心被动通过100%暴击吃满攻击增益的设计，本质提高了他的爆发力；而无视目标风属性伤害的抗性属于稀缺乘区，能提升赛维里安跨环境作战的容错率。</p><p>而对于其他强攻代理人来说，即便忽略无视风属性伤害抗性的这一加成，禁罪囚笼也是目前相当泛用的一个音擎，对于缺少专属音擎的攻击模组的强攻代理人来说，是上上之选。</p>\"]]}]}\n",
+              "style": ""
+            }
+          ],
+          "id": "31",
+          "is_customize_name": true,
+          "is_abstract": false,
+          "is_show_switch": false,
+          "switch": false,
+          "desc": "",
+          "repeated": false,
+          "is_submodule": false,
+          "origin_module_id": "0",
+          "without_border": false,
+          "can_delete": false,
+          "is_hidden": false,
+          "rich_text_editing": false
+        },
+        {
+          "name": "",
+          "is_poped": false,
+          "components": [
+            {
+              "component_id": "multi_table",
+              "layout": "",
+              "data": "{\"tables\":[{\"tab_name\":\"默认标题\",\"header\":[\"音擎效果\"],\"row\":[[\"<p style=\\\"text-align: center\\\">初始面板：基础攻击力+48  暴击率+9.6%</p><p style=\\\"text-align: center\\\">满级面板：基础攻击力+713  暴击率+24%</p><hr><p>对于<span class=\\\"custom-image-view\\\" data-image-url=\\\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/ffe9d67cbc072b7efe43579fda24a5e7_9141896491564449.png\\\" data-image-border=\\\"false\\\" data-image-unit=\\\"px\\\" data-image-width=\\\"20\\\"><span class=\\\"custom-image-wrapper\\\" style=\\\"width: 20px;\\\"><span style=\\\"\\\"><img class=\\\"custom-image\\\" src=\\\"https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/ffe9d67cbc072b7efe43579fda24a5e7_9141896491564449.png\\\" style=\\\"width: 20px;\\\"></span></span></span><span style=\\\"color: rgb(250, 140, 22)\\\">[强攻]</span>角色，能够触发以下效果</p><p>掌中狩恶</p><p>装备者暴击率提升<span style=\\\"color: rgb(82, 196, 26)\\\">20%/23%/26%/29%/32%</span>；装备者的<span style=\\\"color: rgb(233, 233, 233)\\\">[普通攻击</span>]命中敌人时，使自身攻击力提升<span style=\\\"color: rgb(82, 196, 26)\\\">10%/11.5%/13%/14.5%/16%</span>，造成的伤害无视目标<span style=\\\"color: rgb(82, 196, 26)\\\">15%/17.3%/19.5%/21.8%/24%</span><span style=\\\"color: rgb(173, 198, 255)\\\">风属性伤害抗性</span>，持续16秒。</p>\"]]}]}\n",
+              "style": ""
+            }
+          ],
+          "id": "50",
+          "is_customize_name": true,
+          "is_abstract": false,
+          "is_show_switch": false,
+          "switch": false,
+          "desc": "",
+          "repeated": false,
+          "is_submodule": false,
+          "origin_module_id": "0",
+          "without_border": false,
+          "can_delete": false,
+          "is_hidden": false,
+          "rich_text_editing": false
+        },
+        {
+          "name": "",
+          "is_poped": false,
+          "components": [
+            {
+              "component_id": "rich_row_base_info",
+              "layout": "",
+              "data": "{\"rich_text\":\"<p>太平静了，无论剑刃的弧度有多大，利爪之下沾染了多少血腥，当镣铐清脆的「咔哒」声响起时，他的眼神都如一面无风的湖。</p><p>所以永远有人在窥探，想要穿透他仿佛密不透风的铠甲，窥知他的心中所欲。利益与权位的诱惑，有意或无意的威胁——你步子太快、手段太狠，你付出了这么多，到底想要在牌桌上交换什么呢？</p><p>总不会是为了正义吧，别开玩笑，他硬得像石头冷得像铁，灵魂都染着雾蒙蒙的灰色，一定早就抛弃了那种彩色泡泡般的幻觉，就算面对病床上的治安官，都没有多余的表情，所以别开玩笑了，他一定…</p><p>「如果他们能理解我，岂不意味着我沦落成了和他们一样的人？」</p>\"}\n",
+              "style": ""
+            }
+          ],
+          "id": "103",
+          "is_customize_name": true,
+          "is_abstract": false,
+          "is_show_switch": false,
+          "switch": false,
+          "desc": "",
+          "repeated": false,
+          "is_submodule": false,
+          "origin_module_id": "0",
+          "without_border": false,
+          "can_delete": false,
+          "is_hidden": false,
+          "rich_text_editing": false
+        },
+        {
+          "name": "",
+          "is_poped": false,
+          "components": [
+            {
+              "component_id": "map_desc",
+              "layout": "",
+              "data": "{\"list\":[{\"tab_name\":\"默认标题\",\"image\":\"\"}],\"tachieImage\":\"\"}\n",
+              "style": ""
+            }
+          ],
+          "id": "966",
+          "is_customize_name": true,
+          "is_abstract": false,
+          "is_show_switch": false,
+          "switch": false,
+          "desc": "",
+          "repeated": false,
+          "is_submodule": false,
+          "origin_module_id": "0",
+          "without_border": false,
+          "can_delete": false,
+          "is_hidden": false,
+          "rich_text_editing": false
+        }
+      ],
+      "filter_values": {},
+      "menu_id": "0",
+      "menu_name": "",
+      "version": "1794632419",
+      "langs": [],
+      "template_layout": {
+        "tab": [
+          {
+            "tab_id": "9",
+            "tab_name": "页签1",
+            "module_group": [
+              {
+                "module_group_id": "130",
+                "layout": "l2r1",
+                "module": [
+                  {
+                    "id": "27",
+                    "pos": "banner"
+                  }
+                ],
+                "name": "基础展示",
+                "repeated": false,
+                "parent_group_id": "0"
+              },
+              {
+                "module_group_id": "131",
+                "layout": "l2r1",
+                "module": [
+                  {
+                    "id": "28",
+                    "pos": "banner"
+                  },
+                  {
+                    "id": "50",
+                    "pos": "banner"
+                  }
+                ],
+                "name": "基本信息",
+                "repeated": false,
+                "parent_group_id": "0"
+              },
+              {
+                "module_group_id": "132",
+                "layout": "l2r1",
+                "module": [
+                  {
+                    "id": "30",
+                    "pos": "banner"
+                  }
+                ],
+                "name": "突破材料",
+                "repeated": false,
+                "parent_group_id": "0"
+              },
+              {
+                "module_group_id": "161",
+                "layout": "l2r1",
+                "module": [
+                  {
+                    "id": "103",
+                    "pos": "banner"
+                  }
+                ],
+                "name": "背景介绍",
+                "repeated": false,
+                "parent_group_id": "0"
+              },
+              {
+                "module_group_id": "133",
+                "layout": "l2r1",
+                "module": [
+                  {
+                    "id": "31",
+                    "pos": "banner"
+                  }
+                ],
+                "name": "推荐装备代理人",
+                "repeated": false,
+                "parent_group_id": "0"
+              },
+              {
+                "module_group_id": "632",
+                "layout": "l2r1",
+                "module": [
+                  {
+                    "id": "966",
+                    "pos": "banner"
+                  }
+                ],
+                "name": "官方物料",
+                "repeated": false,
+                "parent_group_id": "0"
+              }
+            ]
+          }
+        ]
+      },
+      "edit_lock_status": "Unlock",
+      "correct_lock_status": "Unlock",
+      "menus": [
+        {
+          "id": "45",
+          "name": "音擎",
+          "has_page": false,
+          "style": "",
+          "sub_menus": [],
+          "icon": "",
+          "mi18n_key": "音擎",
+          "is_hidden": false,
+          "parent_id": "2",
+          "template_id": "",
+          "bg_img": "",
+          "ch_ext": "[{\"type\":\"text\",\"attribute_name\":\"每行个数\",\"attribute_key\":\"col_per_row\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"展示样式\",\"attribute_key\":\"display_type\",\"value\":\"smallAvatar\"},{\"type\":\"text\",\"attribute_name\":\"频道icon\",\"attribute_key\":\"icon_url\",\"value\":\"https://act-upload.mihoyo.com/nap-obc-indep/2024/06/01/76099754/3593482e8866f0529e8a247772e02cf4_691015907261342842.png\"},{\"type\":\"text\",\"attribute_name\":\"跳转链接\",\"attribute_key\":\"jump_url\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"频道icon-pc\",\"attribute_key\":\"icon_url_pc\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"频道icon-pc-hover\",\"attribute_key\":\"icon_url_pc_hover\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"筛选器\",\"attribute_key\":\"filter\",\"value\":\"[{\\\"label\\\":\\\"稀有度\\\",\\\"children\\\":[{\\\"label\\\":\\\"S\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"A\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"B\\\",\\\"children\\\":[]}]},{\\\"label\\\":\\\"特性\\\",\\\"children\\\":[{\\\"label\\\":\\\"异常\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"强攻\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"防护\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"击破\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"支援\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"命破\\\",\\\"children\\\":[]},{\\\"label\\\":\\\"锋御\\\",\\\"children\\\":[]}]}]\"},{\"type\":\"text\",\"attribute_name\":\"首页更多\",\"attribute_key\":\"home_more\",\"value\":\"/zzz/wiki/channel/map/2/45?mhy_presentation_style=fullscreen\"},{\"type\":\"text\",\"attribute_name\":\"在目录中展示\",\"attribute_key\":\"show_in_catalog\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"最新词条\",\"attribute_key\":\"is_latest\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"更多入口icon\",\"attribute_key\":\"king_kong_icon\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"首页更多文案\",\"attribute_key\":\"home_more_text\",\"value\":\"\"},{\"type\":\"text\",\"attribute_name\":\"频道底图\",\"attribute_key\":\"channel_bg\",\"value\":\"\"}]",
+          "updated_at": "-62135596800"
+        }
+      ],
+      "template_id": "6a98709dcc79619ab55acdcd",
+      "ext": {
+        "fe_ext": "{\"c_45\":{\"filter\":{\"text\":\"[\\\"稀有度/S\\\",\\\"特性/强攻\\\"]\"}}}",
+        "post_ext": {
+          "post_id": "",
+          "post_user_name": "",
+          "post_time": "0",
+          "post_avatar_url": "",
+          "url": ""
+        },
+        "server_ext": "",
+        "personalized_color": "",
+        "scrolling_text": "",
+        "corner_mark": "None"
+      },
+      "alias_name": "禁罪囚笼",
+      "lang": "",
+      "beta": false,
+      "page_type": "Default",
+      "menu_style": "",
+      "status": "Online"
+    }
+  }
+}

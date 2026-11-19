@@ -18,6 +18,8 @@
 
 验证入口：[公式](../tests/formula.test.js)、[效果目标](../tests/effect-rule-targets.test.js)、[白盒](../tests/damage-whitebox.test.js)、[Buff 组件](../webapp/src/components/BuffPickerModal.test.ts)。
 
+- 全局暴击率转固定攻击力必须在固定面板汇总后执行，并先于读取攻击力的伤害公式；定向技能暴击率不得参与转换，反向依赖必须被拒绝。封顶由角色公式声明；非暴击伤害目标也必须保留暴击率作为优化相关属性。验证见[赛维里安算例](../tests/severian-damage.test.js)与[浏览器 Worker](../webapp/e2e/severian.e2e.ts)。
+
 - 默认角色来自可展示 catalog，合法的旧选择尽力恢复；角色切换后推荐音擎、核心技、影画、默认循环和默认 Buff 按新角色重新解析。音擎改装等级和影画等级夹紧到合法范围，没有核心技等级的角色允许 `none`。
 - 计算支持单事件直伤、贯穿、锐化、异常、紊乱、自定义事件和角色 `defaultCalculationConfig`；影画变体取不超过当前影画的最高已配置等级；管理员默认循环载入后必须转换为运行态 `adminDefault`。
 - 事件级 `stunned` 缺失默认 `true`，技能组引用展开时覆盖全部组内事件，各路径读取同一状态；目标配置不得保存全局 `stunned`，切换结算属性不得覆盖其他属性输入。

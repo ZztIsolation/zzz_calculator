@@ -22,6 +22,7 @@
 | `nekomata` | 猫又 | 1021 | **隐藏** | [nekomata.md](nekomata.md) | `test:pr81-characters` |
 | `pyrois` | 佩洛伊斯 | 1551 | 可见 | [pyrois.md](pyrois.md) | `test:pyrois-damage` |
 | `remielle_dan` | 蕾米埃尔·丹 | 1581 | 可见 | [remielle_dan.md](remielle_dan.md)（队伍异常评分） | `test:luminescence`、`test:remielle-teammate-buffs` |
+| `severian_lowell` | 赛维里安·洛威尔 | 1631 | **隐藏** | [severian_lowell.md](severian_lowell.md) | `test:severian-damage` |
 | `sigrid` | 希格莉德·德拉叙尔 | 1591 | 可见 | [sigrid.md](sigrid.md) | `test:sigrid-damage` |
 | `soldier_11` | 11号 | 1041 | 可见 | [soldier_11.md](soldier_11.md) | `test:soldier-11-damage` |
 | `velina` | 维琳娜·艾嘉德 | 1561 | 可见 | [velina.md](velina.md)（含风属性异常结算） | `test:velina-damage`、`test:velina-c6-damage`、`test:velina-optimizer`、`test:turbulence-damage` |

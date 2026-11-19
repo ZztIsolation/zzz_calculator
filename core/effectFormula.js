@@ -1,7 +1,7 @@
 import { evaluateFormulaExpression } from "./formulaEvaluator.js"
 
-// Static panel values precede dynamic formulas. AP -> flat ATK conversions run
-// before damage/crit formulas; their source is restricted to AP. Output-only
+// Static panel values precede dynamic formulas. AP/CRIT Rate -> flat ATK conversions run
+// before damage/crit formulas; neither source can be produced by these rules. Output-only
 // damage and crit modifiers are excluded to prevent dependency cycles.
 export const IN_COMBAT_FORMULA_SOURCE_STATS = Object.freeze([
     "hp",
@@ -160,8 +160,9 @@ export function isAllowedSkillMultiplierScaleFormula(rule = {}, sourceType = "se
         && rule.formula?.valueUnit === "storedPercent"
 }
 
-// Panel feedback is intentionally limited: proficiency is complete before this
-// phase and cannot be produced by these rules. Resolve ATK before damage rules.
+// Panel feedback is intentionally limited: proficiency and global CRIT Rate are
+// complete before this phase and cannot be produced by these rules. Resolve ATK
+// before damage rules; event-specific CRIT Rate never feeds the panel conversion.
 export function isAllowedInCombatFormulaOutput(rule = {}, sourceType = "self") {
     if ((rule.mode ?? "flat") !== "flat") return false
     const target = rule.target?.kind ?? "default"
@@ -169,6 +170,10 @@ export function isAllowedInCombatFormulaOutput(rule = {}, sourceType = "self") {
         return isAllowedSkillMultiplierScaleFormula(rule, sourceType)
     }
     if (rule.stat === "dmgBonus") return target === "default"
+    if (sourceType === "self" && rule.stat === "atkFlat"
+        && rule.source?.stat === "critRate" && rule.source?.unit === "storedPercent") {
+        return target === "default" && rule.formula?.valueUnit === "storedValue"
+    }
     if (sourceType !== "self" || rule.source?.stat !== "anomalyProficiency"
         || rule.source?.unit !== "storedValue") return false
     if (rule.stat === "atkFlat") {

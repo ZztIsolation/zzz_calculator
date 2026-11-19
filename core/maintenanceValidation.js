@@ -998,7 +998,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         const readsOutOfCombatPanel = sourceKind === "outOfCombatStat"
         if (readsInCombatPanel) {
             if (!isAllowedInCombatFormulaSourceType(sourceType)) {
-                add(errors, `${path}.source.kind`, "局内面板公式首版只能由角色自身或当前装备的音擎提供。")
+                add(errors, `${path}.source.kind`, "局内面板公式只能由角色自身或当前装备的音擎，以及四件套提供；具体来源与输出组合受支持范围限制。")
             }
             if (effectiveScope !== "inCombat") {
                 add(errors, `${path}.source.kind`, "局内面板来源只能用于局内 Buff。")
@@ -1013,7 +1013,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
                 add(errors, `${path}.target.kind`, "局内面板公式首版只能作用于常规属性 / 全局效果。")
             }
             if (!extendedPanelFormula && rule.stat !== "dmgBonus") {
-                add(errors, `${path}.stat`, "局内面板公式首版只能输出通用伤害加成。")
+                add(errors, `${path}.stat`, "不支持此局内来源与输出组合；固定攻击力仅支持自身异常精通（storedValue）或全局暴击率（storedPercent）来源，结果单位须为 storedValue。")
             }
             if ((rule.mode ?? "flat") !== "flat") {
                 add(errors, `${path}.mode`, "局内面板公式必须使用直接加成方式。")
