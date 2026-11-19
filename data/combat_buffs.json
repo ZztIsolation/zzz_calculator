@@ -10172,6 +10172,273 @@
         }
       ],
       "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_3.p3.lueshuang",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.3",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "掠霜"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.3版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人造成的风属性伤害提升30%，攻击命中敌人时无视其30%的风属性伤害抗性。\n[强攻]特性的代理人暴击伤害提升40%，[普通攻击]造成的伤害提升50%。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_3_p3_lueshuang_wind_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windDmg",
+          "mode": "flat",
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_3_p3_lueshuang_wind_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windResIgnore",
+          "mode": "flat",
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_3_p3_lueshuang_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 40,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_3_p3_lueshuang_basic_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              }
+            ]
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 50,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_3.p3.benting",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.3",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "奔霆"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.3版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的防御力提升10%，锐化伤害提升15%。\n代理人发动[强化特殊技]、[特殊技]、[终结技]后，电属性伤害和风属性伤害提升20%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_3_p3_benting_def_pct",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "defPct",
+          "mode": "pct",
+          "basis": "outOfCombatDef",
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_3_p3_benting_sharp_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "sharpDmgBonus",
+          "mode": "flat",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_3_p3_benting_electric_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "electricDmg",
+          "mode": "flat",
+          "value": 20,
+          "condition": "代理人发动强化特殊技、特殊技、终结技后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_3_p3_benting_wind_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windDmg",
+          "mode": "flat",
+          "value": 20,
+          "condition": "代理人发动强化特殊技、特殊技、终结技后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_3.p3.jipo",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.3",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "极魄"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.3版本第三期"
+      },
+      "description": {
+        "zhCN": "[异常]特性代理人的攻击力提升10%，火属性和风属性异常积蓄效率提升10%。\n代理人造成属性异常伤害并触发暴击后，全队获得20点能量，属性异常伤害提升20%，持续20秒，此效果每20秒可触发一次。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_3_p3_jipo_attack_atk",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "value": 10,
+          "requirement": {
+            "specialty": "anomaly"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_3_p3_jipo_anomaly_damage",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "value": 20,
+          "condition": "代理人造成属性异常伤害并触发暴击后",
+          "durationSeconds": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
     }
   ],
   "bossBuffs": [],

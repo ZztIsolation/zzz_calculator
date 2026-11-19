@@ -6,11 +6,11 @@ Language: [简体中文](README.zh-CN.md)
 
 ## Upload Update Summaries
 
+- **2026-11-19 — Critical Assault 3.3 phase-three Field Buffs and encounters**: added the Field Buffs 掠霜, 奔霆 and 极魄 plus four encounters (熔狱行赭, 库萨里库, 焚昼余火·法厄同 and 异构·基塔布鲁); 异构·基塔布鲁 gained a versioned record because its weakness data changed, and the Field-Buff picker now defaults to Critical Assault 3.3 phase 3.
 - **2026-11-18 — Documentation overhaul**: AGENTS.md gained a project overview and a task routing table; character-specific docs moved under `docs/characters/`; the regression contract was cut to cross-character invariants; a periodic catalog maintenance handbook was added; committed investigation artifacts were removed. No calculation, catalog, deployment or user-data behavior changed.
 - **2026-11-06 — Critical Assault 3.3 phase-two bosses and Field Buffs**: added the phase-two Field Buffs, four encounters and three local boss icons; unsupported mechanics remain descriptive, and the maintenance-page adjustment is preserved as saved.
 - **2026-11-03 — Nekomata and Asaba Harumasa temporarily hidden**: their models, skills, Buffs, icons, Enka mappings and maintenance entries remain, but they stay out of the workbench, optimizer and Enka choice lists until review is complete; Evelyn remains visible.
 - **2026-11-01 — Completed Evelyn skill multiplier catalog**: filled the Basic, Dodge, Assist and Basic Special multiplier tables under the current complete-skill model boundary.
-- **2026-10-31 — Defense Battle 3.3 phase-one Field Buffs**: added three Field Buffs while retaining the catalog rule that Defense Battle is shown first when both modes share the current version and phase.
 
 Older release and implementation history is in the [archived summaries](docs/archive) and the [current changelog](docs/changelog.md).
 

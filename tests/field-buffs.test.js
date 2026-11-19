@@ -193,7 +193,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 57, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 60, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -1900,3 +1900,204 @@ approx(chiyangAttack.inCombat.panel.atk - chiyangAttack.outOfCombat.panel.atk, c
 const jilinAttack = calculateAttackBasic(defense332[2].id)
 approx(jilinAttack.inCombat.panel.fireDmg - jilinAttack.outOfCombat.panel.fireDmg, 0, '极凛破界 excludes non-Rupture fire damage')
 console.log('3.3 phase 2 Defense Battle checks passed')
+
+// 3.3 phase 3 Critical Assault: 掠霜 / 奔霆 / 极魄.
+const CRITICAL_ASSAULT_3_3_PHASE_3_IDS = {
+    lueshuang: 'field.critical_assault.v3_3.p3.lueshuang',
+    benting: 'field.critical_assault.v3_3.p3.benting',
+    jipo: 'field.critical_assault.v3_3.p3.jipo',
+}
+const EXPECTED_3_3_PHASE_3_NAMES = {
+    [CRITICAL_ASSAULT_3_3_PHASE_3_IDS.lueshuang]: '掠霜',
+    [CRITICAL_ASSAULT_3_3_PHASE_3_IDS.benting]: '奔霆',
+    [CRITICAL_ASSAULT_3_3_PHASE_3_IDS.jipo]: '极魄',
+}
+const criticalAssault33Phase3 = allFieldBuffs.filter(buff =>
+    buff.period?.modeId === 'critical_assault'
+    && buff.period?.gameVersion === '3.3'
+    && buff.period?.phaseNo === 3,
+)
+assert.deepEqual(
+    criticalAssault33Phase3.map(buff => buff.id),
+    Object.values(CRITICAL_ASSAULT_3_3_PHASE_3_IDS),
+    '危局强袭战 3.3 phase 3 should keep its three authored entries in catalog order',
+)
+for (const id of Object.values(CRITICAL_ASSAULT_3_3_PHASE_3_IDS)) {
+    const buff = fieldBuff(id)
+    assert.equal(buff.name?.zhCN, EXPECTED_3_3_PHASE_3_NAMES[id], `${id} should keep its maintained name`)
+    assert.equal(buff.sourceType, 'field', `${id} should be a field Buff`)
+    assert.equal(buff.scope, 'inCombat', `${id} should be an in-combat Buff`)
+    assert.deepEqual(buff.period, {
+        modeId: 'critical_assault',
+        gameVersion: '3.3',
+        phaseNo: 3,
+        phaseName: { zhCN: '第三期' },
+    })
+    assert.equal(buff.source?.zhCN, '危局强袭战')
+    assert.equal(buff.sourcePeriod?.zhCN, '3.3版本第三期')
+    assert.deepEqual(buff.buffModifiers, [], `${id} should not need buff modifiers`)
+    const validation = validateMaintenanceItem('field-buffs', buff, {
+        items: catalog.combatBuffs, currentId: id, agentSkills: catalog.agentSkills,
+    })
+    assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
+}
+
+const [lueshuang33, benting33, jipo33] = criticalAssault33Phase3.map(buff => fieldBuff(buff.id))
+
+// 掠霜: elemental damage and RES ignore are unconditional; CRIT DMG and Basic Attack damage are Attack-only.
+assert.equal(
+    lueshuang33.description.zhCN,
+    '代理人造成的风属性伤害提升30%，攻击命中敌人时无视其30%的风属性伤害抗性。\n[强攻]特性的代理人暴击伤害提升40%，[普通攻击]造成的伤害提升50%。',
+)
+assert.deepEqual(
+    lueshuang33.effects.map(effect => [effect.stat, effect.value]),
+    [['windDmg', 30], ['windResIgnore', 30], ['critDmg', 40], ['dmgBonus', 50]],
+)
+assert.deepEqual(lueshuang33.effects.map(effect => effect.requirement?.specialty ?? null), [null, null, 'attack', 'attack'])
+assert.deepEqual(lueshuang33.effects[3].target, {
+    kind: 'skill',
+    skillTargets: [{ kind: 'skillType', skillType: 'basic' }],
+})
+const lueshuang33Attack = calculateAttackBasic(CRITICAL_ASSAULT_3_3_PHASE_3_IDS.lueshuang, {}, 'wind')
+approx(
+    lueshuang33Attack.inCombat.panel.windDmg - lueshuang33Attack.outOfCombat.panel.windDmg,
+    0.3,
+    '掠霜 should grant 30% Wind damage',
+)
+approx(lueshuang33Attack.damage.targetBreakdown.resIgnore, 0.3, '掠霜 should ignore 30% Wind RES')
+approx(
+    lueshuang33Attack.inCombat.panel.critDmg - lueshuang33Attack.outOfCombat.panel.critDmg,
+    0.4,
+    '掠霜 should grant Attack agents 40% CRIT DMG',
+)
+approx(lueshuang33Attack.damage.multipliers.directDamageBonus, 0.5, '掠霜 should grant 50% Basic Attack damage')
+const lueshuang33Anomaly = calculateSkill(CRITICAL_ASSAULT_3_3_PHASE_3_IDS.lueshuang, miyabiSkillRefs.basic)
+approx(
+    lueshuang33Anomaly.inCombat.panel.critDmg - lueshuang33Anomaly.outOfCombat.panel.critDmg,
+    0,
+    '掠霜 CRIT DMG should exclude non-Attack agents',
+)
+approx(lueshuang33Anomaly.damage.multipliers.directDamageBonus, 0, '掠霜 Basic Attack damage should exclude non-Attack agents')
+
+// 奔霆: DEF and Sharp damage are unconditional; Electric/Wind damage is triggered after Special/EX/Ultimate.
+assert.equal(
+    benting33.description.zhCN,
+    '代理人的防御力提升10%，锐化伤害提升15%。\n代理人发动[强化特殊技]、[特殊技]、[终结技]后，电属性伤害和风属性伤害提升20%，持续15秒，重复触发时刷新持续时间。',
+)
+assert.deepEqual(
+    benting33.effects.map(effect => [effect.stat, effect.value]),
+    [['defPct', 10], ['sharpDmgBonus', 15], ['electricDmg', 20], ['windDmg', 20]],
+)
+assert.equal(benting33.effects[0].basis, 'outOfCombatDef', '奔霆 DEF uses out-of-combat DEF')
+for (const effect of benting33.effects.slice(2)) {
+    assert.equal(effect.condition, '代理人发动强化特殊技、特殊技、终结技后')
+    assert.equal(effect.durationSeconds, 15)
+}
+const benting33Attack = calculateAttackBasic(CRITICAL_ASSAULT_3_3_PHASE_3_IDS.benting, {}, 'ice')
+approx(
+    benting33Attack.inCombat.panel.def - benting33Attack.outOfCombat.panel.def,
+    benting33Attack.outOfCombat.panel.def * 0.1,
+    '奔霆 should grant 10% of out-of-combat DEF',
+)
+approx(
+    benting33Attack.inCombat.panel.electricDmg - benting33Attack.outOfCombat.panel.electricDmg,
+    0.2,
+    '奔霆 should grant 20% Electric damage',
+)
+approx(
+    benting33Attack.inCombat.panel.windDmg - benting33Attack.outOfCombat.panel.windDmg,
+    0.2,
+    '奔霆 should grant 20% Wind damage',
+)
+const benting33Sharp = calculateInCombatPanel(catalog, {
+    agentId: 'claret',
+    wEngineId: 'zzz_wiki_2188',
+    wEngineModificationLevel: 5,
+    coreSkillLevel: 'F',
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: [CRITICAL_ASSAULT_3_3_PHASE_3_IDS.benting],
+        runtimeInputs: {},
+    },
+    damage: {
+        selectedEventId: 'benting-sharp',
+        events: [{
+            id: 'benting-sharp',
+            kind: 'sharp',
+            skillRef: {
+                agentSkillId: 'claret',
+                categoryId: 'special',
+                moveId: 'special_slash_gold',
+                rowId: 'hit_1',
+            },
+            critMode: 'nonCrit',
+            count: 1,
+        }],
+        target: { defense: 953, levelCoefficient: 794 },
+    },
+})
+approx(benting33Sharp.damage.events[0].multipliers.sharpDmg, 1.15, '奔霆 should grant 15% Sharp damage')
+const benting33HalfCoverage = calculateSkill(
+    CRITICAL_ASSAULT_3_3_PHASE_3_IDS.benting,
+    miyabiSkillRefs.basic,
+    { effects: {
+        [benting33.effects[2].id]: { coverage: 0.5 },
+        [benting33.effects[3].id]: { coverage: 0.5 },
+    } },
+)
+approx(
+    benting33HalfCoverage.inCombat.panel.electricDmg - benting33HalfCoverage.outOfCombat.panel.electricDmg,
+    0.1,
+    '奔霆 Electric damage should honor coverage',
+)
+approx(
+    benting33HalfCoverage.inCombat.panel.windDmg - benting33HalfCoverage.outOfCombat.panel.windDmg,
+    0.1,
+    '奔霆 Wind damage should honor coverage',
+)
+
+// 极魄: ATK is Anomaly-only; the triggered anomaly damage stays conditional, and the energy /
+// anomaly-buildup / cooldown clauses remain descriptive only.
+assert.equal(
+    jipo33.description.zhCN,
+    '[异常]特性代理人的攻击力提升10%，火属性和风属性异常积蓄效率提升10%。\n代理人造成属性异常伤害并触发暴击后，全队获得20点能量，属性异常伤害提升20%，持续20秒，此效果每20秒可触发一次。',
+)
+assert.deepEqual(
+    jipo33.effects.map(effect => [effect.stat, effect.value]),
+    [['atkPct', 10], ['anomalyDamageBonus', 20]],
+)
+assert.equal(jipo33.effects[0].requirement.specialty, 'anomaly', '极魄 ATK is Anomaly-specialty only')
+assert.equal(jipo33.effects[0].basis, 'outOfCombatAtk')
+assert.equal(jipo33.effects[1].condition, '代理人造成属性异常伤害并触发暴击后')
+assert.equal(jipo33.effects[1].durationSeconds, 20)
+assert.ok(jipo33.description.zhCN.includes('火属性和风属性异常积蓄效率提升10%'))
+assert.ok(jipo33.description.zhCN.includes('全队获得20点能量'))
+assert.ok(jipo33.description.zhCN.includes('此效果每20秒可触发一次'))
+const jipo33Anomaly = calculateAnomaly(CRITICAL_ASSAULT_3_3_PHASE_3_IDS.jipo, {
+    id: 'jipo-burn', kind: 'anomaly', settlementType: 'attribute', anomalyEffect: 'burn', procCount: 1,
+})
+approx(
+    jipo33Anomaly.inCombat.panel.atk - jipo33Anomaly.outOfCombat.panel.atk,
+    jipo33Anomaly.outOfCombat.panel.atk * 0.1,
+    '极魄 should grant Anomaly agents 10% of out-of-combat ATK',
+)
+approx(jipo33Anomaly.damage.multipliers.attributeAnomalyDamage, 1.2, '极魄 should grant 20% attribute-anomaly damage')
+const jipo33Disorder = calculateAnomaly(CRITICAL_ASSAULT_3_3_PHASE_3_IDS.jipo, {
+    id: 'jipo-disorder', kind: 'disorder', anomalyEffect: 'burn', elapsedSeconds: 0,
+})
+approx(jipo33Disorder.damage.multipliers.disorderDamage, 1, '极魄 anomaly damage should not increase Disorder damage')
+const jipo33Attack = calculateAttackBasic(CRITICAL_ASSAULT_3_3_PHASE_3_IDS.jipo)
+approx(
+    jipo33Attack.inCombat.panel.atk - jipo33Attack.outOfCombat.panel.atk,
+    0,
+    '极魄 ATK should exclude non-Anomaly agents',
+)
+const jipo33HalfCoverage = calculateAnomaly(CRITICAL_ASSAULT_3_3_PHASE_3_IDS.jipo, {
+    id: 'jipo-burn-half', kind: 'anomaly', settlementType: 'attribute', anomalyEffect: 'burn', procCount: 1,
+}, { effects: { [jipo33.effects[1].id]: { coverage: 0.5 } } })
+approx(
+    jipo33HalfCoverage.damage.multipliers.attributeAnomalyDamage,
+    1.1,
+    '极魄 triggered anomaly damage should honor coverage',
+)
+console.log('3.3 phase 3 Critical Assault field numerical checks passed')

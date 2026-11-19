@@ -13,9 +13,9 @@ const meta = buildMeta(catalog)
 const source = JSON.parse(await readFile(path.join(rootDir, "data", "bosses.json"), "utf8"))
 
 assert.equal(source.version, 2)
-assert.equal(source.bosses.length, 25)
-assert.equal(meta.bosses.length, 25)
-assert.equal(meta.bossCombatBuffs.length, 34)
+assert.equal(source.bosses.length, 26)
+assert.equal(meta.bosses.length, 26)
+assert.equal(meta.bossCombatBuffs.length, 38)
 
 for (const boss of source.bosses) {
     assert.ok(boss.images.icon.startsWith("/assets/bosses/"))
@@ -48,8 +48,8 @@ const bossEntries = source.bosses.flatMap(boss =>
         ...(encounter.playerDebuffs ?? []),
     ]))
 const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
-assert.equal(bossEntries.length, 61)
-assert.equal(bossEffects.length, 71)
+assert.equal(bossEntries.length, 69)
+assert.equal(bossEffects.length, 82)
 for (const effect of bossEffects) {
     assert.deepEqual(
         effect.coverage,
@@ -581,3 +581,113 @@ if (typhonDmgBonusModifier) {
     assert.equal(typhonPhase33P2.inCombat.buffTotals.dmgBonus, 0.1)
 }
 console.log('3.3 phase 2 boss checks passed')
+
+const phase33PhaseThreeBossIds = source.bosses
+    .filter(boss => boss.encounters.some(encounter => encounter.appearances.some(appearance =>
+        appearance.modeId === "critical_assault"
+        && appearance.gameVersion === "3.3"
+        && appearance.phaseNo === 3)))
+    .map(boss => boss.id)
+assert.deepEqual(phase33PhaseThreeBossIds, [
+    "boss.kusariku",
+    "boss.scorched_horizon_phaethon.v3_2",
+    "boss.molten_hunt",
+    "boss.integrated_girtablullu.v3_3",
+])
+
+const integratedGirtablulluV33 = source.bosses.find(boss => boss.id === "boss.integrated_girtablullu.v3_3")
+assert.equal(integratedGirtablulluV33?.target.defense, 952)
+assert.deepEqual(integratedGirtablulluV33?.target.weaknessElements, ["wind", "fire"])
+assert.deepEqual(integratedGirtablulluV33?.target.resistanceElements, [])
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.integrated_girtablullu")?.target.weaknessElements, [])
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.integrated_girtablullu.v3_2")?.target.weaknessElements, [])
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.molten_hunt")?.target.weaknessElements, ["ice", "wind"])
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.kusariku")?.target.weaknessElements, ["electric", "fire"])
+
+const moltenHuntPhase33P3 = resultFor("boss_encounter.molten_hunt.v3_3.p3")
+assert.equal(moltenHuntPhase33P3.inCombat.buffTotals.critDmg, 0.75)
+assert.equal(
+    moltenHuntPhase33P3.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    -0.3,
+)
+for (const stacks of [0, 1, 3]) {
+    const id = "boss_encounter.molten_hunt.v3_3.p3"
+    const result = resultFor(id, { [id]: { effects: { molten_hunt_v3_3_p3_overheat_crit_dmg: { stacks } } } })
+    assert.equal(result.inCombat.buffTotals.critDmg, stacks * 0.25)
+}
+
+const kusarikuPhase33P3 = resultFor("boss_encounter.kusariku.v3_3.p3")
+assert.equal(kusarikuPhase33P3.inCombat.buffTotals.lacerationDmg, 0.8)
+assert.equal(
+    kusarikuPhase33P3.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    -0.4,
+)
+for (const stacks of [0, 1, 4]) {
+    const id = "boss_encounter.kusariku.v3_3.p3"
+    const result = resultFor(id, { [id]: { effects: { kusariku_v3_3_p3_see_through_laceration_dmg: { stacks } } } })
+    assert.equal(result.inCombat.buffTotals.lacerationDmg, stacks * 0.2)
+}
+
+const scorchedPhase33P3 = resultFor("boss_encounter.scorched_horizon_phaethon.v3_3.p3")
+assert.equal(scorchedPhase33P3.inCombat.buffTotals.critDmg, 0)
+assert.equal(
+    scorchedPhase33P3.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    0.3,
+)
+for (const stacks of [0, 1, 5]) {
+    const id = "boss_encounter.scorched_horizon_phaethon.v3_3.p3"
+    const result = resultFor(id, { [id]: { effects: { scorched_horizon_phaethon_v3_3_departing_flame_crit_dmg: { stacks } } } })
+    assert.ok(Math.abs(result.inCombat.buffTotals.critDmg - stacks * -0.25) < 1e-9)
+}
+
+const integratedGirtablulluPhase33P3 = resultFor("boss_encounter.integrated_girtablullu.v3_3.p3")
+const integratedGirtablulluPhase33P3Modifiers = integratedGirtablulluPhase33P3.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(integratedGirtablulluPhase33P3.inCombat.buffTotals.critDmg, 1.2)
+assert.equal(integratedGirtablulluPhase33P3Modifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.2)
+assert.equal(integratedGirtablulluPhase33P3Modifiers.find(effect => effect.stat === "sharpDmgBonus")?.value, 0.65)
+assert.equal(integratedGirtablulluPhase33P3.inCombat.buffTotals.lacerationDmg, 0.25)
+assert.equal(
+    integratedGirtablulluPhase33P3.inCombat.panel.anomalyProficiency
+    - integratedGirtablulluPhase33P3.outOfCombat.panel.anomalyProficiency,
+    20,
+)
+
+const phase33PhaseThreeEncounters = {
+    "boss.molten_hunt": "boss_encounter.molten_hunt.v3_3.p3",
+    "boss.kusariku": "boss_encounter.kusariku.v3_3.p3",
+    "boss.scorched_horizon_phaethon.v3_2": "boss_encounter.scorched_horizon_phaethon.v3_3.p3",
+    "boss.integrated_girtablullu.v3_3": "boss_encounter.integrated_girtablullu.v3_3.p3",
+}
+for (const [bossId, encounterId] of Object.entries(phase33PhaseThreeEncounters)) {
+    const encounter = source.bosses.find(boss => boss.id === bossId)?.encounters
+        .find(candidate => candidate.id === encounterId)
+    assert.ok(encounter, `${bossId} should keep the 3.3 phase 3 encounter`)
+    assert.deepEqual(encounter.appearances, [{
+        modeId: "critical_assault",
+        gameVersion: "3.3",
+        phaseNo: 3,
+        startDate: "2026-11-20",
+        endDate: "2026-12-02",
+    }])
+    assert.equal(encounter.sources[0]?.url, "https://zzz.nanoka.cc/boss/690501")
+}
+assert.deepEqual(
+    source.bosses.find(boss => boss.id === "boss.molten_hunt")?.encounters
+        .find(candidate => candidate.id === "boss_encounter.molten_hunt.v3_3.p3")?.recommendedSpecialties,
+    [],
+)
+assert.deepEqual(
+    source.bosses.find(boss => boss.id === "boss.kusariku")?.encounters
+        .find(candidate => candidate.id === "boss_encounter.kusariku.v3_3.p3")?.recommendedSpecialties,
+    ["armorer"],
+)
+assert.deepEqual(
+    source.bosses.find(boss => boss.id === "boss.scorched_horizon_phaethon.v3_2")?.encounters
+        .find(candidate => candidate.id === "boss_encounter.scorched_horizon_phaethon.v3_3.p3")?.recommendedSpecialties,
+    ["anomaly"],
+)
+console.log('3.3 phase 3 boss checks passed')

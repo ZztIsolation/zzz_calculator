@@ -4,6 +4,13 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-19 — 危局强袭战 3.3 第三期场地 Buff 与敌情
+
+- 问题：3.3 版本第三期危局（2026-11-20 04:00 至 2026-12-02 03:59）此前未入库，场地页签与 Boss 页签在 3.3 只能默认到第二期，第三期的场地 Buff 与敌情数据缺失。
+- 变化：依据 [nanoka.cc/boss/690501](https://zzz.nanoka.cc/boss/690501) 页面内嵌来源 JSON（`https://static.nanoka.cc/zzz/3.4.4+20539349/zh/boss/690501.json`，周期 2026-11-20 04:00 至 2026-12-02 03:59），在 `data/combat_buffs.json` 新增三条 `field.critical_assault.v3_3.p3.*` 场地 Buff（`fieldBuffs` 共 60 项）：**掠霜**建模风属性伤害 +30% 与风属性伤害抗性无视 30%，以及 `[强攻]` 特性暴击伤害 +40%、`[普通攻击]` 伤害 +50%；**奔霆**建模防御力 +10%（按局外防御力）、锐化伤害 +15%，以及发动 `[强化特殊技]`/`[特殊技]`/`[终结技]` 后电属性与风属性伤害 +20%（持续 15 秒，独立覆盖率）；**极魄**建模 `[异常]` 特性攻击力 +10%（按局外攻击力）与触发式属性异常伤害 +20%（持续 20 秒，独立覆盖率）。`data/bosses.json` 新增本期四条敌情：熔狱行赭（`boss_encounter.molten_hunt.v3_3.p3`）、库萨里库（`boss_encounter.kusariku.v3_3.p3`）、焚昼余火·法厄同（`boss_encounter.scorched_horizon_phaethon.v3_3.p3`）与异构·基塔布鲁（新建 `boss.integrated_girtablullu.v3_3` 记录及 `boss_encounter.integrated_girtablullu.v3_3.p3`）；Boss 目录 25→26、敌情 34→38，未新增图片资源。异构·基塔布鲁本期目标数据（弱点风/火）与此前记录（弱点与抗性均为空）不同，按维护手册新建带版本后缀的 Boss 条目，旧条目保持原样。
+- 关键边界：火属性和风属性异常积蓄效率、全队获得 20 点能量、`[紊相值]` 积累、操作得分、部位破坏、失衡与触发冷却等未建模机制只保留在逐字来源文本中，不生成效果规则；`[紊相]` 按固定窗口描述，触发类效果使用独立覆盖率而不推导触发时机。同一来源页面还包含 `zone_type 1002` 模式（mode 690502）的异构·基塔布鲁阶段；3.2 第三期、3.3 第一期与第二期均按 `critical_assault` 记录该阶段，本期沿用。场地页默认期依据“同版本取最高期号”变为 `危局强袭战 · 3.3版本 · 第三期`，默认显示不等于自动勾选，旧期内容与用户勾选保持不变。待核实：`boss.integrated_girtablullu` 与 `boss.integrated_girtablullu.v3_2` 的弱点/抗性为空，而本期来源为风/火，未回溯修改旧期数据；掠霜、奔霆、极魄的拼音 ID（`lueshuang`、`benting`、`jipo`）为本项目命名，来源无拼音依据；熔狱行赭本期敌情文本与第二期相同，仍按各期独立条目录入。
+- 验证：本地运行 `test:field-buffs`（新增 3.3 第三期数值与排除断言）、`test:boss-catalog`（Boss 26、敌情 38、条目 69、效果 82 基线）、`test:maintenance-validation`、`test:skill-targets`（技能目标 122→123）、`test:percent-sanity`、`test:effect-rule-targets`、`test:catalog-loader`、`test:repository-integrity`（201 项目录资源，无新增资源）、`test:default-calculation-config`、`test:maintenance-api` 与 `build:webapp`；`BuffPickerModal.test.ts` 71 项通过，真实目录默认 `critical_assault|3.3|3`。均为本地检查，不代表远端 CI 或生产验收。
+
 ## 2026-11-19 — 防卫战第二期与隐藏赛维里安整合
 
 - 问题：防卫战3.3第二期与赛维里安停留在旧分支，main未包含这批资料；角色初稿存在核心成长未引用、暴击率转攻击力静默失效、六影错录、多段技能仅采首值与专武导入缺失。
