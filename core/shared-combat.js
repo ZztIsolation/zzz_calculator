@@ -1448,6 +1448,12 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
             const sourceLabel = localizedText(source.label) || source.stat || "局内面板属性"
             const compactSummary = source.stat === "anomalyProficiency"
                 && ["atkFlat", "anomalyCritRate"].includes(rule.stat)
+            // A self-sourced damage bonus aimed at one move is a plain multiplier
+            // in the UI; the authored expression only matters when it cannot be
+            // evaluated against the current panel.
+            const conciseSkillDamage = !compactSummary
+                && rule.stat === "dmgBonus"
+                && rule.target?.kind === "skill"
             const summaryLabel = `${storedRuleStatLabel(rule, meta)}按${sourceLabel}提升：`
             const parameters = formulaParameterValues(rule)
             const threshold = Number(parameters.threshold)
@@ -1468,6 +1474,8 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
                 text = `局内暴击率超过${threshold}%时，每超出1%暴击率使造成的伤害提升${rate}%，${Number.isFinite(cap) ? `上限${cap}%` : "不设上限"}`
             } else if (thresholdSkillMultiplier) {
                 text = `局内暴击率达到${threshold}%时，原倍率提升至${100 + rate}%`
+            } else if (conciseSkillDamage) {
+                text = `${storedRuleStatLabel(rule, meta)}：提升待计算`
             } else {
                 const parameterText = Object.entries(parameters)
                     .map(([name, value]) => `${name}=${value}`)
@@ -1485,6 +1493,8 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
                         const resultLabel = rule.stat === "dmgBonus" ? "通用伤害提升" : `${storedRuleStatLabel(rule, meta)} +`
                         if (compactSummary) {
                             text = `${summaryLabel} ${displayValue >= 0 ? "+" : ""}${Number(displayValue.toFixed(3))}${rule.formula?.valueUnit === "storedPercent" ? "%" : ""}`
+                        } else if (conciseSkillDamage) {
+                            text = `${storedRuleStatLabel(rule, meta)}：提升${Number(displayValue.toFixed(3))}%`
                         } else if (thresholdSkillMultiplier) {
                             const reached = displaySourceValue >= threshold
                             text += `；当前${sourceLabel}${displaySourceValue}%，${reached ? `已触发，原倍率 ×${100 + rate}%` : "未触发"}`

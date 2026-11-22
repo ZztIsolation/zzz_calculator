@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { loadCalculatorContext, calculateInCombatPanel } from '../backend/calculator.js'
 import { validateMaintenanceItem } from '../core/maintenanceValidation.js'
 import { optimizeDriveDiscs } from '../backend/driveDiscOptimizer.js'
+import { storedEffectRulesText, defaultRuntimeForBuff } from '../core/shared-combat.js'
 
 // Burnice White: Fire Anomaly. Expected values come from the official HoYoWiki
 // entry 840 (revision 1793886424) and the extracted source fixture, never from
@@ -95,6 +96,15 @@ for (const [proficiency, expected] of [[99, 9], [100, 10], [119, 11], [120, 12],
     approx(result.outOfCombat.panel.anomalyProficiency, proficiency, 'proficiency')
     approx(result.damage.multipliers.directDamageBonus, expected / 100, `afterburn bonus at ${proficiency}`)
 }
+// The Buff card shows the computed bonus, not the authored expression.
+const corePassive = agent.combatBuffs.corePassive
+const cardText = storedEffectRulesText(corePassive, defaultRuntimeForBuff(corePassive), catalog, { inCombatPanel: calc({}).inCombat.panel })
+assert.match(cardText, /技能目标伤害加成%：提升12%/)
+assert.match(cardText, /技能：柏妮思·怀特\/核心被动：余烬\/余烬伤害倍率/)
+assert.ok(!cardText.includes("clamp("), cardText)
+const cappedCardText = storedEffectRulesText(corePassive, defaultRuntimeForBuff(corePassive), catalog, { inCombatPanel: calc({ drives: apDrive(300) }).inCombat.panel })
+assert.match(cappedCardText, /技能目标伤害加成%：提升30%/)
+
 // The proficiency bonus only reaches Afterburn, not the rest of her kit.
 approx(calc({ drives: apDrive(180), event: exSingle }).damage.multipliers.directDamageBonus, 0, 'EX excluded from Afterburn bonus')
 
