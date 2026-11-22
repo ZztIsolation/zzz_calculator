@@ -1698,7 +1698,7 @@ function save() {
             </div>
           </div>
           <div class="panel-body section-band">
-            <div v-if="isWindAgent && ['anomaly', 'custom'].includes(draft.mode)" class="calculation-turbulence-note" data-testid="velina-turbulence-note">
+            <div v-if="isVelinaRelease && ['anomaly', 'custom'].includes(draft.mode)" class="calculation-turbulence-note" data-testid="velina-turbulence-note">
               {{ WIND_TURBULENCE_NOTICE }}
             </div>
             <div

@@ -1002,15 +1002,28 @@ function cleanAgentSkillBuff(buff) {
         defaultChecked: buff.defaultChecked ?? false,
     })
     const sourceSkillRef = buff.sourceSkillRef ?? {}
-    next.sourceSkillRef = {
-        agentSkillId: String(sourceSkillRef.agentSkillId ?? "").trim(),
-        categoryId: String(sourceSkillRef.categoryId ?? "").trim(),
-        ...(sourceSkillRef.moveId !== undefined
-            ? { moveId: String(sourceSkillRef.moveId ?? "").trim() }
-            : {}),
-        ...(String(sourceSkillRef.rowId ?? "").trim()
-            ? { rowId: String(sourceSkillRef.rowId).trim() }
-            : {}),
+    const sourceLabel = cleanOptionalZh(buff.source)
+    if (sourceLabel) {
+        next.source = sourceLabel
+    } else {
+        delete next.source
+    }
+    const hasSourceRef = ["agentSkillId", "categoryId", "moveId", "rowId"]
+        .some(key => String(sourceSkillRef[key] ?? "").trim())
+    // 填了来源标签且未选技能目录时，不保存空的技能来源，避免校验把空引用当作未完成。
+    if (hasSourceRef || !sourceLabel) {
+        next.sourceSkillRef = {
+            agentSkillId: String(sourceSkillRef.agentSkillId ?? "").trim(),
+            categoryId: String(sourceSkillRef.categoryId ?? "").trim(),
+            ...(sourceSkillRef.moveId !== undefined
+                ? { moveId: String(sourceSkillRef.moveId ?? "").trim() }
+                : {}),
+            ...(String(sourceSkillRef.rowId ?? "").trim()
+                ? { rowId: String(sourceSkillRef.rowId).trim() }
+                : {}),
+        }
+    } else {
+        delete next.sourceSkillRef
     }
     return next
 }
