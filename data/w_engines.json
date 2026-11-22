@@ -7694,7 +7694,8 @@
         "level60Stats": "source-checked-mihoyo-baike-entry-841-version-1743671257-2026-09-30",
         "effectText": "source-checked-mihoyo-baike-entry-841-version-1743671257-2026-09-30",
         "effectBuff": "partially-modeled; flat off-field Energy restoration remains text-only; shared 0-10 stacks with a fixed AP bonus at 5+ stacks; duration, hit cadence and off-field stack efficiency are manually configured snapshot conditions"
-      }
+      },
+      "relatedAgentId": "burnice_white"
     },
     {
       "id": "zzz_wiki_2087",

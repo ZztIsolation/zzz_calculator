@@ -45,24 +45,45 @@ export function potentialVisionScalingRow(agent = {}, potentialLevel) {
 
 function materializePotentialVisionRule(rule = {}, agent = {}, potentialLevel) {
     const source = rule?.valueSource
-    if (source?.kind !== "potentialVisionScaling") {
-        return rule
+    const scaling = potentialVisionScalingRow(agent, potentialLevel)
+    let next = rule
+    if (source?.kind === "potentialVisionScaling") {
+        const field = String(source.field ?? "").trim()
+        const value = Number(scaling?.[field])
+        if (!field || !Number.isFinite(value)) {
+            throw new Error(`Invalid potential vision scaling source for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)
+        }
+        next = {
+            ...next,
+            value,
+            displayValue: value,
+            ...(rule.type === "stacked" && rule.activationStacks == null
+                ? { valuePerStack: value, displayValuePerStack: value }
+                : {}),
+        }
     }
 
-    const field = String(source.field ?? "").trim()
-    const scaling = potentialVisionScalingRow(agent, potentialLevel)
-    const value = Number(scaling?.[field])
-    if (!field || !Number.isFinite(value)) {
-        throw new Error(`Invalid potential vision scaling source for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)
+    // Formula parameters may also read the potential level row, mirroring the
+    // core passive scaling parameter sources.
+    const parameterSources = rule?.formula?.parameterSources
+    if (!parameterSources || typeof parameterSources !== "object" || Array.isArray(parameterSources)) {
+        return next
     }
-    return {
-        ...rule,
-        value,
-        displayValue: value,
-        ...(rule.type === "stacked" && rule.activationStacks == null
-            ? { valuePerStack: value, displayValuePerStack: value }
-            : {}),
+    const parameters = { ...(next.formula?.parameters ?? {}) }
+    let changed = false
+    for (const [name, parameterSource] of Object.entries(parameterSources)) {
+        if (parameterSource?.kind !== "potentialVisionScaling") continue
+        const field = String(parameterSource.field ?? "").trim()
+        const value = Number(scaling?.[field])
+        if (!field || !Number.isFinite(value)) {
+            throw new Error(`Invalid potential vision parameter scaling source for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)
+        }
+        parameters[name] = value
+        changed = true
     }
+    return changed
+        ? { ...next, formula: { ...(next.formula ?? {}), parameters } }
+        : next
 }
 
 function potentialRequirementMatches(value, potentialLevel) {

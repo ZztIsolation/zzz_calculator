@@ -27,7 +27,7 @@ for (const [id, name, rarity, atk, stat, value, effectName, ranks] of entries) {
     const item = engine(id)
     assert.equal(catalog.wEngines.filter(w => w.id === id || w.name.zhCN === name).length, 1)
     assert.deepEqual([item.name.zhCN, item.rarity, item.specialty, item.level60.atkBase, item.level60.advancedStat.stat, item.level60.advancedStat.value, item.effect.name.zhCN], [name, rarity, "anomaly", atk, stat, value, effectName])
-    assert.equal(item.relatedAgentId, undefined)
+    assert.equal(item.relatedAgentId, id === "zzz_wiki_841" ? "burnice_white" : undefined)
     assert.equal(item.effect.teamBuff, null)
     assert.equal(item.effect.selfBuff.appliesToOutOfCombatPanel, false)
     assert.deepEqual(item.modification, { minLevel: 1, maxLevel: 5, defaultLevel: 1 })

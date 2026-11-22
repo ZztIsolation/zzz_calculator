@@ -1092,8 +1092,27 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
                 add(errors, `${path}.formula.parameterSources.${name}`, "参数来源必须是对象。")
                 continue
             }
+            if (source.kind === "potentialVisionScaling") {
+                if (!context.allowPotentialVisionScalingSource) {
+                    add(errors, `${path}.formula.parameterSources.${name}`, "潜能成长参数仅支持角色自身 Buff。")
+                }
+                if (rule.formula?.modificationValues?.[name] !== undefined) {
+                    add(errors, `${path}.formula.parameterSources.${name}`, "同一参数不能同时引用潜能成长与音擎改装。")
+                }
+                const field = String(source.field ?? "").trim()
+                const levels = context.agent?.potentialVision?.scaling?.levels
+                const maxLevel = Number(context.agent?.potentialVision?.maxLevel ?? 6)
+                if (!/^[A-Za-z][A-Za-z0-9]*$/.test(field) || !Array.isArray(levels)
+                    || levels.length !== maxLevel + 1
+                    || levels.some(level => !Number.isFinite(Number(level?.[field])))) {
+                    add(errors, `${path}.formula.parameterSources.${name}.field`, "潜能参数来源必须引用完整的潜能成长字段。")
+                } else if (Number(parameters[name]) !== Number(levels[0][field])) {
+                    add(errors, `${path}.formula.parameters.${name}`, "兼容参数值必须与潜能成长第一档一致。")
+                }
+                continue
+            }
             if (source.kind !== "corePassiveScaling") {
-                add(errors, `${path}.formula.parameterSources.${name}.kind`, "当前只支持核心被动成长表参数来源。")
+                add(errors, `${path}.formula.parameterSources.${name}.kind`, "当前只支持核心被动或潜能成长表参数来源。")
                 continue
             }
             if (!context.allowCorePassiveScalingSource) {

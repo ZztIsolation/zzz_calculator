@@ -1,6 +1,7 @@
 export const AGENT_ID_OVERRIDES = Object.freeze({
   "1011": "anby_demara",
   "1021": "nekomata",
+  "1171": "burnice_white",
   "1201": "asaba_harumasa",
   "1321": "evelyn_chevalier",
   "1261": "jane_doe",

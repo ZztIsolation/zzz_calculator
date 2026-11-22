@@ -169,7 +169,11 @@ export function isAllowedInCombatFormulaOutput(rule = {}, sourceType = "self") {
     if (rule.stat === "skillMultiplierScaleBonus") {
         return isAllowedSkillMultiplierScaleFormula(rule, sourceType)
     }
-    if (rule.stat === "dmgBonus") return target === "default"
+    if (rule.stat === "dmgBonus") {
+        // Self-sourced damage bonuses may target one specific move (for example a
+        // proficiency-scaled tick). They become event modifiers instead of panel stats.
+        return target === "default" || (sourceType === "self" && target === "skill")
+    }
     if (sourceType === "self" && rule.stat === "atkFlat"
         && rule.source?.stat === "critRate" && rule.source?.unit === "storedPercent") {
         return target === "default" && rule.formula?.valueUnit === "storedValue"

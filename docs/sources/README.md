@@ -6,7 +6,7 @@
 
 ## 读取规则
 
-- **不要整体读取**：8 个文件共约 860 KB，单个最大约 250 KB，整目录读完会占满上下文。
+- **不要整体读取**：9 个文件共约 1.1 MB，单个最大约 250 KB，整目录读完会占满上下文。
 - 改动涉及某个角色时，先读[对应角色文档](../characters/README.md)的“资料来源”，需要核对具体数值再用 `grep` 或 `node -e` 取字段，例如 `node -e "const j=require('./docs/sources/<文件>');console.log(j.<字段>)"`。
 - 不要为了“补全”而手工编辑快照；来源更新时新增一份带新版本号的文件，旧文件在对应角色文档不再引用后删除。
 - 抓取脚本和中间产物放在被忽略的 `tmp/`，不提交。
@@ -29,6 +29,7 @@
 
 | 文件 | 角色 | 来源 | 版本/修订 | 抓取日期 | 元数据 | 角色文档 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `burnice-official-1793886424.json` | 柏妮思·怀特 | 官方百科词条 840 | 修订 `1793886424` | 2026-11-22 | 无（原始响应） | [burnice_white](../characters/burnice_white.md) |
 | `ellen-nanoka-3.3.4+19304006.json` | 艾莲 | Nanoka 角色 1191 | `3.3.4+19304006` | 2026-10-10 | 无 | [ellen_joe](../characters/ellen_joe.md) |
 | `evelyn-nanoka-3.3.12+19520738.json` | 伊芙琳 | Nanoka 角色 1321 | `3.3.12+19520738` | 2026-10-14 | `source` 字段 | [evelyn_chevalier](../characters/evelyn_chevalier.md) |
 | `harumasa-nanoka-3.3.12+19520738.json` | 浅羽悠真 | Nanoka 角色 1201 | `3.3.12+19520738` | 2026-10-13 | `source` 字段 | [asaba_harumasa](../characters/asaba_harumasa.md) |

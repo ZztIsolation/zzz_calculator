@@ -4,6 +4,13 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-23 — 柏妮思·怀特完整建模
+
+- 问题：柏妮思·怀特（`burnice_white`）此前只有队友条目（影画二热意洞穿），工作台、优化器和 Enka 导入都不能选她为主控；专武灼心摇壶也没有绑定角色。
+- 变化：新增 `data/agents.json` 角色条目（60 级面板、核心 A–F、核心被动、额外能力、影画 1/2/4/6、潜能觉醒、推荐盘与默认目标“0影单次余烬”）、`data/agent_skills.json` 技能表（15 个招式、47 行，含核心被动余烬与六影特殊余烬）、`zzz_wiki_841.relatedAgentId`、队友条目补充额外能力的灼伤时长 +3 秒、`1171 → burnice_white` 的 Enka 映射、角色专题与来源快照索引。
+- 关键边界：余烬按核心 1–7 级取 175/205/235/262/290/320/350%，一影 +100 个百分点；精通加成用局内公式只作用于余烬，公式输出到指定招式的 `dmgBonus` 需要放宽 `isAllowedInCombatFormulaOutput`，潜能参数来源需要 `materializePotentialVisionRule` 支持 `parameterSources`，两处扩展都有专属断言。未建模：燃点/能量与 1.35–1.5 秒节奏、+65% 火属性积蓄、流火与灼热抛接法（官方无直伤倍率）、六影额外灼烧结算 1800%、混合招式的物理占比。
+- 验证：`test:burnice-damage`、`test:skill-targets`、`test:maintenance-validation`、`test:repository-integrity`、`test:enka-import`、`test:formula`、`test:damage-whitebox`、`test:compiled-score`、`test:compiled-panel-score`、`test:optimizer`、`test:anomaly-damage`、`test:shared-combat`、`test:default-calculation-config`、`test:effect-rule-targets` 通过。均为本地检查，不代表远端 CI 或生产验收。
+
 ## 2026-11-22 — 赛维里安公开显示
 
 - 问题：赛维里安与专武禁罪囚笼此前为 `hidden: true`，工作台、优化器选择和公开 Enka 导入都不可用。

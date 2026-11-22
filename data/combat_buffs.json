@@ -2546,6 +2546,41 @@
             }
           ],
           "buffModifiers": []
+        },
+        {
+          "id": "burnice.additional.burn_duration",
+          "source": {
+            "zhCN": "额外能力：星火燎原"
+          },
+          "description": {
+            "zhCN": "队伍中任意角色对敌人施加[灼烧]效果时，该效果的持续时间提升3秒。选中本 Buff 表示队伍中存在其他[异常]角色或与柏妮思同阵营的角色，额外能力已满足。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "burnice_additional_burn_duration",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementTypes": [
+                  "attribute"
+                ],
+                "anomalyEffects": [
+                  "burn"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
         }
       ],
       "images": {

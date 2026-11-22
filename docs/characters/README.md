@@ -4,7 +4,7 @@
 
 文件名使用 `data/agents.json` 中的角色 ID。新增或修订角色的流程见[角色制作指南](../character-authoring-guide.md)，文件格式见[模板](_template.md)。表中的游戏 ID、可见性以 `data/agents.json` 和 `data/enka_zzz_mapping.json` 为准，核对基线为 `9d51640c23697a849bdd3674b7f645a30c9f76b0`。
 
-## 角色清单（`data/agents.json`，共 20 个）
+## 角色清单（`data/agents.json`，共 22 个）
 
 | 角色 ID | 名称 | 游戏 ID | 首页与优化器 | 专属文档 | 测试入口 |
 | --- | --- | --- | --- | --- | --- |
@@ -12,6 +12,7 @@
 | `anby_demara` | 安比 | 1011 | **隐藏** | 无专属规则，以数据为准 | — |
 | `aria` | 爱芮 | 1501 | 可见 | [aria.md](aria.md) | `test:aria-damage` |
 | `asaba_harumasa` | 浅羽悠真 | 1201 | **隐藏** | [asaba_harumasa.md](asaba_harumasa.md) | `test:pr81-characters` |
+| `burnice_white` | 柏妮思·怀特 | 1171 | 可见 | [burnice_white.md](burnice_white.md) | `test:burnice-damage` |
 | `claret` | 克拉蕾·弗林特 | 1611 | 可见 | [claret.md](claret.md)（含锐化伤害域） | `test:sharp-damage`、`test:teammate-team-effects` |
 | `ellen_joe` | 艾莲 | 1191 | 可见 | [ellen_joe.md](ellen_joe.md) | `test:ellen-integration` |
 | `evelyn_chevalier` | 伊芙琳 | 1321 | 可见 | [evelyn_chevalier.md](evelyn_chevalier.md) | `test:pr81-characters` |
@@ -32,7 +33,7 @@
 
 ## 仅作为队友的角色
 
-`data/combat_buffs.json` 的 `teammates` 另有 25 个不在 `agents.json` 中的角色（洛克茜、橘福福、耀嘉音等）。其中有专属验收边界的只有橘福福和洛克茜，见 [teammates.md](teammates.md)；其余以数据和维护页为准。
+`data/combat_buffs.json` 的 `teammates` 还收录了若干不在 `agents.json` 中的角色（洛克茜、橘福福、耀嘉音等）。其中有专属验收边界的只有橘福福和洛克茜，见 [teammates.md](teammates.md)；其余以数据和维护页为准。
 
 ## 维护约定
 

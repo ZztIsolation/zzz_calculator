@@ -14649,6 +14649,706 @@
           "modeled": true
         }
       ]
+    },
+    {
+      "id": "burnice_white",
+      "name": {
+        "zhCN": "柏妮思·怀特"
+      },
+      "rarity": "S",
+      "attribute": "fire",
+      "damageElement": "fire",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "pierce"
+      ],
+      "faction": "卡吕冬之子",
+      "images": {
+        "portrait": "/assets/agents/burnice_white.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/10/08/76099754/c00700f00787444df5c7de8b09d81766_3155659045192705400.png"
+      },
+      "level60": {
+        "hpBase": 7368,
+        "atkBase": 788,
+        "defBase": 600,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 83,
+        "anomalyProficiency": 120,
+        "anomalyMastery": 118,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：燃油特调"
+          },
+          "description": {
+            "zhCN": "柏妮思消耗能量值时，会为自身累积[燃点]，最多累积100点；每消耗1点能量值，能够累积1.4点[燃点]，当[燃点]累积至50点时，柏妮思将进入[燃油特调]状态，直到[燃点]耗尽；进入战场时，柏妮思立刻累积100点[燃点]。\n[燃油特调]状态下，柏妮思的[普通攻击：炽焰搅拌式]、[强化特殊技：灼热摇荡法]、[强化特殊技：灼热摇荡法·双份]、[连携技：燃油熔焰]或[终结技：纵享盛焰]命中敌人时，将对目标施加[灼伤]效果，直到柏妮思退出[燃油特调]状态；队伍中其他角色攻击命中处于[灼伤]状态下的敌人时，会触发[余烬]效果，消耗8点[燃点]，对目标造成等同于柏妮思175%/205%/235%/262%/290%/320%/350%攻击力的火属性伤害并累积火属性异常积蓄值，1.5秒内最多触发一次；每拥有10点异常精通，[余烬]效果造成的伤害提升1%，最多提升30%；[余烬]效果造成的伤害被视为[支援攻击]伤害。\n潜能觉醒：沸点派对（P2-P6）：初始能量自动回复达到1.8后，每多0.1点令异常掌控提升1/1.3/1.6/2/2.5点（最多25点）、造成的伤害提升1%/1.25%/1.5%/1.75%/2%（最多20%），[余烬]触发间隔降低至1.35秒。"
+          },
+          "effects": [
+            {
+              "id": "burnice-afterburn-proficiency",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "burnice_white",
+                    "categoryId": "core_skill",
+                    "skillType": "core_skill",
+                    "moveId": "core_afterburn",
+                    "rowId": "damage"
+                  }
+                ]
+              },
+              "source": {
+                "kind": "inCombatStat",
+                "stat": "anomalyProficiency",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "局内异常精通"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "clamp(floor(max(x, 0) / 10) * 1, 0, 30)",
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "burnice-potential-anomaly-mastery",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "requirement": {
+                "minPotentialLevel": 2
+              },
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "energyRegen",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "柏妮思初始能量自动回复"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "clamp(floor(max(x - 1.8, 0) * 10 + 0.0001) * rate, 0, 25)",
+                "parameters": {
+                  "rate": 0
+                },
+                "parameterSources": {
+                  "rate": {
+                    "kind": "potentialVisionScaling",
+                    "field": "potentialMasteryPerTenth"
+                  }
+                },
+                "valueUnit": "storedValue"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "burnice-potential-damage-bonus",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "requirement": {
+                "minPotentialLevel": 2
+              },
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "energyRegen",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "柏妮思初始能量自动回复"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "clamp(floor(max(x - 1.8, 0) * 10 + 0.0001) * rate, 0, 20)",
+                "parameters": {
+                  "rate": 0
+                },
+                "parameterSources": {
+                  "rate": {
+                    "kind": "potentialVisionScaling",
+                    "field": "potentialDmgBonusPerTenth"
+                  }
+                },
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：星火燎原"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他[异常]角色或与自身阵营相同的角色时触发：柏妮思[普通攻击：炽焰搅拌式]、[强化特殊技：灼热摇荡法]、[强化特殊技：灼热摇荡法·双份]命中敌人，或触发[余烬]效果时，招式累积的火属性异常积蓄值提升65%；队伍中任意角色对敌人施加[灼烧]效果时，该效果的持续时间提升3秒。火属性异常积蓄值提升当前未建模，只记录原文。"
+          },
+          "defaultChecked": true,
+          "effects": [
+            {
+              "id": "burnice-additional-burn-duration",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "anomalyEffects": [
+                  "burn"
+                ],
+                "settlementType": "attribute"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "热络同心"
+            },
+            "description": {
+              "zhCN": "[燃点]的上限从100点提升至140点，进入战场时，柏妮思额外累积40点[燃点]；[余烬]效果的伤害倍率提升，提升效果等同于柏妮思攻击力的100%；[余烬]效果累积的火属性异常积蓄值提升25%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "burnice-c1-afterburn-multiplier",
+                "type": "fixed",
+                "stat": "skillMultiplierBonus",
+                "value": 100,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "burnice_white",
+                      "categoryId": "core_skill",
+                      "skillType": "core_skill",
+                      "moveId": "core_afterburn",
+                      "rowId": "damage"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "加量不加价"
+            },
+            "description": {
+              "zhCN": "触发[余烬]效果时，将对敌人施加[热意洞穿]，最多叠加5层，持续6秒，重复触发时刷新持续时间；受到我方攻击时，目标每拥有一层[热意洞穿]，本次攻击的穿透率提升4%，最多提升20%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "burnice-c2-heat-pierce",
+                "type": "stacked",
+                "stat": "penRatio",
+                "mode": "flat",
+                "valuePerStack": 4,
+                "maxStacks": 5,
+                "defaultStacks": 5,
+                "target": {
+                  "kind": "default"
+                },
+                "durationSeconds": 6,
+                "condition": "触发[余烬]后对目标施加，重复触发刷新持续时间",
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "超绝燃油补给"
+            },
+            "description": {
+              "zhCN": "[强化特殊技]或[支援攻击]命中敌人时，招式的暴击率提升30%；[强化特殊技：灼热摇荡法·双份]中，火焰喷射的持续时间上限提升1秒。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "burnice-c4-ex-assist-crit",
+                "type": "fixed",
+                "stat": "critRate",
+                "value": 30,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "skillTag",
+                      "skillTag": "exSpecial"
+                    },
+                    {
+                      "kind": "skillTag",
+                      "skillTag": "assistAttack"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "盛焰邀约"
+            },
+            "description": {
+              "zhCN": "柏妮思的[强化特殊技：灼热摇荡法·双份]命中敌人时，将额外触发特殊的[余烬]效果，对目标造成等同于柏妮思60%攻击力的火属性伤害，0.5秒内最多触发1次，无需消耗[燃点]；发动[强化特殊技：灼热摇荡法·双份]命中敌人后，招式发动期间，[强化特殊技：灼热摇荡法·双份]、特殊的[余烬]效果、[灼烧]伤害将无视目标25%火属性伤害抗性；在[强化特殊技：灼热摇荡法·双份]中发动火焰冲击命中处于[灼烧]状态下的敌人时，能够额外结算一次[灼烧]伤害，伤害效果等同于原本的1,800%，同一目标20秒内最多触发一次。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "burnice-c6-fire-res-ignore-skill",
+                "type": "fixed",
+                "stat": "fireResIgnore",
+                "value": 25,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "burnice_white",
+                      "categoryId": "special",
+                      "skillType": "special",
+                      "moveId": "ex_scorch_shake_double"
+                    },
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "burnice_white",
+                      "categoryId": "cinema",
+                      "skillType": "cinema",
+                      "moveId": "cinema_6_special_afterburn",
+                      "rowId": "damage"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              },
+              {
+                "id": "burnice-c6-fire-res-ignore-burn",
+                "type": "fixed",
+                "stat": "fireResIgnore",
+                "value": 25,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "anomalyEffects": [
+                    "burn"
+                  ],
+                  "settlementType": "attribute"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ]
+      },
+      "cinemaDescriptions": [
+        {
+          "cinemaLevel": 1,
+          "name": {
+            "zhCN": "热络同心"
+          },
+          "description": {
+            "zhCN": "[燃点]的上限从100点提升至140点，进入战场时，柏妮思额外累积40点[燃点]；[余烬]效果的伤害倍率提升，提升效果等同于柏妮思攻击力的100%；[余烬]效果累积的火属性异常积蓄值提升25%。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 2,
+          "name": {
+            "zhCN": "加量不加价"
+          },
+          "description": {
+            "zhCN": "触发[余烬]效果时，将对敌人施加[热意洞穿]，最多叠加5层，持续6秒，重复触发时刷新持续时间；受到我方攻击时，目标每拥有一层[热意洞穿]，本次攻击的穿透率提升4%，最多提升20%。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 3,
+          "name": {
+            "zhCN": "天性乐观"
+          },
+          "description": {
+            "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技]技能等级+2"
+          },
+          "modeled": false
+        },
+        {
+          "cinemaLevel": 4,
+          "name": {
+            "zhCN": "超绝燃油补给"
+          },
+          "description": {
+            "zhCN": "[强化特殊技]或[支援攻击]命中敌人时，招式的暴击率提升30%；[强化特殊技：灼热摇荡法·双份]中，火焰喷射的持续时间上限提升1秒。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 5,
+          "name": {
+            "zhCN": "冰与火之舞"
+          },
+          "description": {
+            "zhCN": "[普通攻击]、[闪避]、[支援技]、[特殊技]、[连携技]技能等级+2"
+          },
+          "modeled": false
+        },
+        {
+          "cinemaLevel": 6,
+          "name": {
+            "zhCN": "盛焰邀约"
+          },
+          "description": {
+            "zhCN": "柏妮思的[强化特殊技：灼热摇荡法·双份]命中敌人时，将额外触发特殊的[余烬]效果，对目标造成等同于柏妮思60%攻击力的火属性伤害，0.5秒内最多触发1次，无需消耗[燃点]；发动[强化特殊技：灼热摇荡法·双份]命中敌人后，招式发动期间，[强化特殊技：灼热摇荡法·双份]、特殊的[余烬]效果、[灼烧]伤害将无视目标25%火属性伤害抗性；在[强化特殊技：灼热摇荡法·双份]中发动火焰冲击命中处于[灼烧]状态下的敌人时，能够额外结算一次[灼烧]伤害，伤害效果等同于原本的1,800%，同一目标20秒内最多触发一次。"
+          },
+          "modeled": true
+        }
+      ],
+      "coreSkill": {
+        "name": {
+          "zhCN": "燃油特调"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "energyRegen",
+                "value": 10,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "energyRegen",
+                "value": 10,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "energyRegen",
+                "value": 10,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/840/detail?mhy_presentation_style=fullscreen"
+        ]
+      },
+      "potentialVision": {
+        "name": {
+          "zhCN": "潜能觉醒：沸点派对"
+        },
+        "defaultLevel": 6,
+        "maxLevel": 6,
+        "mechanicUnlockLevel": 1,
+        "scaling": {
+          "name": {
+            "zhCN": "潜能觉醒：沸点派对"
+          },
+          "levels": [
+            {
+              "level": 0,
+              "potentialMasteryPerTenth": 0,
+              "potentialDmgBonusPerTenth": 0
+            },
+            {
+              "level": 1,
+              "potentialMasteryPerTenth": 0,
+              "potentialDmgBonusPerTenth": 0
+            },
+            {
+              "level": 2,
+              "potentialMasteryPerTenth": 1,
+              "potentialDmgBonusPerTenth": 1
+            },
+            {
+              "level": 3,
+              "potentialMasteryPerTenth": 1.3,
+              "potentialDmgBonusPerTenth": 1.25
+            },
+            {
+              "level": 4,
+              "potentialMasteryPerTenth": 1.6,
+              "potentialDmgBonusPerTenth": 1.5
+            },
+            {
+              "level": 5,
+              "potentialMasteryPerTenth": 2,
+              "potentialDmgBonusPerTenth": 1.75
+            },
+            {
+              "level": 6,
+              "potentialMasteryPerTenth": 2.5,
+              "potentialDmgBonusPerTenth": 2
+            }
+          ]
+        },
+        "mechanics": {
+          "levelOneUnlocksPotentialEnhancedMoves": true,
+          "energyRegenThreshold": 1.8,
+          "energyRegenStep": 0.1,
+          "maxAnomalyMasteryBonus": 25,
+          "maxDamageBonus": 20,
+          "afterburnIntervalSeconds": 1.35
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/840/detail?mhy_presentation_style=fullscreen"
+        ]
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "chaos_jazz"
+        ],
+        "defaultTwoPieceSetIds": [
+          "phaethons_melody"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "fireDmg",
+            "penRatio",
+            "atkPct"
+          ],
+          "6": [
+            "anomalyMastery",
+            "energyRegen"
+          ]
+        }
+      },
+      "importantSubStats": [
+        "anomalyProficiency",
+        "atkPct"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "anomalyProficiency",
+        "anomalyMastery"
+      ],
+      "defaultCalculationConfig": {
+        "mode": "single",
+        "name": {
+          "zhCN": "0影单次余烬"
+        },
+        "cinemaLevel": 0,
+        "events": [
+          {
+            "id": "burnice_afterburn",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "burnice_white",
+              "categoryId": "core_skill",
+              "moveId": "core_afterburn",
+              "rowId": "damage"
+            }
+          }
+        ],
+        "skillLevelsByCategory": {
+          "basic": 12,
+          "dodge": 12,
+          "assist": 12,
+          "special": 12,
+          "chain": 12
+        },
+        "selectedEventId": "burnice_afterburn"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/840/detail?mhy_presentation_style=fullscreen",
+        "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page?entry_page_id=840&lang=zh-cn&app_sn=zzz_wiki"
+      ],
+      "verification": {
+        "officialEntryPageId": "840",
+        "officialEntryVersion": "1793886424",
+        "level60Stats": "官方 60 级关键数据：生命 7368、攻击 788（不含核心节点）、防御 600、冲击 83、异常掌控 118、异常精通 120、能量自动回复 1.2、穿透率 0%；核心 A/C/E 各 +0.12 能量回复、B/D/F 各 +25 攻击。",
+        "afterburn": "核心被动余烬倍率按核心等级 1-7 为 175/205/235/262/290/320/350%，来自官方词条核心技与技能等级文本，取满级核心 F 的 350%。",
+        "potential": "潜能觉醒：沸点派对 P2-P6 的异常掌控与增伤系数来自官方词条潜能觉醒条目；P0-P1 无数值。",
+        "unsupportedMechanics": "燃点/能量资源与 1.35 秒触发节奏、额外能力的 +65% 火属性异常积蓄、[流火]计数与强化特殊技：灼热抛接法（官方词条未给出倍率）、一影燃点上限与 25% 积蓄、四影喷射时长、六影额外灼烧结算 1800%、普攻/闪避反击/快速支援的物理伤害占比均未建模，只保留原文。",
+        "acquiredAt": "2026-11-22",
+        "officialEntrySha256": "d125516bcd95e2d70045ce8432b03b33acd3ffd08ac7924846016a7c5f9e623c"
+      }
     }
   ]
 }
