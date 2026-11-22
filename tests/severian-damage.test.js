@@ -5,7 +5,9 @@ import { loadCalculatorContext, calculateInCombatPanel, createInCombatPanelCalcu
 import { validateMaintenanceItem } from "../core/maintenanceValidation.js"
 import { cleanMaintenanceItem } from "../backend/server.js"
 import { normalizeRuntimeForBuff, defaultWEngineIdForAgent } from "../core/shared-combat.js"
+import { resolveDefaultCalculationConfig } from "../core/defaultCalculationConfig.js"
 import { isAllowedInCombatFormulaOutput } from "../core/effectFormula.js"
+import { expandCalculationConfigSkillGroups } from "../core/calculationSkillGroups.js"
 import { optimizeDriveDiscs, optimizeDriveDiscsAsync } from "../backend/driveDiscOptimizer.js"
 import { createDriveDiscOptimizerRuntime } from "../core/driveDiscOptimizer-core.js"
 import { severianOptimizerInput, severianOptimizerStore } from "./fixtures/severian-optimizer.js"
@@ -24,13 +26,62 @@ function input(buffs = [], overrides = {}) {
 }
 const run = (buffs, overrides) => calculateInCombatPanel(catalog, input(buffs, overrides))
 
-assert.equal(agent.hidden, true)
-assert.equal(weapon.hidden, true)
-assert.equal(buildMeta(catalog).displayAgents.some(a => a.id === agent.id), false)
-assert.equal(buildMeta(catalog).displayWEngines.some(w => w.id === weapon.id), false)
+assert.equal(agent.hidden, false)
+assert.equal(weapon.hidden, false)
+assert.equal(buildMeta(catalog).displayAgents.some(a => a.id === agent.id), true)
+assert.equal(buildMeta(catalog).displayWEngines.some(w => w.id === weapon.id), true)
 assert.equal(defaultWEngineIdForAgent(catalog.wEngines, agent.id, "zzz_wiki_14163"), weapon.id)
-assert.equal(agent.defaultCalculationConfig, undefined)
-assert.equal(agent.skillGroups?.length ?? 0, 0)
+const defaultLoop = resolveDefaultCalculationConfig(agent.defaultCalculationConfig, 0)
+assert.equal(agent.defaultCalculationConfig.cinemaLevel, 0)
+assert.equal(defaultLoop.name.zhCN, "0影2强普2连携1大招1强特")
+assert.deepEqual(defaultLoop.events.map(event => [
+    event.skillRef.categoryId,
+    event.skillRef.moveId,
+    event.skillRef.rowId,
+    event.count,
+]), [
+    ["basic", "basic_move_3", "row_1", 2],
+    ["chain", "chain_move_1", "row_1", 2],
+    ["chain", "chain_move_2", "row_1", 1],
+    ["special", "special_move_2", "row_1", 1],
+])
+assert.equal(defaultLoop.selectedEventId, "severian_basic_move_3")
+for (const event of defaultLoop.events) {
+    assert.equal(event.kind, "direct")
+    assert.equal(event.stunned, true)
+    assert.equal(event.critMode, "expected")
+    assert.equal(event.skillRef.agentSkillId, agent.id)
+    assert.equal(rowFor(event.skillRef.categoryId, event.skillRef.moveId, event.skillRef.rowId).kind, "damageMultiplier")
+}
+assert.deepEqual(agent.skillGroups.map(group => [group.id, group.defaultCount, group.minCount, group.step]), [
+    ["gale_edge_sequence", 1, 0, 1],
+])
+const galeEdgeGroup = agent.skillGroups[0]
+assert.deepEqual(galeEdgeGroup.name.zhCN, "疾锋1至4段（不含第四段极限闪避分支）")
+assert.deepEqual(galeEdgeGroup.events.map(event => [
+    event.skillRef.moveId,
+    event.skillRef.rowId,
+    event.count,
+    event.stunned,
+    event.critMode,
+]), [
+    ["basic_move_1", "row_1", 1, true, "expected"],
+    ["basic_move_1", "damage_2", 1, true, "expected"],
+    ["basic_move_1", "damage_3", 1, true, "expected"],
+    ["basic_move_1", "damage_4", 1, true, "expected"],
+])
+assert.equal(galeEdgeGroup.events.some(event => event.skillRef.moveId === "basic_gale_edge_dodge_fourth"), false,
+    "极限闪避成功分支是独立替代招式，不并入疾锋四段技能组")
+const expandedGaleEdge = expandCalculationConfigSkillGroups({
+    mode: "custom",
+    events: [{ kind: "skillGroup", skillGroupId: "gale_edge_sequence", count: 1 }],
+}, agent, { strict: true })
+assert.deepEqual(expandedGaleEdge.events.map(event => [event.skillRef.rowId, event.count]), [
+    ["row_1", 1],
+    ["damage_2", 1],
+    ["damage_3", 1],
+    ["damage_4", 1],
+])
 assert.equal(agent.cinemaDescriptions.length, 6)
 assert.deepEqual(agent.level60, fixture.level60)
 for (const [kind, item] of [["agents", agent], ["agent-skills", skills], ["wEngines", weapon]]) {
@@ -54,6 +105,19 @@ const base = run([])
 approx(base.inCombat.panel.atk, 858 + 75 + 713, "base ATK excludes converted ATK")
 approx(base.inCombat.panel.critRate, .29, "weapon base CRIT Rate")
 approx(run([additional]).inCombat.panel.atk, 1646 + 246.5, "29% crit -> 246.5 ATK")
+
+const imbuement = `agent:${agent.id}.skill.imbuement`, imbuementBuff = agent.combatBuffs.skillBuffs.find(b => b.id === "imbuement")
+const imbuementOf = result => result.damage.events[0].multipliers.imbuement
+assert.equal(imbuementBuff.defaultChecked, true)
+assert.equal(imbuementBuff.source.zhCN, "异常效果")
+assert.equal(imbuementBuff.sourceSkillRef, undefined)
+approx(imbuementOf(run([])), 1, "imbuement off without buff")
+approx(imbuementOf(run([imbuement])), 1.1, "own imbuement is an independent 1.1 zone")
+approx(run([imbuement]).damage.totalFinalDamage / run([]).damage.totalFinalDamage, 1.1, "imbuement scales direct damage once")
+const imbuementOff = normalizeRuntimeForBuff(imbuementBuff, { effects: { "severian-imbuement": { coverage: 0 } } })
+approx(imbuementOf(run([imbuement], { combatBuffs: { runtimeInputs: { [imbuement]: imbuementOff } } })), 1, "imbuement coverage 0")
+approx(imbuementOf(run([imbuement, "roxy.additional_ability"])), 1.18, "same-kind imbuement takes the highest, no stacking")
+approx(imbuementOf(run(["roxy.additional_ability"])), 1.18, "Roxy imbuement alone")
 approx(run([additional, "nicole.cinema_6.energy_field_crit_rate"]).inCombat.panel.atk,
     1646 + 44 * 8.5, "teammate global crit participates in conversion")
 const targeted = run([additional], { combatBuffs: { manualEffects: [{ id: "targeted-crit", effects: [{

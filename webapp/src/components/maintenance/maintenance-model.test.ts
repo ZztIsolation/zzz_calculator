@@ -13,7 +13,7 @@ describe("maintenance structured model", () => {
     expect(draft.combatBuffs.additionalAbility.effects).toEqual(agent.combatBuffs.additionalAbility.effects.map(effect => ({ ...effect, scope: "inCombat" })))
     expect(draft.combatBuffs.corePassive.effects).toEqual(agent.combatBuffs.corePassive.effects)
     expect(prepareDraft("agents", JSON.parse(JSON.stringify(draft))).combatBuffs).toEqual(draft.combatBuffs)
-    expect(draft.hidden).toBe(true)
+    expect(draft.hidden).toBe(agent.hidden)
   })
   it("preserves both disc defaults in drafts and previews readable set names", () => {
     const sets = [{ id: "four", name: { zhCN: "四件套甲" } }, { id: "energy", name: { zhCN: "充能套装" } }]

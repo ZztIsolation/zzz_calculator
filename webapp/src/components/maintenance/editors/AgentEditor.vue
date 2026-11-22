@@ -289,7 +289,7 @@ function addSkillBuff() {
 }
 
 function skillBuffCategoryOptions() {
-  return categoryOptions(props.catalog, currentAgentSkill()?.id ?? "")
+  return [{ label: "无（使用来源标签）", value: "" }, ...categoryOptions(props.catalog, currentAgentSkill()?.id ?? "")]
 }
 
 function skillBuffMoveOptions(buff: any) {
@@ -299,6 +299,11 @@ function skillBuffMoveOptions(buff: any) {
 function changeSkillBuffCategory(buff: any, value: string) {
   const skill = currentAgentSkill()
   buff.sourceSkillRef ??= {}
+  if (!value) {
+    buff.sourceSkillRef = { agentSkillId: "", categoryId: "", moveId: "" }
+    changed()
+    return
+  }
   buff.sourceSkillRef.agentSkillId = skill?.id ?? ""
   buff.sourceSkillRef.categoryId = value
   buff.sourceSkillRef.moveId = String(moveOptions(props.catalog, skill?.id ?? "", value)[0]?.value ?? "")
@@ -474,6 +479,7 @@ function addDefaultTeammate() {
         <div class="maintenance-grid">
           <label class="maintenance-field"><span>稳定 ID</span><NInput :value="buff.id" :disabled="disabled" @update:value="buff.id = String($event); changed()" /></label>
           <label class="maintenance-field"><span>Buff 名称</span><NInput :value="textOf(buff.name)" :disabled="disabled" @update:value="buff.name = { zhCN: String($event) }; changed()" /></label>
+          <label class="maintenance-field"><span>来源标签</span><NInput :value="textOf(buff.source)" placeholder="未选技能目录时显示，如：异常效果" :disabled="disabled" @update:value="buff.source = { zhCN: String($event) }; changed()" /></label>
           <label class="maintenance-field"><span>来源技能目录</span><NSelect :value="buff.sourceSkillRef?.categoryId" :options="skillBuffCategoryOptions()" :disabled="disabled || !currentAgentSkill()" @update:value="changeSkillBuffCategory(buff, String($event))" /></label>
           <label class="maintenance-field"><span>来源招式</span><NSelect :value="buff.sourceSkillRef?.moveId ?? ''" :options="skillBuffMoveOptions(buff)" :disabled="disabled || !currentAgentSkill()" @update:value="changeSkillBuffMove(buff, String($event))" /></label>
           <label class="maintenance-field"><span>生效范围</span><NSelect :value="buff.scope" :options="SCOPE_OPTIONS" :disabled="disabled" @update:value="setBuffScope(buff, String($event))" /></label>

@@ -2,9 +2,24 @@ import { describe, expect, it } from "vitest"
 import {
   buffLabelForId,
   buildCombatBuffGroups,
+  currentAgentBuffCandidates,
   teamWEngineBuffCandidates,
   teammateDriveDiscSetIdsFromBuffIds,
 } from "@/utils/combatBuffs"
+
+describe("skill buff without a skill source", () => {
+  it("labels a source-label-only buff as 异常效果｜浸染", () => {
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色甲" }, combatBuffs: { skillBuffs: [{
+        id: "imbuement", source: { zhCN: "异常效果" }, name: { zhCN: "浸染" }, scope: "inCombat", defaultChecked: true,
+        effects: [{ id: "imb", type: "fixed", stat: "imbuementDmgBonus", value: 10 }],
+      }] } }],
+      agentSkills: [{ id: "agent_a", agentId: "agent_a", categories: [] }],
+    }
+    const buff = currentAgentBuffCandidates(meta, "agent_a", 0).find((item: any) => item.id === "agent:agent_a.skill.imbuement")
+    expect(buff.source).toEqual({ zhCN: "异常效果｜浸染" })
+  })
+})
 
 describe("combat buff display helpers", () => {
   const meta = {

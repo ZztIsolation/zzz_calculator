@@ -1758,7 +1758,7 @@ function validateReleaseSkillRef(errors, skillRef, path, context = {}, agentId =
 
 function validateSkillBuffSourceRef(errors, skillRef, path, context = {}, agentId = "") {
     if (!skillRef || typeof skillRef !== "object" || Array.isArray(skillRef)) {
-        add(errors, path, "必须选择来源技能。")
+        add(errors, path, "必须选择来源技能，或填写来源标签。")
         return
     }
     for (const key of ["agentSkillId", "categoryId"]) {
@@ -2610,7 +2610,13 @@ function validateSkillBuffs(errors, skillBuffs, context = {}, agentId = "") {
         if (buff?.defaultChecked !== undefined && typeof buff.defaultChecked !== "boolean") {
             add(errors, `${path}.defaultChecked`, "默认启用状态必须是布尔值。")
         }
-        validateSkillBuffSourceRef(errors, buff?.sourceSkillRef, `${path}.sourceSkillRef`, context, agentId)
+        const sourceRef = buff?.sourceSkillRef
+        const hasSourceRef = sourceRef && typeof sourceRef === "object" && !Array.isArray(sourceRef)
+            && ["agentSkillId", "categoryId", "moveId", "rowId"].some(key => String(sourceRef[key] ?? "").trim())
+        // 非技能来源（如异常效果）：不绑定技能目录，用来源标签显示。
+        if (hasSourceRef || !hasText(buff?.source)) {
+            validateSkillBuffSourceRef(errors, sourceRef, `${path}.sourceSkillRef`, context, agentId)
+        }
         validateEffectSet(errors, buff, path, { requireRule: true, sourceType: "self", context })
     })
 }
