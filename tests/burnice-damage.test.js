@@ -127,15 +127,32 @@ const cinemaMove = skills.categories.find(category => category.id === 'cinema').
 assert.deepEqual(cinemaMove.rows[0].values, [60])
 assert.equal(cinemaMove.skillType, 'cinema')
 
-// Additional ability extends Burn by 3 seconds for any character.
+// Additional ability extends Burn by 3 seconds for attribute Burn, Burn Disorder, and Burn Turbulence.
+const burnDisorderEvent = { id: 'burn-disorder', kind: 'disorder', anomalyEffect: 'burn', elapsedSeconds: 0, count: 1, stunned: true }
+const burnTurbulenceEvent = { id: 'burn-turbulence', kind: 'anomaly', settlementType: 'turbulence', anomalyEffect: 'burn', elapsedSeconds: 0, count: 1, stunned: true }
+const shockDisorderEvent = { id: 'shock-disorder', kind: 'disorder', anomalyEffect: 'shock', elapsedSeconds: 0, count: 1, stunned: true }
 const burnOn = calc({ event: burnEvent })
 const burnCoreOnly = calculateInCombatPanel(catalog, { ...input({ event: burnEvent }), combatBuffs: { activeBuffIds: ['agent:burnice_white.corePassive'] } })
 approx(burnOn.damage.multipliers.durationSeconds, 13, 'Burn duration bonus')
 approx(burnOn.damage.multipliers.anomaly - burnCoreOnly.damage.multipliers.anomaly, 3, 'Burn tick bonus')
 approx(burnOn.damage.multipliers.baseDurationSeconds, 10)
-// Teammate entry exposes the same +3 seconds to the active agent.
+const burnDisorderOn = calc({ event: burnDisorderEvent })
+const burnDisorderOff = calculateInCombatPanel(catalog, { ...input({ event: burnDisorderEvent }), combatBuffs: { activeBuffIds: ['agent:burnice_white.corePassive'] } })
+approx(burnDisorderOn.damage.multipliers.remainingSeconds, 13, 'Burn Disorder duration bonus')
+approx(burnDisorderOff.damage.multipliers.remainingSeconds, 10, 'Burn Disorder base duration')
+const burnTurbulenceOn = calc({ event: burnTurbulenceEvent })
+const burnTurbulenceOff = calculateInCombatPanel(catalog, { ...input({ event: burnTurbulenceEvent }), combatBuffs: { activeBuffIds: ['agent:burnice_white.corePassive'] } })
+approx(burnTurbulenceOn.damage.multipliers.remainingSeconds, 13, 'Burn Turbulence duration bonus')
+approx(burnTurbulenceOff.damage.multipliers.remainingSeconds, 10, 'Burn Turbulence base duration')
+const shockDisorderOn = calc({ event: shockDisorderEvent })
+approx(shockDisorderOn.damage.multipliers.remainingSeconds, 10, 'Non-Burn Disorder excluded')
+// Teammate entry exposes the same +3 seconds to the active agent across attribute, disorder, and turbulence.
 const withTeammate = calculateInCombatPanel(catalog, { ...input({ event: burnEvent }), combatBuffs: { activeBuffIds: ['burnice.additional.burn_duration'] } })
 approx(withTeammate.damage.multipliers.durationSeconds, 13, 'teammate Burn duration')
+const withTeammateDisorder = calculateInCombatPanel(catalog, { ...input({ event: burnDisorderEvent }), combatBuffs: { activeBuffIds: ['burnice.additional.burn_duration'] } })
+approx(withTeammateDisorder.damage.multipliers.remainingSeconds, 13, 'teammate Burn Disorder duration')
+const withTeammateTurbulence = calculateInCombatPanel(catalog, { ...input({ event: burnTurbulenceEvent }), combatBuffs: { activeBuffIds: ['burnice.additional.burn_duration'] } })
+approx(withTeammateTurbulence.damage.multipliers.remainingSeconds, 13, 'teammate Burn Turbulence duration')
 
 // Potential: initial Energy Regen >= 1.8 converts each 0.1 into Mastery and damage.
 const potential = level => calc({ potentialLevel: level, drives: energyDrive() })

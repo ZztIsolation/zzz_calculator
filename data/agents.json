@@ -14842,6 +14842,46 @@
                 "max": 1,
                 "step": 0.1
               }
+            },
+            {
+              "id": "burnice-additional-burn-duration-disorder",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "anomalyEffects": [
+                  "burn"
+                ],
+                "settlementType": "disorder"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "burnice-additional-burn-duration-turbulence",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "anomalyEffects": [
+                  "burn"
+                ],
+                "settlementType": "turbulence"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []

@@ -2578,6 +2578,50 @@
                 "max": 1,
                 "step": 0.1
               }
+            },
+            {
+              "id": "burnice_additional_burn_duration_disorder",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementTypes": [
+                  "disorder"
+                ],
+                "anomalyEffects": [
+                  "burn"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "burnice_additional_burn_duration_turbulence",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementTypes": [
+                  "turbulence"
+                ],
+                "anomalyEffects": [
+                  "burn"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []

@@ -463,14 +463,27 @@ function setFormulaParameterModificationText(rule: any, name: string, value: str
   emit("change")
 }
 
+function formulaParameterSourceOptionValue(rule: any, name: string) {
+  const source = rule.formula?.parameterSources?.[name]
+  if (source?.kind === "potentialVisionScaling") return `potential:${source.field}`
+  return source?.field ?? ""
+}
+
 function setFormulaParameterSource(rule: any, name: string, field: string | null) {
   rule.formula.parameterSources ??= {}
-  if (field) {
-    rule.formula.parameterSources[name] = { kind: "corePassiveScaling", field }
-    rule.formula.parameters[name] = Number(props.corePassiveScaling.levels[0][field])
-  } else {
+  const normalized = String(field ?? "").trim()
+  if (!normalized) {
     delete rule.formula.parameterSources[name]
     if (!Object.keys(rule.formula.parameterSources).length) delete rule.formula.parameterSources
+  } else if (normalized.startsWith("potential:")) {
+    const potentialField = normalized.slice("potential:".length)
+    rule.formula.parameterSources[name] = { kind: "potentialVisionScaling", field: potentialField }
+    const firstValue = Number(props.potentialVisionScaling?.levels?.[0]?.[potentialField])
+    if (Number.isFinite(firstValue)) rule.formula.parameters[name] = firstValue
+  } else {
+    rule.formula.parameterSources[name] = { kind: "corePassiveScaling", field: normalized }
+    const firstValue = Number(props.corePassiveScaling?.levels?.[0]?.[normalized])
+    if (Number.isFinite(firstValue)) rule.formula.parameters[name] = firstValue
   }
   emit("change")
 }
@@ -805,7 +818,7 @@ function setRuleLabel(rule: any, value: string) {
         <label class="maintenance-field maintenance-field-wide"><span>公式</span><NInput v-model:value="rule.formula.expression" :disabled="disabled" placeholder="clamp(floor((x - 15000) / 400) + 10, 10, 40)" @update:value="emit('change')" /></label>
         <template v-for="name in formulaParameterNames(rule)" :key="name">
           <label class="maintenance-field"><span>参数名</span><NInput :value="name" :disabled="disabled" placeholder="threshold" @update:value="setFormulaParameterName(rule, name, String($event))" /></label>
-          <label v-if="corePassiveScaling?.levels?.length" class="maintenance-field"><span>参数 {{ name }} 数值来源</span><NSelect :value="rule.formula.parameterSources?.[name]?.field ?? null" :options="corePassiveScalingFieldOptions()" :disabled="disabled" @update:value="setFormulaParameterSource(rule, name, $event ? String($event) : null)" /></label>
+          <label v-if="corePassiveScaling?.levels?.length || potentialVisionScaling?.levels?.length" class="maintenance-field"><span>参数 {{ name }} 数值来源</span><NSelect :value="formulaParameterSourceOptionValue(rule, name)" :options="valueSourceOptions()" :disabled="disabled" @update:value="setFormulaParameterSource(rule, name, $event ? String($event) : null)" /></label>
           <label class="maintenance-field"><span>参数 {{ name }} 默认值</span><NInputNumber :value="rule.formula.parameters[name]" :disabled="disabled || Boolean(rule.formula.parameterSources?.[name])" :step="0.01" @update:value="setFormulaParameterValue(rule, name, $event)" /></label>
           <label v-if="allowModificationValues" class="maintenance-field"><span>{{ name }} 的 R1/R2/R3/R4/R5</span><NInput :value="formulaParameterModificationText(rule, name)" :disabled="disabled" placeholder="0.48/0.56/0.64/0.72/0.8" @update:value="setFormulaParameterModificationText(rule, name, String($event))" /></label>
           <NButton quaternary type="error" :disabled="disabled" :title="`删除参数 ${name}`" @click="removeFormulaParameter(rule, name)"><template #icon><Trash2 :size="15" /></template>删除参数 {{ name }}</NButton>
