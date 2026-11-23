@@ -11,7 +11,7 @@
 | `alice_thymefield` | 爱丽丝 | 1401 | 可见 | [alice_thymefield.md](alice_thymefield.md) | `test:alice-damage` |
 | `anby_demara` | 安比 | 1011 | **隐藏** | 无专属规则，以数据为准 | — |
 | `aria` | 爱芮 | 1501 | 可见 | [aria.md](aria.md) | `test:aria-damage` |
-| `asaba_harumasa` | 浅羽悠真 | 1201 | **隐藏** | [asaba_harumasa.md](asaba_harumasa.md) | `test:pr81-characters` |
+| `asaba_harumasa` | 浅羽悠真 | 1201 | 可见 | [asaba_harumasa.md](asaba_harumasa.md) | `test:pr81-characters` |
 | `claret` | 克拉蕾·弗林特 | 1611 | 可见 | [claret.md](claret.md)（含锐化伤害域） | `test:sharp-damage`、`test:teammate-team-effects` |
 | `ellen_joe` | 艾莲 | 1191 | 可见 | [ellen_joe.md](ellen_joe.md) | `test:ellen-integration` |
 | `evelyn_chevalier` | 伊芙琳 | 1321 | 可见 | [evelyn_chevalier.md](evelyn_chevalier.md) | `test:pr81-characters` |
@@ -19,7 +19,7 @@
 | `hoshimi_miyabi` | 星见雅 | 1091 | 可见 | 无专属规则，以数据为准 | — |
 | `jane_doe` | 简·杜 | 1261 | 可见 | [jane_doe.md](jane_doe.md) | `test:jane-damage` |
 | `nangongyu` | 南宫羽 | 1511 | 可见 | [nangongyu.md](nangongyu.md) | `test:nangongyu-damage` |
-| `nekomata` | 猫又 | 1021 | **隐藏** | [nekomata.md](nekomata.md) | `test:pr81-characters` |
+| `nekomata` | 猫又 | 1021 | 可见 | [nekomata.md](nekomata.md) | `test:pr81-characters` |
 | `pyrois` | 佩洛伊斯 | 1551 | 可见 | [pyrois.md](pyrois.md) | `test:pyrois-damage` |
 | `remielle_dan` | 蕾米埃尔·丹 | 1581 | 可见 | [remielle_dan.md](remielle_dan.md)（队伍异常评分） | `test:luminescence`、`test:remielle-teammate-buffs` |
 | `severian_lowell` | 赛维里安·洛威尔 | 1631 | **隐藏** | [severian_lowell.md](severian_lowell.md) | `test:severian-damage` |

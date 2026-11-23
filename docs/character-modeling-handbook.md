@@ -77,7 +77,7 @@
 
 **核心、额外能力与影画的归属**
 
-- 核心被动、额外能力默认启用，不写 `defaultChecked`；条件未确认的额外能力显式写 `defaultChecked: false`（猫又、悠真）。
+- 核心被动、额外能力默认启用，不写 `defaultChecked`；条件未确认的额外能力显式写 `defaultChecked: false`。
 - 影画 Buff 由所选影画等级自动启用，不读取 `defaultChecked`，校验拒绝 `true`。
 - `cinemaBuffs` 通常只有 1、2、4、6 影；3、5 影是技能等级加成，写进 `cinemaDescriptions`（六档齐全，建模过的标 `modeled`），不额外自动加等级，工作台技能等级输入是最终等级。
 - 技能来源 Buff（`skillBuffs`）按真实来源归类，必须有 `sourceSkillRef`（来源不是技能的通用状态，如浸染，可省略它并改填 `source` 来源标签，显示为“异常效果｜浸染”），不因为原文提到招式名就新建独立开关；只有它使用 `defaultChecked: true`。

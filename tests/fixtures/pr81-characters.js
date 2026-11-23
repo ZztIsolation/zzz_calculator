@@ -9,9 +9,9 @@ export function characterInput(catalog, agentId, potentialLevel = 6) {
         combatBuffs: { activeBuffIds: [
             `agent:${agentId}.corePassive`, `wEngine:${wEngineId}.self`,
             "driveDisc4pc:shadow_harmony.self",
-            ...(agent.combatBuffs.additionalAbility.defaultChecked ? [`agent:${agentId}.additionalAbility`] : []),
+            ...(agent.combatBuffs.additionalAbility.defaultChecked !== false ? [`agent:${agentId}.additionalAbility`] : []),
         ] },
-        damage: { mode: "custom", agentLevel: 60, skillLevelsByCategory: { basic: 12, dodge: 12, special: 12, chain: 12 },
+        damage: { mode: "custom", agentLevel: 60, skillLevelsByCategory: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12, cinema: 1 },
             target: { defense: 953, resistanceByElement: { physical: 0, electric: 0, fire: 0 }, stunMultiplierPercent: 150 },
         },
         settings: { fourPieceSetId: "shadow_harmony", twoPieceSetIds: ["hormone_punk"],

@@ -26,8 +26,7 @@ describe("PR81 character defaults and saved overrides", () => {
       combatBuffs: [],
     }
     it(`${id} initializes defaults, preserves a manual event and disabled buffs after reload`, () => {
-      if (id === "evelyn_chevalier") expect(agent.hidden).not.toBe(true)
-      else expect(agent.hidden).toBe(true)
+      expect(agent.hidden).not.toBe(true)
       const store = useBuildStore()
       store.initialize({}, meta)
       expect(store.agentId).toBe(id)
@@ -38,7 +37,7 @@ describe("PR81 character defaults and saved overrides", () => {
       expect(store.damageConfig.mode).toBe("adminDefault")
       const core = `agent:${id}.corePassive`, extra = `agent:${id}.additionalAbility`
       expect(store.activeBuffIds(meta)).toContain(core)
-      expect(store.activeBuffIds(meta).includes(extra)).toBe(id === "evelyn_chevalier")
+      expect(store.activeBuffIds(meta)).toContain(extra)
       const events = [{ ...store.damageConfig.events[0], count: 3, stunned: false }]
       store.setDamageConfig({ ...store.damageConfig, mode: "custom", events, selectedEventId: events[0].id }, agent)
       store.applyBuffState({ selectedBuffIds: [], runtimeInputs: {} }, meta)
@@ -53,7 +52,12 @@ describe("PR81 character defaults and saved overrides", () => {
       store.initialize({}, meta)
       const potentialEvents = JSON.parse(JSON.stringify(store.damageConfig.events))
       store.setPotentialLevel(0, meta)
-      expect(store.damageConfig.events.some((e: any) => e.skillRef?.moveId === "claw_mark" || e.skillGroupId === "ultimate_full")).toBe(false)
+      expect(store.damageConfig.events.some((e: any) =>
+        e.skillRef?.moveId === "claw_mark"
+        || e.skillRef?.moveId === "potential_dodge_counter"
+        || e.skillGroupId === "ultimate_full"
+        || e.skillRef?.moveId === "chasing_thunder"
+        || e.skillRef?.moveId === "ex_patrol")).toBe(false)
       store.setPotentialLevel(6, meta)
       expect(store.damageConfig.events).toEqual(potentialEvents)
     })

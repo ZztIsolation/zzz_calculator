@@ -4,6 +4,17 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-23 — 猫又与浅羽悠真潜能觉醒建模优化与公开显示
+
+- 问题：猫又（`nekomata`）与浅羽悠真（`asaba_harumasa`）此前处于隐藏审阅状态（`hidden: true`），存在空影画 Buff 占位与缺失六档 `cinemaDescriptions`、额外能力默认关闭、推荐盘子与潜能觉醒后主流失衡轴脱节等问题；悠真仅录入了 4 个大招/强化技招式，缺少普攻、冲刺斩击、逐雷、连携、支援与二影/六影电磁爆炸建模，且潜能 2–6 攻击加成的基准写为 `baseAtk`。
+- 变化：
+  - 规范与公开：移除猫又（二/三/五影）与悠真（一/三/四/五影）的空 `cinemaBuffs` 条目，补齐六档 `cinemaDescriptions`；移除核心被动冗余 `defaultChecked: true` 并默认启用两位角色的额外能力（猫步秀、超频）；将两者 `hidden` 设为 `false`，同步更新[猫又专题](characters/nekomata.md)、[浅羽悠真专题](characters/asaba_harumasa.md)、[角色索引](characters/README.md)与[角色建模手册](character-modeling-handbook.md)。
+  - 猫又（`nekomata`）：P1–P6 默认计算目标升级为“0影琉音双大失衡轴：2大2绒爪穿刺2强化技1套普攻＋10爪印”（P0 保持原版 1大2强化技3套普攻）；结合 B 站 3.1 潜能攻略与覆盖率，将推荐 4 件套调整为啄木鸟电音（3 层、覆盖率 `0.7`）、河豚电音（大招后 12 秒攻击覆盖率 `0.8`＋常驻 20% 终结技增伤）、激素朋克（`0.7`）、獠牙重金属（`0.7`），移除如影相随。
+  - 浅羽悠真（`asaba_harumasa`）：依据 Nanoka `3.3.12+19520738` 补齐 6 大类 19 招式（普通攻击：穿云按物理 1–3 段 / 电伤 4–5 段拆分、冲刺攻击：飞弦·斩、逐雷、特殊技：天罗、连携技：会·离、支援技与影画六：电磁爆炸 1500%）；补全 P0/P1+ 核心暴击与锋芒暴伤目标、P2–P6 `outOfCombatAtk` 攻击加成及仅限飞弦·斩/逐雷的 5%–15% 电抗无视、二影「挥霍」+50% 飞弦·斩增伤；新增 `dash_slash_combo` 技能组，默认轴升级为 P0 12 刀失衡轴（总倍率 `11497.7%`）与 P1–P6 12 刀＋12 逐雷失衡轴（总倍率 `13221.9%`）；推荐 4 件套扩展为如影相随（`1.0`）、雷暴重金属（`0.7`）、激素朋克（`0.7`）、河豚电音（`0.8`）。
+  - 测试与基线：同步 `tests/skill-targets.test.js`（277 招式、665 行、132 目标、标签基线），重写 `tests/pr81-characters.test.js` 独立手算算例、排除反例、影画/潜能校验与公开 Enka 映射断言，并更新 `webapp/src/stores/pr81-characters.test.ts`。
+- 关键边界：两者均无全队 Buff，不创建队友条目，不预绑 `defaultTeammates`；不模拟动作时长、喧响/能量、电壶/电囚/呼噜能量收支、自动叠层或站位判定；猫又 `超凶爪印` 仍不挂 `followUp`、悠真 `逐雷` 不挂 `dashAttack`；悠真六影 `电磁爆炸` 为可选手动影画招式，不自动进入 0 影默认轴。未提交、推送或部署。
+- 验证：本地运行完整 `npm test`（全部根目录 Node 回归测试包括 `test:pr81-characters`、`test:skill-targets`、`test:maintenance-validation`、`test:repository-integrity`、`test:enka-import`、`test:optimizer` 等均通过；`test:webapp` 在默认 UTC-8 环境下 78/79 文件、1046/1047 用例通过，唯一失败为与本次无关的 `ImportView.test.ts:310` 时区格式化断言，在 `TZ=Asia/Shanghai` 下复验 `ImportView.test.ts` 与 `pr81-characters.test.ts` 共 38/38 全部通过）；`npm run build:webapp`（含 179 张缩略图 `--check`、`vue-tsc --noEmit`、`vite build`）与 `git diff --check` 通过。均为本地验证，不代表远端 CI 或线上验收。
+
 ## 2026-11-22 — 赛维里安公开显示
 
 - 问题：赛维里安与专武禁罪囚笼此前为 `hidden: true`，工作台、优化器选择和公开 Enka 导入都不可用。
