@@ -4140,6 +4140,9 @@ export function damageModifierAppliesTo(modifier, event) {
     const appliesTo = modifier.appliesTo ?? {}
     const skillTargets = generatedModifierSkillTargets(modifier)
     const hasSkillTargets = skillTargets.length > 0
+    if (modifier.requirement?.eventDamageKind && modifier.requirement.eventDamageKind !== matchingEvent.kind) {
+        return false
+    }
     if (Object.prototype.hasOwnProperty.call(modifier?.requirement ?? {}, "eventStunned")
         && normalizeEventStunned(matchingEvent?.stunned) !== normalizeStunned(modifier.requirement.eventStunned)) {
         return false
@@ -7053,7 +7056,9 @@ function denseSharpEventTotals(sums, damageElement) {
         "stunDmgMultiplierBonusAlways",
         "stunDmgMultiplierBonusCapAlways",
     ].filter(Boolean)
-    return Object.fromEntries(keys.map(key => [key, denseModifierSum(sums, key)]))
+    const totals = Object.fromEntries(keys.map(key => [key, denseModifierSum(sums, key)]))
+    totals.enemyDefReduction += denseModifierSum(sums, DEF_IGNORE_KEY_BY_ELEMENT[damageElement])
+    return totals
 }
 
 function denseSharpCombatTotals(combatValues) {
@@ -8915,8 +8920,8 @@ export function createInCombatPanelCalculator(catalog, input) {
             const effect = part === "team"
                 ? driveDiscFourPieceTeamBuff(set)
                 : driveDiscFourPieceSelfBuff(set)
-            const setIndex = setIndexById?.get?.(setId)
-            if (setIndex === undefined) {
+            const setIndex = setIndexById?.get?.(setId) ?? setIds.indexOf(setId)
+            if (setIndex < 0) {
                 continue
             }
             if (!pushEntry({

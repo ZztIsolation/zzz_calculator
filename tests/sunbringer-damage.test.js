@@ -56,7 +56,7 @@ for (const [coreSkillLevel, critRate, ignore] of [["none", .22, .11], ["F", .40,
     close(hits[0].multipliers.defense, 794 / (794 + 953 * (1 - ignore)), "polar defense ignore " + coreSkillLevel)
 }
 
-// Build an independent oracle from the V5 level-12 Nanoka multipliers.
+// Build an independent oracle from the level-12 Nanoka multipliers.
 // No skippable live-state buffs, enemy defense or teammate multipliers enter these examples.
 function directValues(cinema, defense = 441) {
     const unit = defense * (cinema >= 1 ? 1.15 : 1) * (cinema >= 4 ? 1.1 : 1)
@@ -129,5 +129,16 @@ verify(6, [hit("spear"), hit("ordinary"), hit("maim", { count: 3 }), hit("wish")
     [d.spear + d.ordinary + 3 * d.maim + d.wish + d.red,
         .81 * (d.spear + d.red) + .405 * d.ordinary + .54 * 3 * d.maim + 1.20 * d.wish * 1.80, 0],
 "M6 echoes only the local deposit from this wish")
+
+// Both M6 finishers echo only their own deposit. M4 belongs to the first one.
+const twoWishes = [hit("spear"), hit("wish"), hit("maim", { count: 3 }), hit("spear", { id: "second-spear" }), hit("wish", { id: "second-wish" })]
+verify(6, twoWishes, d => [2 * d.spear + 2 * d.wish + 3 * d.maim,
+    .81 * 2 * d.spear + .54 * 3 * d.maim + (1.20 + .81) * 1.80 * d.wish, 0], "both M6 finishers echo")
+const twoWishResult = calculateInCombatPanel(catalog, input(6, twoWishes)).damage
+const echoRows = twoWishResult.events.filter(event => event.kind === "emberSettlement")
+assert.deepEqual(echoRows.map(event => event.id), ["wish::ember", "wish::echo", "second-wish::ember", "second-wish::echo"])
+const wishDamage = directValues(6).wish
+close(echoRows[1].finalDamage, .80 * 1.20 * wishDamage, "first echo includes M4")
+close(echoRows[3].finalDamage, .80 * .81 * wishDamage, "second echo uses the second wish deposit")
 
 console.log("sunbringer damage and optimizer scoring passed")

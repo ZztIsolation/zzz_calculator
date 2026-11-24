@@ -628,6 +628,10 @@
     "34200": {
       "id": "zzz_wiki_2121",
       "name": "棘刺玫瑰"
+    },
+    "34300": {
+      "id": "monument_of_the_star",
+      "name": "星之碑"
     }
   },
   "driveDiscEquipment": {

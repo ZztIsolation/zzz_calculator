@@ -38,5 +38,7 @@
 | `severian-official-1794906819.json` | 赛维里安·洛威尔 | 官方百科词条 2217 | 修订 `1794906819` | 2026-11-18 | 无（原始响应） | [severian_lowell](../characters/severian_lowell.md) |
 | `severian-official-weapon-1794632419.json` | 禁罪囚笼（赛维里安专武） | 官方百科词条 2305 | 修订 `1794632419` | 2026-11-18 | 无（原始响应） | [severian_lowell](../characters/severian_lowell.md) |
 | `sunbringer-nanoka-3.4.5+20713015.json` | 挽昼 | Nanoka 角色 1601 | `3.4.5+20713015` | 2026-11-22 | 无（原始响应） | [sunbringer](../characters/sunbringer.md) |
+| `sunbringer-nanoka-3.4.12+20749856.json` | 挽昼 | Nanoka 角色 1601 | `3.4.12+20749856` | 2026-11-24 | 无（原始响应） | [sunbringer](../characters/sunbringer.md) |
+| `dragonfire-mirage-nanoka-3.4.12+20749856.json` | 蜃炎梦火 | Nanoka 音擎 14160 | `3.4.12+20749856` | 2026-11-24 | 无（原始响应） | [sunbringer](../characters/sunbringer.md) |
 
 其余角色（简、佩洛伊斯等）没有保存快照；它们的来源见各自角色文档。

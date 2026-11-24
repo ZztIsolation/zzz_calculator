@@ -135,6 +135,7 @@ for (const [suitId, metadata] of Object.entries(equipments?.Suits ?? {})) {
   })
   if (item) suitMappings[suitId] = { id: item.id, name: zhName(item) }
 }
+addPreviewMapping(suitMappings, equipments?.Suits ?? {}, setItems, "monument_of_the_star")
 assertVisibleCatalogCoverage("Drive Disc set", setItems, new Set(Object.values(suitMappings).map(item => item.id)))
 
 const equipmentMappings = {}

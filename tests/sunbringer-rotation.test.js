@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
 import { expandCalculationEvents } from "../core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "../core/defaultCalculationConfig.js"
 
@@ -9,55 +11,53 @@ const skills = readCatalog("agent_skills").agentSkills.find(entry => entry.agent
 assert.ok(agent?.defaultCalculationConfig, "挽昼应有管理员默认轴")
 assert.ok(skills, "挽昼应有技能表")
 
-function rotation(cinema, toggleExtraMaim = false) {
+function rotation(cinema) {
     const config = resolveDefaultCalculationConfig(agent.defaultCalculationConfig, cinema)
-    if (toggleExtraMaim) {
-        const adjustable = config.events.find(event => event.skillGroupId === "variable_maim")
-        assert.ok(adjustable, "单投轮内的一次毁伤应能单独切换失衡状态")
-        adjustable.stunned = true
-    }
     return expandCalculationEvents(config.events, agent, { strict: true }).events
 }
 
-function hits(events, move, row, stunned) {
-    return events.filter(event => event.skillRef.moveId === move && event.skillRef.rowId === row
-        && (stunned === undefined || event.stunned === stunned))
-        .reduce((total, event) => total + event.count, 0)
-}
-
-const single = rotation(0)
-const double = rotation(2)
-assert.deepEqual(rotation(1), single)
-assert.deepEqual(rotation(6), double)
-for (const event of double.concat(single)) {
-    const { agentSkillId, categoryId, moveId, rowId } = event.skillRef
-    assert.equal(agentSkillId, "sunbringer")
-    assert.equal(event.kind, "sharp")
-    const category = skills.categories.find(item => item.id === categoryId)
-    const move = category?.moves.find(item => item.id === moveId)
-    assert.equal(move?.rows.find(item => item.id === rowId)?.kind, "damageMultiplier", `${categoryId}/${moveId}/${rowId}`)
-}
-for (const [cinema, totalMaims, stunnedMaims, count] of [[0, 3, 1, 3], [2, 9, 4, 6]]) {
-    const base = rotation(cinema)
-    const alternate = rotation(cinema, true)
-    assert.equal(hits(base, "move_1601001", "maim"), totalMaims)
-    assert.equal(hits(base, "move_1601001", "maim", true), stunnedMaims)
-    assert.equal(hits(alternate, "move_1601001", "maim"), totalMaims)
-    assert.equal(hits(alternate, "move_1601001", "maim", true), stunnedMaims + 1)
-    for (const row of ["damage_1", "damage_2", "damage_3", "damage_4"]) {
-        assert.equal(hits(base, "move_1601001", row, false), count)
+for (let cinema = 0; cinema <= 6; cinema++) {
+    const events = rotation(cinema)
+    const openingRelease = cinema === 6 ? "1601021" : "1601012"
+    assert.deepEqual(events.map(event => event.skillRef.moveId.slice(5)), [
+        "1601004", "1601009", openingRelease, "1601018", "1601001",
+        "1601004", "1601009", "1601020", "1601021",
+    ])
+    assert.deepEqual(events.map(event => event.count), [1, 1, 1, 1, 3, 1, 1, 1, 1])
+    assert.equal(events[4].skillRef.rowId, "maim", "连携后三次毁伤应参与第二次结算")
+    for (const event of events) {
+        assert.equal(event.stunned, true)
+        assert.equal(event.kind, "sharp")
+        const { agentSkillId, categoryId, moveId, rowId } = event.skillRef
+        assert.equal(agentSkillId, "sunbringer")
+        const move = skills.categories.find(item => item.id === categoryId)?.moves.find(item => item.id === moveId)
+        assert.equal(move?.rows.find(item => item.id === rowId)?.kind, "damageMultiplier")
     }
-    assert.equal(base.at(-1).skillRef.moveId, "move_1601021", "轴尾此愿应结清累计烬痕")
 }
-
-const stunnedMoves = double.filter(event => event.stunned && event.skillRef.rowId !== "maim")
-    .flatMap(event => Array(event.count).fill(event.skillRef.moveId))
-assert.deepEqual(stunnedMoves, [
-    "move_1601004", "move_1601009", "move_1601012", "move_1601018", "move_1601004", "move_1601020", "move_1601021",
-    "move_1601004", "move_1601009", "move_1601018", "move_1601020", "move_1601018", "move_1601011", "move_1601021",
-])
-assert.equal(hits(double, "move_1601009", "damage", false), 1, "第二轮失衡前只有黄星")
-assert.equal(hits(double, "move_1601012", "damage", false), 0)
+const catalog = await loadCalculatorContext(fileURLToPath(new URL("../", import.meta.url)))
+for (const cinemaLevel of [0, 2, 4, 6]) {
+    const events = rotation(cinemaLevel)
+    const request = {
+        agentId: agent.id, cinemaLevel, coreSkillLevel: "F", wEngineId: "dragonfire_mirage", driveDiscs: [],
+        damage: { mode: "custom", selectedEventId: events[0].id, events },
+    }
+    const result = calculateInCombatPanel(catalog, request).damage
+    const hits = result.events.filter(event => event.kind === "sharp").map(event => event.finalDamage)
+    const releases = result.events.filter(event => event.kind === "emberSettlement")
+    const mainRate = cinemaLevel >= 2 ? .81 : .60
+    const openingRate = cinemaLevel >= 4 ? 1.20 : mainRate
+    const first = mainRate * (hits[0] + hits[1]) + openingRate * hits[2]
+    const second = (cinemaLevel >= 2 ? .405 * hits[3] + .54 * hits[4] : .40 * hits[4])
+        + mainRate * (hits[5] + hits[6] + hits[7] + hits[8])
+    const expected = cinemaLevel === 6
+        ? [first, .80 * openingRate * hits[2], second, .80 * mainRate * hits[8]] : [first, second]
+    assert.equal(result.ember.pendingDamage, 0)
+    assert.equal(releases.length, expected.length)
+    expected.forEach((value, index) => {
+        assert.ok(value > 0 && Math.abs(releases[index].finalDamage - value) < value * 1e-9,
+            `影画 ${cinemaLevel} 第 ${index + 1} 次烬灭的积攒来源不符`)
+    })
+}
 // A release followed by a fresh deposit must carry its tail across the group boundary.
 const source = {
     ...agent,

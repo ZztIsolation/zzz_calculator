@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
 import { defaultWEngineIdForAgent } from "../core/shared-combat.js"
@@ -48,7 +49,12 @@ const ranks = [
     [26, 29, 14.5],
     [28, 32, 16],
 ]
+const sourceVersion = engine.verification.sourceVersion
+const source = JSON.parse(readFileSync(new URL(`../docs/sources/dragonfire-mirage-nanoka-${sourceVersion}.json`, import.meta.url), "utf8"))
+assert.equal(source.id, engine.verification.sourceId)
 for (const [index, [crit, fire, fireSharp]] of ranks.entries()) {
+    const text = source.talents[index + 1].desc.replace(/<[^>]+>/g, "")
+    assert.deepEqual([...text.matchAll(/([\d.]+)%/g)].map(match => Number(match[1])), [crit, fire, fireSharp])
     const result = calculate(index + 1)
     assert.deepEqual(result.outOfCombat.baseBreakdown.wEngine, { hp: 0, atk: 0, def: 446 })
     assert.equal(result.inCombat.buffTotals.critRate, crit / 100)

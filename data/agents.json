@@ -14711,7 +14711,7 @@
             "scope": "inCombat",
             "defaultChecked": false,
             "description": {
-              "zhCN": "进入战场时，挽昼立即获得1000点喧响值，在勘域模式中此效果180秒内最多触发一次；进入战场时，挽昼首次发动[普通攻击：执旌·聚锋]后，下次发动[强化特殊技：燃灯·永昼之炬]或[终结技：「此愿，重塑万象」]使目标积攒[烬痕]时，[影画：继承者的叛旗]中的[烬痕]积攒量提升效果额外提升65%，在勘域模式中此效果180秒内最多触发一次；挽昼造成的伤害提升10%。"
+              "zhCN": "进入战场时，挽昼立即获得1000点喧响值，在勘域模式中此效果180秒内最多触发一次；进入战场时，挽昼首次发动[普通攻击：执旌·聚锋]后，下次发动的[强化特殊技：燃灯·永昼之炬]或[终结技：「此愿，重塑万象」]使目标积攒[烬痕]时，[影画：继承者的叛旗]中的[烬痕]积攒量提升效果额外提升65%，在勘域模式中此效果180秒内最多触发一次；挽昼造成的伤害提升10%。"
             },
             "effects": [
               {
@@ -14914,15 +14914,17 @@
           "defaultLevelAtCoreSkill": "F"
         },
         "sources": [
-          "https://static.nanoka.cc/zzz/3.4.5+20713015/zh/character/1601.json"
+          "https://static.nanoka.cc/zzz/3.4.12+20749856/zh/character/1601.json"
         ]
       },
       "preferredDriveDiscs": {
         "defaultSetIds": [
-          "zzz_wiki_2121"
+          "monument_of_the_star"
         ],
         "defaultTwoPieceSetIds": [
-          "puffer_electro"
+          "inferno_metal",
+          "soul_rock",
+          "woodpecker_electro"
         ],
         "mainStatLimits": {
           "4": [
@@ -14952,10 +14954,10 @@
         "def"
       ],
       "sources": [
-        "https://static.nanoka.cc/zzz/3.4.5+20713015/zh/character/1601.json"
+        "https://static.nanoka.cc/zzz/3.4.12+20749856/zh/character/1601.json"
       ],
       "verification": {
-        "sourceVersion": "3.4.5+20713015",
+        "sourceVersion": "3.4.12+20749856",
         "sourceId": 1601,
         "level60Stats": "60级满突破，初始暴击 5%，核心 A 至 F 各增加 4.8%，暴伤转暴率由局外效果计算。"
       },
@@ -15495,105 +15497,255 @@
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "单投一轮（单轮伤害）"
+          "zhCN": "失衡内双投"
         },
         "events": [
           {
-            "id": "preparation-1",
-            "kind": "skillGroup",
-            "skillGroupId": "preparation",
+            "id": "1-javelin",
+            "kind": "sharp",
             "count": 1,
-            "stunned": false
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "basic",
+              "moveId": "move_1601004",
+              "rowId": "damage"
+            }
           },
           {
-            "id": "maim-2",
-            "kind": "skillGroup",
-            "skillGroupId": "maim",
+            "id": "2-yellow",
+            "kind": "sharp",
             "count": 1,
-            "stunned": false
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "special",
+              "moveId": "move_1601009",
+              "rowId": "damage"
+            }
           },
           {
-            "id": "variable_maim-3",
-            "kind": "skillGroup",
-            "skillGroupId": "variable_maim",
+            "id": "3-red",
+            "kind": "sharp",
             "count": 1,
-            "stunned": false
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "special",
+              "moveId": "move_1601012",
+              "rowId": "damage"
+            }
           },
           {
-            "id": "first_single-4",
-            "kind": "skillGroup",
-            "skillGroupId": "first_single",
+            "id": "4-chain",
+            "kind": "sharp",
             "count": 1,
-            "stunned": true
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "chain",
+              "moveId": "move_1601018",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "5-maim",
+            "kind": "sharp",
+            "count": 3,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "basic",
+              "moveId": "move_1601001",
+              "rowId": "maim"
+            }
+          },
+          {
+            "id": "6-javelin",
+            "kind": "sharp",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "basic",
+              "moveId": "move_1601004",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "7-yellow",
+            "kind": "sharp",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "special",
+              "moveId": "move_1601009",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "8-first",
+            "kind": "sharp",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "chain",
+              "moveId": "move_1601020",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "9-final",
+            "kind": "sharp",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sunbringer",
+              "categoryId": "chain",
+              "moveId": "move_1601021",
+              "rowId": "damage"
+            }
           }
         ],
-        "selectedEventId": "preparation-1",
+        "selectedEventId": "1-javelin",
         "variants": [
           {
             "mode": "custom",
-            "cinemaLevel": 2,
+            "cinemaLevel": 6,
             "name": {
-              "zhCN": "双投接单投（90秒，两轮合计）"
+              "zhCN": "失衡内双投（六影）"
             },
             "events": [
               {
-                "id": "preparation-1",
-                "kind": "skillGroup",
-                "skillGroupId": "preparation",
+                "id": "1-javelin",
+                "kind": "sharp",
                 "count": 1,
-                "stunned": false
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "basic",
+                  "moveId": "move_1601004",
+                  "rowId": "damage"
+                }
               },
               {
-                "id": "maim-2",
-                "kind": "skillGroup",
-                "skillGroupId": "maim",
+                "id": "2-yellow",
+                "kind": "sharp",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "special",
+                  "moveId": "move_1601009",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "3-final",
+                "kind": "sharp",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "chain",
+                  "moveId": "move_1601021",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "4-chain",
+                "kind": "sharp",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "chain",
+                  "moveId": "move_1601018",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "5-maim",
+                "kind": "sharp",
                 "count": 3,
-                "stunned": false
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "basic",
+                  "moveId": "move_1601001",
+                  "rowId": "maim"
+                }
               },
               {
-                "id": "first_double-3",
-                "kind": "skillGroup",
-                "skillGroupId": "first_double",
+                "id": "6-javelin",
+                "kind": "sharp",
                 "count": 1,
-                "stunned": true
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "basic",
+                  "moveId": "move_1601004",
+                  "rowId": "damage"
+                }
               },
               {
-                "id": "preparation-4",
-                "kind": "skillGroup",
-                "skillGroupId": "preparation",
+                "id": "7-yellow",
+                "kind": "sharp",
                 "count": 1,
-                "stunned": false
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "special",
+                  "moveId": "move_1601009",
+                  "rowId": "damage"
+                }
               },
               {
-                "id": "extra_yellow-5",
-                "kind": "skillGroup",
-                "skillGroupId": "extra_yellow",
+                "id": "8-first",
+                "kind": "sharp",
                 "count": 1,
-                "stunned": false
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "chain",
+                  "moveId": "move_1601020",
+                  "rowId": "damage"
+                }
               },
               {
-                "id": "maim-6",
-                "kind": "skillGroup",
-                "skillGroupId": "maim",
+                "id": "9-final",
+                "kind": "sharp",
                 "count": 1,
-                "stunned": false
-              },
-              {
-                "id": "variable_maim-7",
-                "kind": "skillGroup",
-                "skillGroupId": "variable_maim",
-                "count": 1,
-                "stunned": false
-              },
-              {
-                "id": "second_single-8",
-                "kind": "skillGroup",
-                "skillGroupId": "second_single",
-                "count": 1,
-                "stunned": true
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "sunbringer",
+                  "categoryId": "chain",
+                  "moveId": "move_1601021",
+                  "rowId": "damage"
+                }
               }
             ],
-            "selectedEventId": "preparation-1"
+            "selectedEventId": "1-javelin"
           }
         ]
       }

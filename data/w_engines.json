@@ -9950,14 +9950,15 @@
       },
       "sources": [
         "https://zzz.nanoka.cc/weapon/14160",
-        "https://static.nanoka.cc/zzz/3.4.5%2B20713015/zh/weapon/14160.json"
+        "https://static.nanoka.cc/zzz/3.4.12%2B20749856/zh/weapon/14160.json"
       ],
       "verification": {
         "sourceId": 14160,
-        "level60Stats": "Nanoka 3.4.5+20713015, weapon 14160, level 60 and ascension 5",
+        "sourceVersion": "3.4.12+20749856",
+        "level60Stats": "Nanoka 3.4.12+20749856, weapon 14160, level 60 and ascension 5",
         "effectText": "Nanoka weapon 14160, talents 1–5",
         "effectBuff": "锋御装备者常驻暴击率，强化特殊技或接战后刷新 25 秒火属性增伤与火属性锐化增伤。",
-        "acquiredAt": "2026-11-22"
+        "acquiredAt": "2026-11-24"
       }
     }
   ]
