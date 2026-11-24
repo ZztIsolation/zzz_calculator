@@ -2,11 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NConfigProvider, NMessageProvider } from "naive-ui"
 import { storageIssues, exportUnreadableData } from "@runtime/storage-guard.js"
-import { Calculator, Database, Download, HardDrive, Settings2, UserRound, Monitor, Sun, Moon } from "lucide-vue-next"
+import { Calculator, Database, Download, HardDrive, Settings2, UserRound, Monitor, Sun, Moon, Palette } from "lucide-vue-next"
 import { useRoute, useRouter } from "vue-router"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useTheme } from "@/runtime/theme"
+import { useSkin } from "@/runtime/skin"
 import PersonalBackupPanel from "@/components/PersonalBackupPanel.vue"
 
 const accountStore = useAccountStore()
@@ -25,12 +26,21 @@ const accountChipText = computed(() => {
   return "账号加载中"
 })
 
-const { preference, naiveTheme, themeOverrides, cyclePreference } = useTheme()
+const { preference, isDark, naiveTheme, themeOverrides, cyclePreference } = useTheme()
+const { isEditorial, toggleSkin, syncSkinFromQueryParam, resolveThemeOverrides } = useSkin()
+const activeThemeOverrides = computed(() => resolveThemeOverrides(themeOverrides.value, isDark.value))
+const skinButtonLabel = computed(() => isEditorial.value
+  ? "界面风格：画册风（点击切回经典）"
+  : "界面风格：经典（点击切换为画册风）")
 const themeButtonLabel = computed(() => ({
   system: "主题：跟随系统（点击切换为浅色）",
   light: "主题：浅色（点击切换为深色）",
   dark: "主题：深色（点击切换为跟随系统）",
 })[preference.value])
+
+watch(() => route.query.skin, value => {
+  syncSkinFromQueryParam(value)
+}, { immediate: true })
 
 // 主导航的滑块：一个绝对定位的白色块滑到当前链接下面。
 // 链接位置只在导航尺寸变化时量一次并缓存，切页时直接取缓存，避免新页面渲染时强制排版。
@@ -123,7 +133,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides">
+  <NConfigProvider :theme="naiveTheme" :theme-overrides="activeThemeOverrides">
     <NMessageProvider>
       <div class="app-shell">
         <header class="app-topbar">
@@ -165,6 +175,18 @@ onBeforeUnmount(() => {
             </RouterLink>
           </nav>
           <div class="topbar-actions">
+            <button
+              type="button"
+              class="theme-toggle skin-toggle"
+              :class="{ 'is-editorial': isEditorial }"
+              data-testid="skin-toggle"
+              :aria-pressed="isEditorial"
+              :title="skinButtonLabel"
+              :aria-label="skinButtonLabel"
+              @click="toggleSkin"
+            >
+              <Palette :size="16" aria-hidden="true" />
+            </button>
             <button
               type="button"
               class="theme-toggle"

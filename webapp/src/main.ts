@@ -11,10 +11,13 @@ import { formatStartupError } from "@runtime/startup-errors"
 import { recoverPersonalRestore } from "@runtime/personal-backup"
 import "@/styles/tokens.css"
 import { initTheme } from "@/runtime/theme"
+import { initSkin } from "@/runtime/skin"
 import "@/styles/workbench.css"
+import "@/styles/editorial-skin.css"
 
 const STARTUP_RECOVERY_LOCK_TIMEOUT_MS = 5_000
 initTheme()
+initSkin()
 
 async function bootstrap() {
   const pinia = createPinia()
