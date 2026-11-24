@@ -4,7 +4,7 @@
 
 文件名使用 `data/agents.json` 中的角色 ID。新增或修订角色的流程见[角色制作指南](../character-authoring-guide.md)，文件格式见[模板](_template.md)。表中的游戏 ID、可见性以 `data/agents.json` 和 `data/enka_zzz_mapping.json` 为准，核对基线为 `9d51640c23697a849bdd3674b7f645a30c9f76b0`。
 
-## 角色清单（`data/agents.json`，共 20 个）
+## 角色清单（`data/agents.json`，共 22 个）
 
 | 角色 ID | 名称 | 游戏 ID | 首页与优化器 | 专属文档 | 测试入口 |
 | --- | --- | --- | --- | --- | --- |
@@ -25,6 +25,7 @@
 | `severian_lowell` | 赛维里安·洛威尔 | 1631 | **隐藏** | [severian_lowell.md](severian_lowell.md) | `test:severian-damage` |
 | `sigrid` | 希格莉德·德拉叙尔 | 1591 | 可见 | [sigrid.md](sigrid.md) | `test:sigrid-damage` |
 | `soldier_11` | 11号 | 1041 | 可见 | [soldier_11.md](soldier_11.md) | `test:soldier-11-damage` |
+| `sunbringer` | 挽昼 | 1601 | 可见 | [sunbringer.md](sunbringer.md) | `npm run test:sunbringer` |
 | `velina` | 维琳娜·艾嘉德 | 1561 | 可见 | [velina.md](velina.md)（含风属性异常结算） | `test:velina-damage`、`test:velina-c6-damage`、`test:velina-optimizer`、`test:turbulence-damage` |
 | `vivian` | 薇薇安·班希 | 1331 | 可见 | [vivian.md](vivian.md) | `test:vivian-damage`、`test:teammate-team-effects` |
 | `ye_shunguang` | 叶瞬光 | 1431 | 可见 | [ye_shunguang.md](ye_shunguang.md) | 无专属测试 |

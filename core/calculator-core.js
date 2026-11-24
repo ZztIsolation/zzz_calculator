@@ -12,6 +12,7 @@ import {
 import { isTurbulenceSettlement, isWindAgent, isLegacyTurbulenceEvent } from "./anomalySettlement.js"
 export { isTurbulenceSettlement } from "./anomalySettlement.js"
 import { expandCalculationConfigSkillGroups } from "./calculationSkillGroups.js"
+import { emberScoreRequest, planEmberSettlement, settleEmberResults } from "./emberSettlement.js"
 import { skillMultiplierTargetId, skillTagsForMove, skillTargetMatches, skillTypeForMove } from "./skillTargets.js"
 import {
     disorderBaseMultiplier,
@@ -6326,7 +6327,7 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
 
 function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel, bonusTotals, input, includeWhiteBox = true, skillOptions = {} }) {
     const damageRequest = normalizeDamageRequest(input, agent, catalog, skillOptions)
-    const events = damageRequest.events.map(event => {
+    const hits = damageRequest.events.map(event => {
         if (event.kind === "direct") {
             return calculateDirectDamageEvent({
                 event,
@@ -6367,12 +6368,15 @@ function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel
             includeWhiteBox,
         })
     })
+    const emberPlan = planEmberSettlement(damageRequest.events, agent.sharpProfile?.ember, skillOptions.cinemaLevel)
+    const { events, ember } = settleEmberResults(hits, emberPlan)
     const selectedEvent = events.find(event => event.id === damageRequest.selectedEventId) ?? events[0] ?? null
     const totalFinalDamage = events.reduce((total, event) => total + Number(event.finalDamage ?? 0), 0)
 
     return {
         finalDamage: Number(selectedEvent?.finalDamage ?? 0),
         totalFinalDamage,
+        ...(ember ? { ember } : {}),
         scalarReady: selectedEvent?.scalarReady ?? true,
         scalarBlockReasons: selectedEvent?.scalarBlockReasons ?? [],
         objectiveKind: selectedEvent?.objectiveKind ?? null,
@@ -8578,12 +8582,14 @@ export function createInCombatPanelCalculator(catalog, input) {
         currentWEngineRequirement,
         agent,
     })
-    const normalizedDamageInput = normalizeDamageRequest(input.damage, agent, catalog, {
+    const damageRequest = normalizeDamageRequest(input.damage, agent, catalog, {
         coreSkillLevel: input.coreSkillLevel,
         cinemaLevel: input.cinemaLevel,
         potentialLevel,
         buffModifiers: initialSkillBuffModifiers,
     })
+    const emberPlan = planEmberSettlement(damageRequest.events, agent.sharpProfile?.ember, input.cinemaLevel)
+    const normalizedDamageInput = emberScoreRequest(damageRequest, emberPlan)
     const compiledDamageTarget = compileDamageScoreTarget(normalizedDamageInput, agent)
     const hasMasteryToProficiencyConversion = activeAgentBuffs.some(entry =>
         effectRules(entry.buff).some(rule => rule?.stat === "anomalyProficiencyPerMasteryAbove140")

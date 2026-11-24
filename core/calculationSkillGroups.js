@@ -137,6 +137,7 @@ export function normalizeCalculationEventsWithSkillGroups(events = [], source = 
 export function expandCalculationEvents(events = [], source = {}, options = {}) {
     const expandedEvents = []
     const selectedIdMap = new Map()
+    const orderedExpansionLimit = 64
 
     normalizeCalculationEventsWithSkillGroups(events, source, options).forEach((event, eventIndex) => {
         if (!isSkillGroupReferenceEvent(event)) {
@@ -155,29 +156,44 @@ export function expandCalculationEvents(events = [], source = {}, options = {}) 
             return
         }
         const refId = normalizeId(event.id) || `${event.skillGroupId}-ref-${eventIndex + 1}`
-        group.events.forEach((childEvent, childIndex) => {
-            if (!childEvent || typeof childEvent !== "object" || Array.isArray(childEvent) || isSkillGroupReferenceEvent(childEvent)) {
-                if (options.strict && isSkillGroupReferenceEvent(childEvent)) {
-                    throw strictSkillGroupError(`技能组 ${event.skillGroupId} 内不能嵌套技能组。`, event)
+        const appendPass = (weight, passIndex = null) => {
+            group.events.forEach((childEvent, childIndex) => {
+                if (!childEvent || typeof childEvent !== "object" || Array.isArray(childEvent) || isSkillGroupReferenceEvent(childEvent)) {
+                    if (options.strict && isSkillGroupReferenceEvent(childEvent)) {
+                        throw strictSkillGroupError(`技能组 ${event.skillGroupId} 内不能嵌套技能组。`, event)
+                    }
+                    return
                 }
-                return
-            }
-            const next = cloneJson(childEvent)
-            const childId = normalizeId(next.id) || `event-${childIndex + 1}`
-            const childCount = finiteNumber(next.count, 1)
-            next.id = `${refId}__${childId}`
-            next.count = childCount * groupCount
-            next.skillGroupExpansion = {
-                groupId: event.skillGroupId,
-                repeatCount: groupCount,
-                childCount,
-            }
-            next.stunned = normalizeStunned(event.stunned)
-            if (!selectedIdMap.has(refId)) {
-                selectedIdMap.set(refId, next.id)
-            }
-            expandedEvents.push(next)
-        })
+                const next = cloneJson(childEvent)
+                const childId = normalizeId(next.id) || `event-${childIndex + 1}`
+                const childCount = finiteNumber(next.count, 1)
+                next.id = passIndex === null ? `${refId}__${childId}` : `${refId}__r${passIndex + 1}__${childId}`
+                next.count = childCount * weight
+                next.skillGroupExpansion = {
+                    groupId: event.skillGroupId,
+                    repeatCount: groupCount,
+                    childCount,
+                    ...(passIndex === null ? {} : { orderedRepeat: passIndex }),
+                }
+                next.stunned = normalizeStunned(event.stunned)
+                if (!selectedIdMap.has(refId)) selectedIdMap.set(refId, next.id)
+                expandedEvents.push(next)
+            })
+        }
+        if (!group.orderSensitive) {
+            appendPass(groupCount)
+        } else if (Number.isInteger(groupCount) && groupCount <= orderedExpansionLimit) {
+            for (let pass = 0; pass < groupCount; pass++) appendPass(1, pass)
+        } else {
+            // Preserve the opening trigger and the deposits after the final release.
+            // Interior cycles have identical hits and can share a weighted pass.
+            const last = Math.min(1, groupCount)
+            const first = Math.min(1, groupCount - last)
+            const middle = groupCount - first - last
+            if (first > 0) appendPass(first, 0)
+            if (middle > 0) appendPass(middle, 1)
+            appendPass(last, first > 0 ? 2 : 0)
+        }
     })
 
     const requestedSelectedId = normalizeId(options.selectedEventId)

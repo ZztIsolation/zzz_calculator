@@ -66,6 +66,15 @@ function assertVisibleCatalogCoverage(kind, items, mappedIds) {
   if (missing.length) throw new Error(`${kind} missing Enka ID mappings:\n${missing.join("\n")}`)
 }
 
+// The pinned Enka release predates these preview items. Prefer Enka as soon as it lists them.
+function addPreviewMapping(mappings, upstream, items, id) {
+  const item = items.find(candidate => candidate.id === id)
+  const gameId = item?.verification?.sourceId
+  if (gameId && !Object.hasOwn(upstream, gameId)) {
+    mappings[gameId] = { id, name: zhName(item) }
+  }
+}
+
 const [avatars, weapons, locations, equipments, properties, agentsRaw, wEnginesRaw, setsRaw] = await Promise.all([
   fetchJson("avatars.json"),
   fetchJson("weapons.json"),
@@ -96,6 +105,7 @@ for (const [enkaId, metadata] of Object.entries(avatars)) {
   })
   if (item) agentMappings[enkaId] = { id: item.id, name: zhName(item) }
 }
+addPreviewMapping(agentMappings, avatars, agentItems, "sunbringer")
 assertVisibleCatalogCoverage("Agent", agentItems, new Set(Object.values(agentMappings).map(item => item.id)))
 
 const wEngineMappings = {}
@@ -110,6 +120,7 @@ for (const [enkaId, metadata] of Object.entries(weapons)) {
   })
   if (item) wEngineMappings[enkaId] = { id: item.id, name: zhName(item) }
 }
+addPreviewMapping(wEngineMappings, weapons, wEngineItems, "dragonfire_mirage")
 assertVisibleCatalogCoverage("W-Engine", wEngineItems, new Set(Object.values(wEngineMappings).map(item => item.id)))
 
 const suitMappings = {}
