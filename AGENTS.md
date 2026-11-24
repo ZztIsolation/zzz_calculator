@@ -32,6 +32,8 @@ Vue 3 + 共享计算核心的绝区零工具：角色面板与伤害快照（含
 - 界面任务检查真实容器尺寸、控件和保存回读；失败保留草稿，自动属性避免重复手输。
 - 在已授权范围内自主完成。只有资料歧义或影响结果的未定偏好才集中询问，不增加例行审批环节。
 - 临时调查脚本、诊断输出和过程报告放在已忽略的 `tmp/`（根目录临时脚本用 `.tmp_*`）；只有核实后的结论进入对应现行文档或变更日志。
+- **玩家可见说明保持原文**：核心被动、额外能力、影画、技能、音擎等的 `description` 只放来源原文或忠实缩减，不追加“默认…可调整”“不自动…”“用户确认…”类尾句；默认状态用数据字段表达，未建模边界写进角色专题。规则与检查见[建模手册](docs/character-modeling-handbook.md#九来源与-verification)（`npm run test:description-style`）。
+- **“待核实”必须有证据**：只记录来源歧义或数据与实现的冲突并给出证据位置；未留存到 `docs/sources/` 的外部攻略、实测不得写成“已核实/已确认”，也不为证明建模正确而增写反例论证或重复算例。
 - 每条完整规则只维护在对应主文档，其他位置用链接引用；行为或人工默认配置改变时同步现行说明。历史档案不作为执行规范。
 - 完成说明列出变更、实际运行的验证及未建模边界；不得把历史测试结果或本地检查表述成当前线上验收。
 - 提交、推送、合并和部署遵循当次授权；普通文档或角色编辑不隐含部署授权，生产流程见[发布手册](docs/production-deployment-runbook.md)。
@@ -48,7 +50,7 @@ Vue 3 + 共享计算核心的绝区零工具：角色面板与伤害快照（含
 | **D. 发布与部署**：CI/CD、控制面、恢复 | `.github/workflows/`、`deploy/`、部署相关脚本 | [发布手册](docs/production-deployment-runbook.md) | [部署管理器说明](deploy/production/README.md)、[恢复手册](deploy/production/RECOVERY.md)、回归契约的“路由与发布”节 | 其余全部 |
 | **文档维护** | 只改 `*.md` | [文档索引](docs/README.md)（分工、头部格式、验收） | — | — |
 
-**最低验证**（按影响再加）：A 运行相关 `npm run test:<角色/公式/优化器>` 聚焦脚本，共享逻辑变更跑 `npm test`；B 运行 `test:field-buffs`、`test:boss-catalog`、`test:repository-integrity` 等（清单见目录维护手册）；C 运行 `npm run test:webapp`、`npm run build:webapp`，布局变更加 `npm run test:layout`；D 运行 `node scripts/validate-deployment-config.js`、`npm run test:deployment-workflows`、`npm run test:deployment-timeouts`。纯文档改动不要求业务测试。
+**最低验证**（按影响再加）：A、B 改动任何 `description` 文案加 `npm run test:description-style`；A 运行相关 `npm run test:<角色/公式/优化器>` 聚焦脚本，共享逻辑变更跑 `npm test`；B 运行 `test:field-buffs`、`test:boss-catalog`、`test:repository-integrity` 等（清单见目录维护手册）；C 运行 `npm run test:webapp`、`npm run build:webapp`，布局变更加 `npm run test:layout`；D 运行 `node scripts/validate-deployment-config.js`、`npm run test:deployment-workflows`、`npm run test:deployment-timeouts`。纯文档改动不要求业务测试。
 
 ## 文档地图
 
