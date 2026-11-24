@@ -733,6 +733,17 @@ const missingSkillBuffSource = clone(validSkillBuffAgent)
 delete missingSkillBuffSource.combatBuffs.skillBuffs[0].sourceSkillRef
 assertInvalid("agents", missingSkillBuffSource, "必须选择来源技能", skillBuffContext)
 
+const labelOnlySkillBuff = clone(validSkillBuffAgent)
+delete labelOnlySkillBuff.combatBuffs.skillBuffs[0].sourceSkillRef
+labelOnlySkillBuff.combatBuffs.skillBuffs[0].source = { zhCN: "异常效果" }
+assertValid("agents", labelOnlySkillBuff, skillBuffContext)
+const emptyRefLabelSkillBuff = clone(labelOnlySkillBuff)
+emptyRefLabelSkillBuff.combatBuffs.skillBuffs[0].sourceSkillRef = { agentSkillId: "", categoryId: "", moveId: "" }
+assertValid("agents", emptyRefLabelSkillBuff, skillBuffContext)
+const halfRefLabelSkillBuff = clone(labelOnlySkillBuff)
+halfRefLabelSkillBuff.combatBuffs.skillBuffs[0].sourceSkillRef = { agentSkillId: validAgentSkill.id, categoryId: "" }
+assertInvalid("agents", halfRefLabelSkillBuff, "sourceSkillRef.categoryId: 必填", skillBuffContext)
+
 const crossAgentSkillBuffSource = clone(validSkillBuffAgent)
 crossAgentSkillBuffSource.combatBuffs.skillBuffs[0].sourceSkillRef.agentSkillId = "other_agent_skill"
 assertInvalid("agents", crossAgentSkillBuffSource, "技能倍率目录不属于当前角色", {

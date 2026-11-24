@@ -16,6 +16,41 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-22 — 赛维里安公开显示
+
+- 问题：赛维里安与专武禁罪囚笼此前为 `hidden: true`，工作台、优化器选择和公开 Enka 导入都不可用。
+- 变化：`data/agents.json` 的 `severian_lowell.hidden` 与 `data/w_engines.json` 的 `zzz_wiki_2305.hidden` 改为 `false`；[角色专题](characters/severian_lowell.md)的“首页与优化器”“专武”“验收边界”同步改为公开显示，专属测试的 `agent.hidden`/`weapon.hidden` 与 `displayAgents`/`displayWEngines` 断言改为公开状态，维护页草稿断言改为读取目录值。
+- 关键边界：公开只影响选择与导入可见性，不改角色数值、默认循环、Buff 默认值或 Enka 映射；维护页仍可编辑。隐藏期间的历史条目保留原记录。
+- 验证：`test:severian-damage`、`test:enka-import`、`test:maintenance-api`、`test:webapp`（1047 项）通过。
+
+## 2026-11-22 — 赛维里安浸染描述修正
+
+- 问题：浸染 Buff 描述写成“队伍中角色触发其他属性异常形成浸染”，与机制不符：浸染由风化状态下首次非风属性伤害触发，不需要先触发另一种异常。
+- 变化：`severian_lowell.combatBuffs.skillBuffs.imbuement.description` 改为“敌人处于风化状态时，队伍中角色首次对其造成非风属性（火、冰、电、物理、以太）伤害，形成对应属性的浸染……”并删去结尾的推导说明；效果 `condition` 同步改为“敌人处于风化状态且队伍首次造成非风属性伤害形成浸染”。文案依据见[角色专题](characters/severian_lowell.md)与官方维琳娜机制前瞻。
+- 关键边界：只改文案，`imbuementDmgBonus` 10%、默认勾选与覆盖率口径不变；`system.imbuement` 仍保留旧文案并保持隐藏。单人风属性队伍仍无法实际触发浸染，默认按条件满足计算仍是偏乐观假设，但不再用“触发异常”表述。
+- 验证：`test:maintenance-validation`、`test:severian-damage`、`test:webapp` 通过；8787 目录 API 回读新文案。
+
+## 2026-11-22 — 赛维里安普通攻击疾锋技能组
+
+- 问题：赛维里安此前只能把普通攻击：疾锋的一至四段分别加四个独立事件，不能作为一个按钮组合整体重复；按用户要求需要把这一套普攻收成一个技能组。
+- 变化：在 `severian_lowell.skillGroups` 新增 `gale_edge_sequence`（显示名“疾锋1至4段（不含第四段极限闪避分支）”，`defaultCount` 1、`minCount` 0、`step` 1），子事件为 `basic`/`basic_move_1` 的 `row_1`（一段）、`damage_2`（二段）、`damage_3`（三段）、`damage_4`（四段），全部 `kind: "direct"`、`count: 1`、`stunned: true`、`critMode: "expected"`。第四段取普通命中，`basic_gale_edge_dodge_fourth`（第四段极限闪避成功）保持独立替代招式，不并入组内，避免多段合计时重复求和。同步[角色专题](characters/severian_lowell.md)的取值边界、默认目标与交付核对，并把专属测试的“无技能组”断言改为校验组结构、展开结果与替代段排除。
+- 关键边界：技能组只表达四段倍率本身，不含极限闪避成功后的倍率提升、流息累积、无敌帧、动作时间或段数打断判定，也不复制第四段替代招式；默认循环不引用该组，仍直接使用原四个事件（技能组重复次数由工作台选择）。
+- 验证：`test:severian-damage`（用 `tmp/` 中性化 `hidden` 断言的副本通过；原命令仍因工作区既有 `hidden` 冲突在首条断言失败）、`test:maintenance-validation`、`test:repository-integrity`（201 项目录资源）、`test:calculation-skill-groups`、`test:catalog-loader`、`test:damage-whitebox`、`test:compiled-score`、`test:optimizer`、`test:default-calculation-config`、`test:maintenance-api` 通过；`node tmp/verify_severian_skillgroup.mjs` 确认维护校验、清洗与严格展开为四行。均为本地检查，不代表远端 CI 或生产验收。
+
+## 2026-11-22 — 赛维里安浸染独立乘区
+
+- 问题：赛维里安作为风属性角色可吃到浸染的 10% 独立乘区，但通用条目 `system.imbuement` 隐藏，工作台选不到。
+- 变化：在 `severian_lowell.combatBuffs.skillBuffs` 新增 `imbuement`（`imbuementDmgBonus` +10%，`defaultChecked: true`，覆盖率默认1，只作用于普通、贯穿、锐化直伤）。与洛克茜额外能力可同时选择，沿用既有“同类取最高”，不叠加；`system.imbuement` 保持隐藏且未改。
+- 关键边界：默认循环因此整体 ×1.1，默认按“敌人已风化、队伍首次造成非风属性伤害形成浸染”计算，而该角色无默认队友，属偏乐观假设。来源不是技能，故不挂 `sourceSkillRef`，改用 `source` 标签“异常效果”，界面显示“异常效果｜浸染”；为此放宽 `skillBuffs` 校验（无 `sourceSkillRef` 且有来源标签即合法，半填的技能引用仍报错）、服务端清洗（有标签且未选技能时不写空引用）和维护页编辑器（新增“来源标签”输入与“无”目录选项）。
+- 验证：`test:severian-damage`（用 `tmp/` 中性化 `hidden` 断言的副本通过；原命令仍因工作区既有 `hidden` 冲突失败）、`test:maintenance-validation`、`test:repository-integrity`、`test:damage-whitebox`、`test:compiled-score`、`test:optimizer`、`test:default-calculation-config`、`test:maintenance-api`、`test:enka-import`、`test:field-buffs`、`BuffPickerModal.test.ts`、`combatBuffs.test.ts` 通过；`test:webapp` 1047 项中仅工作区既有的 `draft.hidden` 断言失败。本地检查，不代表远端 CI 或生产验收。
+
+## 2026-11-22 — 赛维里安默认计算循环
+
+- 问题：赛维里安（`severian_lowell`）此前按约定没有 `defaultCalculationConfig`，工作台只能从单个手动事件起步，与用户当前要求的固定循环不符。
+- 变化：按用户要求新增默认循环“0影2强普2连携1大招1强特”（`mode: "custom"`、`cinemaLevel: 0`、本配置无 `variants`）：普通攻击：苍风影猎（`basic`/`basic_move_3`/`row_1`）×2、连携技：冽刃收割（`chain`/`chain_move_1`/`row_1`）×2、终结技：戮灭的风灾（`chain`/`chain_move_2`/`row_1`）×1、强化特殊技：瞬风裂毁（`special`/`special_move_2`/`row_1`）×1，四个事件均为 `direct`、`stunned: true`、`critMode: "expected"`，同类事件合并为一个 `count`。同步[角色专题](characters/severian_lowell.md)的“默认计算目标”与“交付核对”，并把专属测试中“无默认配置”的断言改为校验事件结构。
+- 关键边界：按期望暴击和失衡状态计算，不模拟 `[流息]` 上限与回复（苍风影猎×2 只看倍率）、烁影/凭风/风起、自动闪避、无敌帧、喧响和计时器。强化特殊技的 `row_1`（组合技伤害倍率）与 `damage_2`（风刃最大伤害倍率）是点按与长按两种互斥用法，默认循环按用户要求的点按组合技只取 `row_1`，不叠加长按风刃；`energy_cost_*` 与 `daze_*` 行不入循环。技能组与 `defaultTeammates` 仍不创建，其他角色条目未改动。待核实：本次只改默认循环，未处理工作区中角色/专武 `hidden` 标记的未提交改动，因此角色专题“验收边界”的“继续隐藏”与专属测试的 `hidden: true` 断言仍需与那次改动一并核对。
+- 验证：本地 `test:maintenance-validation`、`test:repository-integrity`（201 项目录资源）、`test:catalog-loader`、`test:skill-targets`、`test:percent-sanity`、`test:effect-rule-targets`、`test:field-buffs`、`test:boss-catalog`、`test:default-calculation-config`、`test:calculation-skill-groups`、`test:maintenance-api`、`test:enka-import`、`test:damage-whitebox`、`test:compiled-score`、`test:optimizer` 与 `build:webapp` 通过；`node tmp/verify_severian_loop.mjs` 确认新配置能通过维护校验、清洗不丢字段，并解析出四个事件与`selectedEventId`。`test:severian-damage` 中新增的默认循环断言通过（用 `tmp/` 里仅中性化 `hidden` 断言的副本验证）；原命令仍在 `agent.hidden`/`weapon.hidden` 两条断言失败，`test:webapp` 亦在 `maintenance-model.test.ts` 的 `draft.hidden` 断言失败——两处都是工作区既有 `hidden: false` 与测试 `hidden: true` 的冲突，不由本次默认循环改动引起。均为本地检查，不代表远端 CI 或生产验收。
+
 ## 2026-11-19 — 危局强袭战 3.3 第三期场地 Buff 与敌情
 
 - 问题：3.3 版本第三期危局（2026-11-20 04:00 至 2026-12-02 03:59）此前未入库，场地页签与 Boss 页签在 3.3 只能默认到第二期，第三期的场地 Buff 与敌情数据缺失。

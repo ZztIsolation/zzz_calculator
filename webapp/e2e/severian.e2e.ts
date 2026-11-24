@@ -8,11 +8,11 @@ import { severianOptimizerInput, severianOptimizerStore } from "../../tests/fixt
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
-test("hidden Severian remains absent from player selectors", async ({ page, request }) => {
+test("released Severian and its weapon appear in player selectors", async ({ page, request }) => {
   const meta = await (await request.get("/api/meta")).json()
   const payload = meta.data ?? meta
-  expect(payload.displayAgents.some((a: any) => a.id === "severian_lowell")).toBe(false)
-  expect(payload.displayWEngines.some((w: any) => w.id === "zzz_wiki_2305")).toBe(false)
+  expect(payload.displayAgents.some((a: any) => a.id === "severian_lowell")).toBe(true)
+  expect(payload.displayWEngines.some((w: any) => w.id === "zzz_wiki_2305")).toBe(true)
   await page.goto("/")
   await expect(page.getByTestId("open-calculation-config")).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
@@ -40,7 +40,7 @@ test("Severian formula survives maintenance edit, save and reload", async ({ pag
     await page.locator(".record-option").filter({ hasText: "赛维里安" }).click()
     const current = (await read()).agents.agents.find((a: any) => a.id === "severian_lowell")
     expect(current.combatBuffs.additionalAbility.effects[0]).toMatchObject({ stat: "atkFlat", source: { stat: "critRate", unit: "storedPercent" }, formula: { expression: "min(max(x, 0), 100) * 8.50", valueUnit: "storedValue" } })
-    expect(current.hidden).toBe(true)
+    expect(current.hidden).toBe(false)
     expect(current.combatBuffs.corePassive.effects[2].coverage.default).toBe(1)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
     await page.screenshot({ path: testInfo.outputPath("severian-maintenance.png") })

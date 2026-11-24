@@ -477,6 +477,18 @@ describe("CalculationConfigModal", () => {
     expect(document.body.querySelector('[data-testid="velina-turbulence-note"]')).not.toBeNull()
   })
 
+  it("keeps the wind turbulence notice off wind attack agents", async () => {
+    const severian = (agentsData as any).agents.find((agent: any) => agent.id === "severian_lowell")
+    const wrapper = mountModal({
+      agent: severian,
+      damageConfig: { ...clone(severian.defaultCalculationConfig), mode: "custom" },
+    })
+    await openModal(wrapper)
+
+    expect(document.body.querySelector('[data-testid="velina-turbulence-note"]')).toBeNull()
+    expect(document.body.textContent).not.toContain("乱流")
+  })
+
   it("restores the saved configuration after cancelling draft changes", async () => {
     const wrapper = mountModal()
     await openModal(wrapper)

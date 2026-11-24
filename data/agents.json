@@ -13975,7 +13975,7 @@
             "zhCN": "核心被动：风回无终"
           },
           "description": {
-            "zhCN": "核心被动：风回无终\n赛维里安的暴击伤害提升30%/35%/40%/45%/50%/55%/60%，造成的伤害提升12.5%/14.6%/16.7%/18.8%/20.8%/22.9%/25%，若队伍中存在其他风属性角色则伤害额外提升15%/17.5%/20%/22.5%/25%/27.5%/30%；\n赛维里安在即将受到敌人攻击的瞬间发动[普通攻击：疾锋]时，可以闪避本次攻击，若通过前三段普攻闪避了本次攻击则自动发动[普通攻击：烈旋]，若是第四段普攻则提升本次普攻的伤害倍率和失衡倍率至与[普通攻击：烈旋]一致；\n赛维里安进入战场时可获得两层[烁影]，在勘域模式中此效果180秒内最多触发一次；\n赛维里安拥有[烁影]且不具有无敌效果时，若受到敌人非控制技攻击且未能主动闪避或招架此次攻击，赛维里安会消耗一层[烁影]自动闪避本次攻击并发动[普通攻击：烈旋]；\n赛维里安通过发动[普通攻击：疾锋]成功闪避敌人攻击，触发[烁影]自动闪避敌人攻击和直接闪避敌人攻击都视为[极限闪避]；\n[烁影]最多获取两层，若满层时再获取[烁影]，将获得一层[凭风]效果且下次的[普通攻击：疾锋]会被提升为[普通攻击：烈旋]；\n赛维里安每次极限闪避都能获得一层[凭风]效果，当赛维里安拥有[凭风]效果且处于接战状态下点按从后场切换至前场发动[登场技]；\n赛维里安通过固定招式命中敌人或触发极限闪避时，会获得[流息]，[流息]上限为150点；\n当[流息]达到100点时，长按可以消耗100点[流息]发动[普通攻击：苍风影猎]。"
+            "zhCN": "核心被动：风回无终\n赛维里安的暴击伤害提升30%/35%/40%/45%/50%/55%/60%，造成的伤害提升12.5%/14.6%/16.7%/18.8%/20.8%/22.9%/25%，若队伍中存在其他风属性角色则伤害额外提升15%/17.5%/20%/22.5%/25%/27.5%/30%；\n赛维里安通过固定招式命中敌人或触发极限闪避时，会获得[流息]，[流息]上限为150点；\n当[流息]达到100点时，长按可以消耗100点[流息]发动[普通攻击：苍风影猎]。"
           },
           "effects": [
             {
@@ -14066,7 +14066,8 @@
                 "min": 0,
                 "max": 1,
                 "step": 0.1
-              }
+              },
+              "scope": "inCombat"
             }
           ],
           "buffModifiers": []
@@ -14190,6 +14191,42 @@
                       "rowId": "row_1"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ],
+        "skillBuffs": [
+          {
+            "id": "imbuement",
+            "source": {
+              "zhCN": "异常效果"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "name": {
+              "zhCN": "浸染"
+            },
+            "description": {
+              "zhCN": "敌人处于风化状态时，队伍中角色首次对其造成其他属性伤害，形成对应属性的浸染：对应造成的直伤获得10%独立乘区加成；不作用于属性异常、紊乱、极性紊乱、乱流、异放及耀变等异常伤害。"
+            },
+            "effects": [
+              {
+                "id": "severian-imbuement",
+                "type": "fixed",
+                "stat": "imbuementDmgBonus",
+                "value": 10,
+                "mode": "flat",
+                "condition": "敌人处于风化状态且队伍首次造成非风属性伤害形成浸染",
+                "target": {
+                  "kind": "default"
                 },
                 "coverage": {
                   "default": 1,
@@ -14375,10 +14412,14 @@
         ]
       },
       "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "zzz_wiki_1552"
+        ],
         "mainStatLimits": {
           "4": [
             "critRate",
-            "critDmg"
+            "critDmg",
+            "atkPct"
           ],
           "5": [
             "windDmg",
@@ -14388,14 +14429,135 @@
           "6": [
             "atkPct"
           ]
-        },
-        "defaultSetIds": [
-          "zzz_wiki_1552"
-        ],
-        "defaultTwoPieceSetIds": [
-          "puffer_electro"
-        ]
+        }
       },
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "0影2强普2连携1大招1强特"
+        },
+        "events": [
+          {
+            "id": "severian_basic_move_3",
+            "kind": "direct",
+            "count": 2,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "severian_lowell",
+              "categoryId": "basic",
+              "moveId": "basic_move_3",
+              "rowId": "row_1"
+            }
+          },
+          {
+            "id": "severian_chain_move_1",
+            "kind": "direct",
+            "count": 2,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "severian_lowell",
+              "categoryId": "chain",
+              "moveId": "chain_move_1",
+              "rowId": "row_1"
+            }
+          },
+          {
+            "id": "severian_chain_move_2",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "severian_lowell",
+              "categoryId": "chain",
+              "moveId": "chain_move_2",
+              "rowId": "row_1"
+            }
+          },
+          {
+            "id": "severian_special_move_2",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "severian_lowell",
+              "categoryId": "special",
+              "moveId": "special_move_2",
+              "rowId": "row_1"
+            }
+          }
+        ],
+        "selectedEventId": "severian_basic_move_3"
+      },
+      "skillGroups": [
+        {
+          "id": "gale_edge_sequence",
+          "name": {
+            "zhCN": "疾锋1至4段（不含第四段极限闪避分支）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "gale-edge-1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "severian_lowell",
+                "categoryId": "basic",
+                "moveId": "basic_move_1",
+                "rowId": "row_1"
+              }
+            },
+            {
+              "id": "gale-edge-2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "severian_lowell",
+                "categoryId": "basic",
+                "moveId": "basic_move_1",
+                "rowId": "damage_2"
+              }
+            },
+            {
+              "id": "gale-edge-3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "severian_lowell",
+                "categoryId": "basic",
+                "moveId": "basic_move_1",
+                "rowId": "damage_3"
+              }
+            },
+            {
+              "id": "gale-edge-4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "severian_lowell",
+                "categoryId": "basic",
+                "moveId": "basic_move_1",
+                "rowId": "damage_4"
+              }
+            }
+          ]
+        }
+      ],
       "importantSubStats": [
         "critRate",
         "critDmg",
@@ -14407,7 +14569,7 @@
         "critRate",
         "critDmg"
       ],
-      "hidden": true,
+      "hidden": false,
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/content/2217/detail?mhy_presentation_style=fullscreen",
         "https://zzz.nanoka.cc/character/1631"
@@ -14422,7 +14584,7 @@
           "未公开苍风影猎末击基础倍率：只支持完整招式及末击固定倍率加算"
         ],
         "modelingNotes": "docs/characters/severian_lowell.md",
-        "defaultObjective": "按维护范围不新增技能组、管理员循环或默认队友；隐藏期间手动选技能。",
+        "defaultObjective": "按用户要求创建0影默认循环：2次苍风影猎、2次连携技：冽刃收割、1次终结技：戮灭的风灾、1次强化特殊技：瞬风裂毁；期望暴击且按失衡状态，不模拟流息资源；不新增技能组和默认队友。",
         "recommendation": "套装采用Nanoka fairy_recommend.slot4/slot2；保留维护主词条候选，忽略来源中不合法盘位属性。"
       },
       "cinemaDescriptions": [
