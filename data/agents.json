@@ -12389,7 +12389,7 @@
       },
       "skillGroups": [
         {
-          "id": "basic_single",
+          "id": "basic_expected",
           "name": {
             "zhCN": "普攻五段（末段一次，不含爪印）"
           },
@@ -12465,85 +12465,9 @@
           ]
         },
         {
-          "id": "basic_expected",
-          "name": {
-            "zhCN": "原版普攻五段（末段三连概率期望，不含爪印）"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "step": 1,
-          "events": [
-            {
-              "id": "a1",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "nekomata",
-                "categoryId": "basic",
-                "moveId": "basic_claw",
-                "rowId": "hit_1"
-              }
-            },
-            {
-              "id": "a2",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "nekomata",
-                "categoryId": "basic",
-                "moveId": "basic_claw",
-                "rowId": "hit_2"
-              }
-            },
-            {
-              "id": "a3",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "nekomata",
-                "categoryId": "basic",
-                "moveId": "basic_claw",
-                "rowId": "hit_3"
-              }
-            },
-            {
-              "id": "a4",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "nekomata",
-                "categoryId": "basic",
-                "moveId": "basic_claw",
-                "rowId": "hit_4"
-              }
-            },
-            {
-              "id": "a5",
-              "kind": "direct",
-              "count": 1.6666666666666665,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "nekomata",
-                "categoryId": "basic",
-                "moveId": "basic_claw",
-                "rowId": "hit_5"
-              }
-            }
-          ]
-        },
-        {
           "id": "basic_potential_stunned",
           "name": {
-            "zhCN": "潜能失衡普攻五段（末段三次，不含爪印）"
+            "zhCN": "潜能失衡普攻五段（末段四次，不含爪印）"
           },
           "defaultCount": 1,
           "minCount": 0,
@@ -12604,7 +12528,7 @@
             {
               "id": "a5",
               "kind": "direct",
-              "count": 3,
+              "count": 4,
               "stunned": true,
               "critMode": "expected",
               "skillRef": {
@@ -12621,9 +12545,22 @@
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "0影原版失衡轴：1大2强化技3套普攻"
+          "zhCN": "0影原版失衡轴：2连携1大2强化技3套普攻"
         },
         "events": [
+          {
+            "id": "chain_1",
+            "kind": "direct",
+            "count": 2,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "nekomata",
+              "categoryId": "chain",
+              "moveId": "chain_claw",
+              "rowId": "damage"
+            }
+          },
           {
             "id": "ultimate_1",
             "kind": "direct",
@@ -12664,9 +12601,22 @@
             "mode": "custom",
             "cinemaLevel": 0,
             "name": {
-              "zhCN": "0影琉音双大失衡轴：2大2绒爪穿刺2强化技1套普攻＋10爪印"
+              "zhCN": "0影琉音双大失衡轴：1连携2大2绒爪穿刺2强化技1套普攻＋10爪印"
             },
             "events": [
+              {
+                "id": "chain_1",
+                "kind": "direct",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "nekomata",
+                  "categoryId": "chain",
+                  "moveId": "chain_claw",
+                  "rowId": "damage"
+                }
+              },
               {
                 "id": "ultimate_2",
                 "kind": "direct",

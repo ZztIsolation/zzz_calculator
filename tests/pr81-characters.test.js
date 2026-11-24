@@ -95,9 +95,10 @@ for (const potential of [0, 1, 6]) {
     const request = input("nekomata", potential)
     const events = request.damage.events
     const count = (move, row) => events.filter(e => e.skillRef?.moveId === move && (!row || e.skillRef.rowId === row)).reduce((n, e) => n + e.count, 0)
-    approx(count("basic_claw", "hit_5"), potential ? 3 : 5, "Nekomata fifth hits")
+    approx(count("basic_claw", "hit_5"), potential ? 4 : 3, "Nekomata fifth hits")
     assert.equal(count("potential_dodge_counter"), potential ? 2 : 0, "Nekomata potential dodge counter count")
     assert.equal(count("claw_mark"), potential ? 10 : 0, "Nekomata claw mark count")
+    assert.equal(count("chain_claw"), potential ? 1 : 2, "Nekomata Chain count")
     assert.equal(count("ex_ambush"), 2, "Nekomata EX count")
     assert.equal(count("ultimate_claw"), potential ? 2 : 1, "Nekomata Ultimate count")
 }

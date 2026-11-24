@@ -4,6 +4,16 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-23 — 猫又默认轴补入连携技并调整普攻第五段次数
+
+- 问题：猫又 P0 与 P1–P6 的默认轴都没有引用 `chain_claw`（连携技：刃爪挥击），而同期悠真两条轴都含 1 次连携；旧版参考组合与本次改轴均未说明排除连携的原因。原版普攻技能组末段次数为 `5/3`，显示不直观，且与手动用的 `basic_single` 重复。
+- 变化（均为用户决定）：
+  - P0 默认轴增加 2 次 `chain_1`（`chain_claw`，12 级伤害倍率 1073%，失衡内期望暴击），轴名改为“2连携1大2强化技3套普攻”；P1–P6 默认轴增加 1 次，轴名改为“1连携2大…”。
+  - 原版普攻末段恒定 1 次（来源写的是 33.33% 概率重复，不取期望，会低估原版普攻）；`basic_single` 并入 `basic_expected`，后者改名“普攻五段（末段一次，不含爪印）”，保留原 ID 以兼容旧存档；`basic_single` 已删除。
+  - 潜能失衡普攻组末段由 3 次改为 4 次，名称改为“末段四次”。
+- 关键边界：默认总倍率随之变化；六影连携/终结技暴伤层数仍是快照，不随事件数变化；旧存档若手动选过 `basic_single`，该引用将无法展开（严格计算路径会报“技能组不存在”）；末段次数无逐帧实测。
+- 验证：本地运行 `test:pr81-characters`、`test:skill-targets`、`test:default-calculation-config`、`test:maintenance-validation`、`test:repository-integrity`、`test:calculation-skill-groups`、`test:description-style` 与 webapp 的 `pr81-characters.test.ts`，均通过；未运行完整 `npm test` 与构建，不代表远端 CI 或线上验收。
+
 ## 2026-11-23 — 清理说明文字中的防御性内容并增加检查
 
 - 问题：猫又与悠真的核心被动、额外能力说明末尾带有“默认按…可调整”“不自动推导”一类面向维护者的尾句，悠真六影电磁爆炸招式说明带有“按需手动添加”；角色专题新增了“已核实边界”“待游戏实测确认”等小节，其中引用的 B 站、Prydwen、海外专版等材料没有留存到 `docs/sources/`，无法核对。
