@@ -5,6 +5,7 @@ const sunbringerPairs = [
   [star, "inferno_metal"],
   [star, "soul_rock"],
   [star, "woodpecker_electro"],
+  [star, "zzz_wiki_2121"],
   ["zzz_wiki_2121", "puffer_electro"],
 ]
 

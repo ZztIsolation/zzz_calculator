@@ -18,21 +18,28 @@ describe("挽昼参考配装", () => {
     localStorage.clear()
   })
 
-  it("空槽位默认使用星之碑四件与火伤两件，另外三套都能直接参与计算", () => {
+  it("空槽位默认使用星之碑四件与火伤两件，另外四套都能直接参与计算", () => {
     const store = useBuildStore()
     store.applyAgentConfig("sunbringer", meta, { discMode: "manual", manualDriveDiscIdsBySlot: {} })
     const loadouts = referenceDiscLoadouts("sunbringer", meta)
     expect(store.discMode).toBe("loadout")
     expect(store.selectedLoadoutId).toBe(loadouts[0].id)
     expect(loadouts.map(loadout => loadout.driveDiscs[5].setId))
-      .toEqual(["inferno_metal", "soul_rock", "woodpecker_electro", "puffer_electro"])
+      .toEqual(["inferno_metal", "soul_rock", "woodpecker_electro", "zzz_wiki_2121", "puffer_electro"])
     const baseline = calculateInCombatPanel(catalog, store.buildInput(catalog, meta, []))
-    for (const [index, loadout] of loadouts.entries()) {
+    for (const loadout of loadouts) {
       const discs = loadout.driveDiscs
-      expect(discs.filter(disc => disc.setId === (index === 3 ? "zzz_wiki_2121" : "monument_of_the_star"))).toHaveLength(4)
+      expect(discs.filter(disc => disc.setId === (discs[5].setId === "puffer_electro" ? "zzz_wiki_2121" : "monument_of_the_star"))).toHaveLength(4)
       const result = calculateInCombatPanel(catalog, store.buildInput(catalog, meta, discs))
       expect(result.damage.totalFinalDamage).toBeGreaterThan(baseline.damage.totalFinalDamage)
-      if (index === 3) {
+      if (discs[5].setId === "zzz_wiki_2121") {
+        const withoutPair = discs.map((disc, i) => i < 4 ? disc : { ...disc, setId: i === 4 ? "soul_rock" : "inferno_metal" })
+        const control = calculateInCombatPanel(catalog, store.buildInput(catalog, meta, withoutPair))
+        const base = result.outOfCombat.baseBreakdown
+        expect(result.outOfCombat.panel.def - control.outOfCombat.panel.def)
+          .toBeCloseTo((base.agent.def + base.wEngine.def) * .16, 0)
+      }
+      if (discs[5].setId === "puffer_electro") {
         expect(discs[4].mainStat).toEqual({ stat: "penRatio", value: 24 })
         expect(result.outOfCombat.panel.penRatio - baseline.outOfCombat.panel.penRatio).toBeCloseTo(.32)
       }
@@ -46,7 +53,7 @@ describe("挽昼参考配装", () => {
     expect(store.manualDriveDiscIdsBySlot).toEqual({ 3: "my-disc" })
     store.applyAgentConfig("sunbringer", meta, { discMode: "loadout", selectedLoadoutId: "my-loadout" })
     expect(store.selectedLoadoutId).toBe("my-loadout")
-    const rose = referenceDiscLoadouts("sunbringer", meta)[3]
+    const rose = referenceDiscLoadouts("sunbringer", meta).find(item => item.driveDiscs[5].setId === "puffer_electro")!
     store.selectLoadout(rose.id)
     await store.persist()
     store.initialize(catalog, meta)
