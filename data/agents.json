@@ -13392,7 +13392,7 @@
                   "max": 1,
                   "step": 0.1
                 },
-                "condition": "连携技与终结技分批补层时可覆盖12刀默认轴；若仅单次触发7层[电掣]覆盖12刀，可将覆盖率调至0.6"
+                "condition": "发动[连携技]或[终结技]获得[电掣]后，拥有[电掣]时的[冲刺攻击：飞弦·斩]"
               }
             ],
             "buffModifiers": []
@@ -13424,7 +13424,7 @@
                   "step": 0.1
                 },
                 "durationSeconds": 12,
-                "condition": "甲乙矢命中失衡或属性异常敌人后生效；1500%攻击力电磁爆炸见影画技能分类按需添加"
+                "condition": "[甲乙矢]命中处于失衡状态或属性异常状态下的敌人后"
               }
             ],
             "buffModifiers": []
@@ -13524,13 +13524,13 @@
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "0影原版失衡轴：1连携1大2地网12刀飞弦斩"
+          "zhCN": "0影原版失衡轴：2连携1大2地网12刀飞弦斩"
         },
         "events": [
           {
             "id": "chain_1",
             "kind": "direct",
-            "count": 1,
+            "count": 2,
             "stunned": true,
             "critMode": "expected",
             "skillRef": {
@@ -13606,13 +13606,13 @@
             "mode": "custom",
             "cinemaLevel": 0,
             "name": {
-              "zhCN": "0影潜能失衡轴：1连携1完整大2巡弋12刀飞弦斩＋12逐雷"
+              "zhCN": "0影潜能失衡轴：2连携1完整大2巡弋12刀飞弦斩＋12逐雷"
             },
             "events": [
               {
                 "id": "chain_1",
                 "kind": "direct",
-                "count": 1,
+                "count": 2,
                 "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
@@ -13698,9 +13698,7 @@
       "preferredDriveDiscs": {
         "defaultSetIds": [
           "shadow_harmony",
-          "thunder_metal",
-          "hormone_punk",
-          "puffer_electro"
+          "thunder_metal"
         ],
         "defaultFourPieceBuffRuntimeInputs": {
           "driveDisc4pc:shadow_harmony.self": {
@@ -13719,20 +13717,6 @@
             "effects": {
               "effect_thunder_metal_4pc_atk_pct": {
                 "coverage": 0.7
-              }
-            }
-          },
-          "driveDisc4pc:hormone_punk.self": {
-            "effects": {
-              "effect_w8d5k2lm": {
-                "coverage": 0.7
-              }
-            }
-          },
-          "driveDisc4pc:puffer_electro.self": {
-            "effects": {
-              "effect_puffer_electro_4pc_atk_pct": {
-                "coverage": 0.8
               }
             }
           }
@@ -13774,7 +13758,7 @@
         "acquiredAt": "2026-10-13",
         "reviewedAt": "2026-11-23",
         "level60Stats": "floor(initial + growth * 59 / 10000 + promotion6); core nodes use deltas of the cumulative extra_level source.",
-        "defaultObjective": "P0: 0影原版失衡轴（1连携＋1残心＋2地网＋12刀飞弦·斩＋1落羽＋12甲乙矢）；P1–P6: 0影潜能失衡轴（1连携＋1完整大招＋2地网·巡弋＋12刀飞弦·斩＋12逐雷＋1落羽＋12甲乙矢），全事件失衡期望暴击。",
+        "defaultObjective": "P0: 0影原版失衡轴（2连携＋1残心＋2地网＋12刀飞弦·斩＋1落羽＋12甲乙矢）；P1–P6: 0影潜能失衡轴（2连携＋1完整大招＋2地网·巡弋＋12刀飞弦·斩＋12逐雷＋1落羽＋12甲乙矢），全事件失衡期望暴击。",
         "buffState": "Core Passive (P0: 飞弦·斩 CR/CD; P1+: 飞弦·斩/逐雷/终结技 CR/CD; P2–P6: outOfCombatAtk +4%..12% and 飞弦·斩/逐雷 electricResIgnore +5%..15%), Additional Ability (Overclock +40% DMG) enabled by default; C2 挥霍 (+50% dmgBonus on 飞弦·斩) & C6 会心 (+15% electricResIgnore) modeled; empty C1/C3/C4/C5 removed and full 6-tier cinemaDescriptions added.",
         "driveDiscs": "4pc candidates: shadow_harmony (3 stacks, 1.0 coverage), thunder_metal (0.7 coverage), hormone_punk (0.7 coverage), puffer_electro (12s ATK 0.8 coverage + permanent 20% Ult DMG).",
         "unsupportedMechanics": "No action timing, energy/Decibel regeneration (C4 30 Decibels per 飞弦·斩), Electro Quiver/Electro Prison stack & duration simulation (C1 14-stack cap / double arrow, C4 20s duration & full-stack Ult), automatic 7-stack C2 电掣 consumption tracking, or automatic 12-arrow C6 Electromagnetic Explosion counting (provided as an optional manual cinema skill move). 逐雷 is not assigned dashAttack tag."

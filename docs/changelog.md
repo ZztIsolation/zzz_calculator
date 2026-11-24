@@ -4,6 +4,27 @@
 
 这里记录近期已经进入当前仓库的变化，采用“问题 / 变化 / 关键边界 / 验证”格式。详细公式和长期不变量分别维护在[建模说明](modeling.md)、[角色指南](character-authoring-guide.md)和[回归契约](regression-contract.md)；2026年5月至9月的完整历史位于[归档日志](archive/changelog-2026-05-to-2026-09.md)，2026年10月1日至13日的条目位于[10月归档](archive/changelog-2026-10.md)。提交进入仓库不等于生产已部署，发布状态以实际 CI/CD evidence 为准。
 
+## 2026-11-23 — 防御性文字检查扩展到触发条件
+
+- 问题：`test:description-style` 只扫描 `description.zhCN`，悠真二影、六影 Buff 的 `condition` 字段仍带有“可将覆盖率调至 0.6”“按需添加”之类的说明性文字，检查没有发现。
+- 变化：检查同时扫描 `condition`，并补充“可将…调…”句式；悠真二影、六影的条件改为只写触发条件（二影：发动[连携技]或[终结技]获得[电掣]后，拥有[电掣]时的[冲刺攻击：飞弦·斩]；六影：[甲乙矢]命中处于失衡状态或属性异常状态下的敌人后）；套装 `zzz_wiki_2038` 与 `yunkui_tales` 四件套条件里既有的“默认按 N 层计算”列入白名单，不改动。
+- 关键边界：覆盖率提示仍在悠真专题的“专属机制与建模假设”表中；数据、数值与默认配置不变。
+- 验证：本地运行 `test:description-style`、`test:pr81-characters`、`test:maintenance-validation`、`test:repository-integrity`、`test:skill-targets` 与 webapp 的 `pr81-characters.test.ts`，结果为通过；把改动前的悠真数据放回时，新检查报出这两条违规。未运行完整 `npm test` 与构建，不代表远端 CI 或线上验收。
+
+## 2026-11-23 — 悠真默认轴连携技改为 2 次
+
+- 问题：悠真两条默认轴的连携技均为 1 次，用户决定改为 2 次。
+- 变化：P0 与 P1–P6 默认轴的 `chain_huili`（连携技：会·离，12 级伤害倍率 1035.7%）改为 2 次，轴名改为“2连携…”；总基础倍率 P0 由 `11497.7%` 变为 `12533.4%`，P1–P6 由 `13221.9%` 变为 `14257.6%`；同步专题、测试断言与 `verification.defaultObjective`。
+- 关键边界：外部资料没有明确写出连携技次数，这是用户决定；二影电掣、六影等按层数快照的效果不随连携事件数变化。
+- 验证：本地运行 `test:pr81-characters`（含新的总倍率断言）、`test:skill-targets`、`test:default-calculation-config`、`test:maintenance-validation`、`test:repository-integrity`、`test:description-style` 与 webapp 的 `pr81-characters.test.ts`，均通过；未运行完整 `npm test` 与构建，不代表远端 CI 或线上验收。
+
+## 2026-11-23 — 悠真推荐驱动盘缩减为两套
+
+- 问题：悠真推荐四件套为如影相随、雷暴重金属、激素朋克、河豚电音，其中激素朋克与河豚电音没有留存的依据；改动前的专题写的是用户指定如影相随、不再提供其他四件套候选。
+- 变化：悠真推荐四件套只保留如影相随（3 层、覆盖率 `1`）与雷暴重金属（覆盖率 `0.7`），移除激素朋克与河豚电音及其运行输入；4/5/6 号位主词条限制与默认输出轴不变。这是用户决定。
+- 关键边界：未找到写明“潜能激发后哪套驱动盘最优”的可核对资料，两套的取舍没有用优化器对比验证；现有外部资料没有留存到 `docs/sources/`。
+- 验证：本地运行 `test:pr81-characters`、`test:maintenance-validation`、`test:repository-integrity`、`test:description-style` 与 webapp 的 `pr81-characters.test.ts`，以及 `test:default-calculation-config`、`test:skill-targets`，均通过；未运行完整 `npm test` 与构建，不代表远端 CI 或线上验收。
+
 ## 2026-11-23 — 猫又默认轴补入连携技并调整普攻第五段次数
 
 - 问题：猫又 P0 与 P1–P6 的默认轴都没有引用 `chain_claw`（连携技：刃爪挥击），而同期悠真两条轴都含 1 次连携；旧版参考组合与本次改轴均未说明排除连携的原因。原版普攻技能组末段次数为 `5/3`，显示不直观，且与手动用的 `basic_single` 重复。
