@@ -6,7 +6,7 @@
 
 ## 读取规则
 
-- **不要整体读取**：8 个文件共约 860 KB，单个最大约 250 KB，整目录读完会占满上下文。
+- 按角色选取所需快照。目录内 9 个 JSON 共约 1 MB，单个最大约 250 KB。
 - 改动涉及某个角色时，先读[对应角色文档](../characters/README.md)的“资料来源”，需要核对具体数值再用 `grep` 或 `node -e` 取字段，例如 `node -e "const j=require('./docs/sources/<文件>');console.log(j.<字段>)"`。
 - 不要为了“补全”而手工编辑快照；来源更新时新增一份带新版本号的文件，旧文件在对应角色文档不再引用后删除。
 - 抓取脚本和中间产物放在被忽略的 `tmp/`，不提交。
@@ -37,5 +37,8 @@
 | `severian-nanoka-3.4.3+20291004.json` | 赛维里安·洛威尔 | Nanoka 角色 1631 | `3.4.3+20291004` | 2026-11-18 | 无 | [severian_lowell](../characters/severian_lowell.md) |
 | `severian-official-1794906819.json` | 赛维里安·洛威尔 | 官方百科词条 2217 | 修订 `1794906819` | 2026-11-18 | 无（原始响应） | [severian_lowell](../characters/severian_lowell.md) |
 | `severian-official-weapon-1794632419.json` | 禁罪囚笼（赛维里安专武） | 官方百科词条 2305 | 修订 `1794632419` | 2026-11-18 | 无（原始响应） | [severian_lowell](../characters/severian_lowell.md) |
+| `sunbringer-nanoka-3.4.5+20713015.json` | 挽昼 | Nanoka 角色 1601 | `3.4.5+20713015` | 2026-11-22 | 无（原始响应） | [sunbringer](../characters/sunbringer.md) |
+| `sunbringer-nanoka-3.4.12+20749856.json` | 挽昼 | Nanoka 角色 1601 | `3.4.12+20749856` | 2026-11-24 | 无（原始响应） | [sunbringer](../characters/sunbringer.md) |
+| `dragonfire-mirage-nanoka-3.4.12+20749856.json` | 蜃炎梦火 | Nanoka 音擎 14160 | `3.4.12+20749856` | 2026-11-24 | 无（原始响应） | [sunbringer](../characters/sunbringer.md) |
 
 其余角色（简、佩洛伊斯等）没有保存快照；它们的来源见各自角色文档。

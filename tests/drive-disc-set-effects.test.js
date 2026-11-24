@@ -459,4 +459,32 @@ approx(vowTwoPiece.outOfCombat.panel.anomalyProficiency - vowNoSet.outOfCombat.p
 approx(vowFourPiece.inCombat.panel.anomalyProficiency - vowFourPiece.outOfCombat.panel.anomalyProficiency, 50, "Vow four-piece Anomaly Proficiency")
 approx(vowFourPiece.damage.multipliers.attributeAnomalyDamage, 1, "Vow anomaly bonus must reject non-Lumiflux wearers")
 
+// The shared four-piece CRIT bonus applies to all hits. Only fire Sharp hits ignore DEF.
+const monumentId = "monument_of_the_star"
+const monumentInput = {
+    agentId: "sunbringer", wEngineId, coreSkillLevel: "none",
+    combatBuffs: { activeBuffIds: [`driveDisc4pc:${monumentId}.self`] },
+    damage: {
+        target: { defense: 953, levelCoefficient: 794, resistance: 0 },
+        events: [["sharp", "fire"], ["direct", "fire"], ["sharp", "electric"]]
+            .map(([kind, damageElement]) => ({
+                id: kind + "-" + damageElement, kind, damageElement, skillMultiplier: 100, critMode: "nonCrit",
+            })),
+    },
+}
+for (const pieces of [0, 2, 3, 4]) {
+    const build = calculateInCombatPanel(catalog, { ...monumentInput, driveDiscs: discs(monumentId, pieces) }, { round: false })
+    const initialDefense = build.outOfCombat.baseBreakdown.agent.def + build.outOfCombat.baseBreakdown.wEngine.def
+    approx(build.outOfCombat.panel.def, initialDefense * (pieces >= 2 ? 1.16 : 1), `Star Monument DEF at ${pieces} pieces`)
+    approx(build.inCombat.panel.critRate - build.outOfCombat.panel.critRate, pieces === 4 ? .12 : 0, "Star Monument CRIT Rate")
+    for (const event of build.damage.events) {
+        const ignore = pieces === 4 && event.id === "sharp-fire" ? .20 : 0
+        approx(event.multipliers.defense, 794 / (794 + 953 * (1 - ignore)), "Star Monument DEF gate: " + event.id)
+    }
+    const prepared = createInCombatPanelCalculator(catalog, { ...monumentInput, driveDiscs: [] })
+    const fixed = prepared.compileDensePanelScoreTarget({ statIds: [], setIds: [monumentId] })
+        .compileForSetCounts(Int16Array.of(pieces))
+    approx(fixed.scoreScalar([]).finalDamage, build.damage.totalFinalDamage, "Star Monument optimized mixed events")
+}
+
 console.log("drive disc set effect tests passed")

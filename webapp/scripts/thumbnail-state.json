@@ -157,6 +157,10 @@
       "sourceHash": "da97c1b4657aa777fc1b5022413f6fc0e975d66a2502c7bb75b9ebf8fef37d40",
       "thumbnailUrl": "/assets/thumbs/agents/soukaku.37fbb3c0c6d4d756.webp"
     },
+    "/assets/agents/sunbringer.webp": {
+      "sourceHash": "7c00d6a06dfec9440f9c84d64629c40f620db8562002f35fecc3c48a572e0661",
+      "thumbnailUrl": "/assets/thumbs/agents/sunbringer.9920498439e8ca03.webp"
+    },
     "/assets/agents/trigger.png": {
       "sourceHash": "faab0d083a325d7e0b83cb2b84dcd49447defb6fa7d6a4ddb922e096e51b786e",
       "thumbnailUrl": "/assets/thumbs/agents/trigger.7dba872b803f6dec.webp"
@@ -204,6 +208,10 @@
     "/assets/w-engines/demara_battery_mark_ii.webp": {
       "sourceHash": "e2c40ff110fddf40c08dff9a4a7ff3132a33d2d73fe24478d838e6a3a2c74de6",
       "thumbnailUrl": "/assets/thumbs/w-engines/demara_battery_mark_ii.00a3264529ca0203.webp"
+    },
+    "/assets/w-engines/dragonfire_mirage.webp": {
+      "sourceHash": "e680d3dea692b30227c1c2cb97a3a217c2f3ee02088ce7167cea33deafdb715c",
+      "thumbnailUrl": "/assets/thumbs/w-engines/dragonfire_mirage.fa1c792cc70da8b5.webp"
     },
     "/assets/w-engines/hailfall_star_palace.png": {
       "sourceHash": "9bda46c197707a80e0a5533dcfe78e4b47e2e469b3c223c6dd9879ca32f87598",
@@ -652,6 +660,10 @@
     "/assets/drive-discs/king_of_the_summit.webp": {
       "sourceHash": "f3867670ee02cd309033dd729283d2d2970956023caca3ff5a572c724daf48a8",
       "thumbnailUrl": "/assets/thumbs/drive-discs/king_of_the_summit.ed8c8ba7c8c8f08d.webp"
+    },
+    "/assets/drive-discs/monument_of_the_star.webp": {
+      "sourceHash": "e8a3005e4e712aadb4892ebf8980ab65ee231cbcb9bf5426dac728c4f8a2382e",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/monument_of_the_star.b53a813e9a1d5f35.webp"
     },
     "/assets/drive-discs/moonlight_lullaby.webp": {
       "sourceHash": "ebb9633d505ee721cc2489d46c6aa9b16f5b3aff7507d3a12f77db79b2abced9",

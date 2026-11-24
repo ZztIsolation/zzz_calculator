@@ -638,6 +638,12 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     if (rule.requirement?.attribute) {
         requireEnum(errors, rule.requirement.attribute, ATTRIBUTE_VALUES, `${path}.requirement.attribute`)
     }
+    if (rule.requirement?.eventDamageKind !== undefined) {
+        requireEnum(errors, rule.requirement.eventDamageKind, DAMAGE_EVENT_KIND_VALUES, `${path}.requirement.eventDamageKind`)
+        if (effectiveScope !== "inCombat" || !DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat)) {
+            add(errors, `${path}.requirement.eventDamageKind`, "伤害类型条件仅适用于局内事件增幅。")
+        }
+    }
     if (rule.requirement?.eventStunned !== undefined && typeof rule.requirement.eventStunned !== "boolean") {
         add(errors, `${path}.requirement.eventStunned`, "失衡状态要求必须是布尔值。")
     }

@@ -8,6 +8,64 @@
   ],
   "sets": [
     {
+      "id": "monument_of_the_star",
+      "name": {
+        "zhCN": "星之碑",
+        "en": "Monument of the Star"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/monument_of_the_star.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/SuitMonumentoftheStar.webp"
+      },
+      "sources": [
+        "https://zzz.nanoka.cc/equipment/34300",
+        "https://static.nanoka.cc/zzz/3.4.12+20749856/zh/equipment/34300.json"
+      ],
+      "verification": {
+        "sourceId": 34300,
+        "sourceVersion": "3.4.12+20749856"
+      },
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "monument-2pc-defense",
+            "type": "fixed",
+            "stat": "defPct",
+            "value": 16,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者的暴击率提升12%，装备者造成火属性锐化伤害时，无视敌人20%防御力。"
+        },
+        "selfBuff": {
+          "effects": [
+            {
+              "id": "monument-4pc-crit",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 12,
+              "mode": "flat"
+            },
+            {
+              "id": "monument-4pc-fire-sharp-ignore",
+              "type": "fixed",
+              "stat": "fireDefIgnore",
+              "value": 20,
+              "mode": "flat",
+              "label": "火属性锐化伤害无视防御",
+              "requirement": {
+                "eventDamageKind": "sharp"
+              }
+            }
+          ]
+        },
+        "teamBuff": null
+      }
+    },
+    {
       "id": "zzz_wiki_2121",
       "name": {
         "zhCN": "棘刺玫瑰"

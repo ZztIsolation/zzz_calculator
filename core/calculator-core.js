@@ -12,6 +12,7 @@ import {
 import { isTurbulenceSettlement, isWindAgent, isLegacyTurbulenceEvent } from "./anomalySettlement.js"
 export { isTurbulenceSettlement } from "./anomalySettlement.js"
 import { expandCalculationConfigSkillGroups } from "./calculationSkillGroups.js"
+import { emberScoreRequest, planEmberSettlement, settleEmberResults } from "./emberSettlement.js"
 import { skillMultiplierTargetId, skillTagsForMove, skillTargetMatches, skillTypeForMove } from "./skillTargets.js"
 import {
     disorderBaseMultiplier,
@@ -4139,6 +4140,9 @@ export function damageModifierAppliesTo(modifier, event) {
     const appliesTo = modifier.appliesTo ?? {}
     const skillTargets = generatedModifierSkillTargets(modifier)
     const hasSkillTargets = skillTargets.length > 0
+    if (modifier.requirement?.eventDamageKind && modifier.requirement.eventDamageKind !== matchingEvent.kind) {
+        return false
+    }
     if (Object.prototype.hasOwnProperty.call(modifier?.requirement ?? {}, "eventStunned")
         && normalizeEventStunned(matchingEvent?.stunned) !== normalizeStunned(modifier.requirement.eventStunned)) {
         return false
@@ -6326,7 +6330,7 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
 
 function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel, bonusTotals, input, includeWhiteBox = true, skillOptions = {} }) {
     const damageRequest = normalizeDamageRequest(input, agent, catalog, skillOptions)
-    const events = damageRequest.events.map(event => {
+    const hits = damageRequest.events.map(event => {
         if (event.kind === "direct") {
             return calculateDirectDamageEvent({
                 event,
@@ -6367,12 +6371,15 @@ function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel
             includeWhiteBox,
         })
     })
+    const emberPlan = planEmberSettlement(damageRequest.events, agent.sharpProfile?.ember, skillOptions.cinemaLevel)
+    const { events, ember } = settleEmberResults(hits, emberPlan)
     const selectedEvent = events.find(event => event.id === damageRequest.selectedEventId) ?? events[0] ?? null
     const totalFinalDamage = events.reduce((total, event) => total + Number(event.finalDamage ?? 0), 0)
 
     return {
         finalDamage: Number(selectedEvent?.finalDamage ?? 0),
         totalFinalDamage,
+        ...(ember ? { ember } : {}),
         scalarReady: selectedEvent?.scalarReady ?? true,
         scalarBlockReasons: selectedEvent?.scalarBlockReasons ?? [],
         objectiveKind: selectedEvent?.objectiveKind ?? null,
@@ -7049,7 +7056,9 @@ function denseSharpEventTotals(sums, damageElement) {
         "stunDmgMultiplierBonusAlways",
         "stunDmgMultiplierBonusCapAlways",
     ].filter(Boolean)
-    return Object.fromEntries(keys.map(key => [key, denseModifierSum(sums, key)]))
+    const totals = Object.fromEntries(keys.map(key => [key, denseModifierSum(sums, key)]))
+    totals.enemyDefReduction += denseModifierSum(sums, DEF_IGNORE_KEY_BY_ELEMENT[damageElement])
+    return totals
 }
 
 function denseSharpCombatTotals(combatValues) {
@@ -8578,12 +8587,14 @@ export function createInCombatPanelCalculator(catalog, input) {
         currentWEngineRequirement,
         agent,
     })
-    const normalizedDamageInput = normalizeDamageRequest(input.damage, agent, catalog, {
+    const damageRequest = normalizeDamageRequest(input.damage, agent, catalog, {
         coreSkillLevel: input.coreSkillLevel,
         cinemaLevel: input.cinemaLevel,
         potentialLevel,
         buffModifiers: initialSkillBuffModifiers,
     })
+    const emberPlan = planEmberSettlement(damageRequest.events, agent.sharpProfile?.ember, input.cinemaLevel)
+    const normalizedDamageInput = emberScoreRequest(damageRequest, emberPlan)
     const compiledDamageTarget = compileDamageScoreTarget(normalizedDamageInput, agent)
     const hasMasteryToProficiencyConversion = activeAgentBuffs.some(entry =>
         effectRules(entry.buff).some(rule => rule?.stat === "anomalyProficiencyPerMasteryAbove140")
@@ -8909,8 +8920,8 @@ export function createInCombatPanelCalculator(catalog, input) {
             const effect = part === "team"
                 ? driveDiscFourPieceTeamBuff(set)
                 : driveDiscFourPieceSelfBuff(set)
-            const setIndex = setIndexById?.get?.(setId)
-            if (setIndex === undefined) {
+            const setIndex = setIndexById?.get?.(setId) ?? setIds.indexOf(setId)
+            if (setIndex < 0) {
                 continue
             }
             if (!pushEntry({

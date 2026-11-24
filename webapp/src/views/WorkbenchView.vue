@@ -22,6 +22,7 @@ import WorkbenchResultColumn from "@/components/workbench/WorkbenchResultColumn.
 import WEngineSelect from "@/components/WEngineSelect.vue"
 import { groupActiveBuffs } from "@/utils/activeBuffGroups"
 import { readBuffSectionExpanded, writeBuffSectionExpanded } from "@/utils/workbenchPreferences"
+import { referenceDiscLoadouts } from "@/utils/referenceDiscLoadouts"
 import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { buffLabelForId, teammateBuffCandidates } from "@/utils/combatBuffs"
 import { inferBuffPickerState, selectedTeammateOwnerIds } from '@/utils/teammateBuffPicker'
@@ -270,7 +271,14 @@ const canRunOptimization = computed(() => Boolean(
   && luminescenceParametersValid.value,
 ))
 const selectedOptimizedScheme = computed(() => optimizerStore.selectedResult(buildStore.selectedOptimizedRank))
-const currentAgentLoadouts = computed(() => inventoryStore.loadoutsForAgent(buildStore.agentId))
+const referenceLoadouts = computed(() => referenceDiscLoadouts(buildStore.agentId, catalogStore.meta))
+const activeReference = computed(() => buildStore.discMode === "loadout"
+  ? referenceLoadouts.value.find(loadout => loadout.id === buildStore.selectedLoadoutId)
+  : undefined)
+const currentAgentLoadouts = computed(() => [
+  ...inventoryStore.loadoutsForAgent(buildStore.agentId),
+  ...referenceLoadouts.value.map(loadout => ({ id: loadout.id, name: `参考 · ${loadout.name}` })),
+])
 const selectedLoadout = computed(() => currentAgentLoadouts.value
   .find((item: any) => item.id === buildStore.selectedLoadoutId))
 const loadoutOptions = computed(() => [
@@ -280,7 +288,7 @@ const loadoutOptions = computed(() => [
 const hasMismatchedLoadoutSelection = computed(() => buildStore.discMode === "loadout"
   && Boolean(buildStore.selectedLoadoutId)
   && !selectedLoadout.value)
-const selectedDriveDiscs = computed(() => inventoryStore.calculatorDriveDiscs({
+const selectedDriveDiscs = computed(() => activeReference.value?.driveDiscs ?? inventoryStore.calculatorDriveDiscs({
   mode: buildStore.discMode,
   idsBySlot: buildStore.manualDriveDiscIdsBySlot,
   loadoutId: selectedLoadout.value?.id ?? "",
@@ -1860,6 +1868,7 @@ function formatPercentValue(value: any) {
               filterable
               @update:value="buildStore.selectLoadout(String($event ?? ''))"
             />
+            <span v-if="activeReference">参考盘按 S 级 +15 主词条计算，无副词条。</span>
             <NAlert
               v-if="hasMismatchedLoadoutSelection"
               type="warning"
@@ -1933,11 +1942,11 @@ function formatPercentValue(value: any) {
               :agents="catalogStore.displayAgents"
               :target-agent-id="buildStore.agentId"
               :interactive="buildStore.discMode === 'manual'"
-              :show-reservation="reservationUiEnabled"
-              :reservation-action="reservationUiEnabled"
+              :show-reservation="reservationUiEnabled && !activeReference"
+              :reservation-action="reservationUiEnabled && !activeReference"
               :reservation-busy="schemeReservationBusy"
-              :show-exclusion="exclusionUiEnabled"
-              :exclusion-action="exclusionUiEnabled"
+              :show-exclusion="exclusionUiEnabled && !activeReference"
+              :exclusion-action="exclusionUiEnabled && !activeReference"
               :exclusion-busy="schemeReservationBusy"
               stat-layout="vertical"
               @select="openManualDiscPicker"
@@ -1945,7 +1954,7 @@ function formatPercentValue(value: any) {
               @toggle-exclusion="toggleSchemeDiscExclusion"
             />
           </div>
-          <div v-if="exclusionUiEnabled" class="drive-disc-restriction-hints ui-notice" aria-label="驱动盘使用限制说明">
+          <div v-if="exclusionUiEnabled && !activeReference" class="drive-disc-restriction-hints ui-notice" aria-label="驱动盘使用限制说明">
             <div class="drive-disc-restriction-hint">
               <span class="restriction-hint-button restriction-hint-button-lock" title="锁定按钮" aria-hidden="true">
                 <LockKeyhole :size="16" />

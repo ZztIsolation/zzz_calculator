@@ -77,6 +77,10 @@
       "id": "sigrid",
       "name": "希格莉德·德拉叙尔"
     },
+    "1601": {
+      "id": "sunbringer",
+      "name": "挽昼"
+    },
     "1611": {
       "id": "claret",
       "name": "克拉蕾·弗林特"
@@ -483,6 +487,10 @@
       "id": "zzz_wiki_2162",
       "name": "骁骑礼赞"
     },
+    "14160": {
+      "id": "dragonfire_mirage",
+      "name": "蜃炎梦火"
+    },
     "14161": {
       "id": "zzz_wiki_2188",
       "name": "猩红渴望"
@@ -620,6 +628,10 @@
     "34200": {
       "id": "zzz_wiki_2121",
       "name": "棘刺玫瑰"
+    },
+    "34300": {
+      "id": "monument_of_the_star",
+      "name": "星之碑"
     }
   },
   "driveDiscEquipment": {

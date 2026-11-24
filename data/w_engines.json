@@ -9864,6 +9864,146 @@
       "legacyIds": [
         "zzz_wiki_14163"
       ]
+    },
+    {
+      "id": "dragonfire_mirage",
+      "name": {
+        "zhCN": "蜃炎梦火",
+        "en": "Dragonfire Mirage"
+      },
+      "rarity": "S",
+      "specialty": "armorer",
+      "relatedAgentId": "sunbringer",
+      "images": {
+        "icon": "/assets/w-engines/dragonfire_mirage.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/Weapon_S_1601.webp"
+      },
+      "level60": {
+        "defBase": 446,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 48,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "灼息",
+          "en": "Scorching Breath"
+        },
+        "requirement": {
+          "specialty": "armorer"
+        },
+        "description": {
+          "zhCN": "暴击率提升20%/22%/24%/26%/28%；装备者发动[强化特殊技]或进入接战状态时，自身造成的火属性伤害提升20%/23%/26%/29%/32%，火属性锐化伤害提升10%/11.5%/13%/14.5%/16%，持续25秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "dragonfire-crit-rate",
+              "type": "fixed",
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  22,
+                  24,
+                  26,
+                  28
+                ]
+              },
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "dragonfire-fire-dmg",
+              "type": "fixed",
+              "stat": "fireDmg",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              },
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "condition": "发动强化特殊技或进入接战状态",
+              "durationSeconds": 25
+            },
+            {
+              "id": "dragonfire-fire-sharp-dmg",
+              "type": "fixed",
+              "stat": "fireSharpDmg",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              },
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "condition": "发动强化特殊技或进入接战状态",
+              "durationSeconds": 25
+            }
+          ],
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://zzz.nanoka.cc/weapon/14160",
+        "https://static.nanoka.cc/zzz/3.4.12%2B20749856/zh/weapon/14160.json"
+      ],
+      "verification": {
+        "sourceId": 14160,
+        "sourceVersion": "3.4.12+20749856",
+        "level60Stats": "Nanoka 3.4.12+20749856, weapon 14160, level 60 and ascension 5",
+        "effectText": "Nanoka weapon 14160, talents 1–5",
+        "effectBuff": "锋御装备者常驻暴击率，强化特殊技或接战后刷新 25 秒火属性增伤与火属性锐化增伤。",
+        "acquiredAt": "2026-11-24"
+      }
     }
   ]
 }

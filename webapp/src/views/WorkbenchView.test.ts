@@ -484,8 +484,8 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain("selectedDriveDiscRows")
     expect(source).toContain("<DriveDiscSlotCard")
     expect(source).toContain('stat-layout="vertical"')
-    expect(source).toContain(':show-reservation="reservationUiEnabled"')
-    expect(source).toContain(':reservation-action="reservationUiEnabled"')
+    expect(source).toContain(':show-reservation="reservationUiEnabled && !activeReference"')
+    expect(source).toContain(':reservation-action="reservationUiEnabled && !activeReference"')
     expect(source).not.toContain('<template v-if="reservationUiEnabled">')
   })
 

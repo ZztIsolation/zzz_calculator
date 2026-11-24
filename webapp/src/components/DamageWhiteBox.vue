@@ -87,6 +87,7 @@ function eventSkillLabel(event: any): string {
 }
 
 function eventLabel(event: any): string {
+  if (event?.kind === "emberSettlement") return event.label
   if (isLuminescenceScoreKind(event?.objectiveKind ?? props.damage?.objectiveKind)) {
     return "队伍异常评分"
   }
@@ -175,6 +176,8 @@ function toggleAllRows() {
       <div class="damage-whitebox-current-values">
         <span v-if="selectedEvent">{{ isLuminescenceScore ? "本评分" : "本事件" }} <b class="num">{{ eventValue(selectedEvent.finalDamage) }}</b></span>
         <span v-if="hasMultipleEvents">总计 <b class="num">{{ summaryNumber(totalDamage) }}</b></span>
+        <span v-if="damage.ember">烬灭合计 <b class="num">{{ summaryNumber(damage.ember.settledDamage) }}</b></span>
+        <span v-if="damage.ember?.pendingDamage > 0">待引爆烬痕 <b class="num">{{ summaryNumber(damage.ember.pendingDamage) }}</b></span>
       </div>
     </div>
 

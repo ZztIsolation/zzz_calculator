@@ -1,3 +1,4 @@
+import { referenceDiscLoadouts } from "@/utils/referenceDiscLoadouts"
 import { cleanStoredReactiveEvent } from "@core/anomalySettlement.js"
 import { defineStore } from "pinia"
 import {
@@ -840,6 +841,7 @@ function writeBuildPersistSnapshot(snapshot: any, options: BuildPersistOptions =
         ? clone(previousSnapshot)
         : null),
     discMode: snapshot.discMode,
+    ...(agentId === "sunbringer" ? { referenceDiscDefaultsApplied: true } : {}),
     manualDriveDiscIdsBySlot: snapshot.manualDriveDiscIdsBySlot,
     targetConfig: snapshot.targetConfig,
     buffPickerState: snapshot.buffPickerState,
@@ -1318,6 +1320,14 @@ export const useBuildStore = defineStore("build", {
           ?? config.driveDiscIdsBySlot,
       )
       this.selectedLoadoutId = String(config.selectedLoadoutId ?? config.loadoutId ?? "")
+      if (!config.referenceDiscDefaultsApplied && this.discMode === "manual"
+        && !this.selectedLoadoutId && !Object.keys(this.manualDriveDiscIdsBySlot).length) {
+        const reference = referenceDiscLoadouts(agent.id, meta)[0]
+        if (reference) {
+          this.discMode = "loadout"
+          this.selectedLoadoutId = reference.id
+        }
+      }
       this.selectedOptimizedRank = numeric(config.selectedOptimizedRank, 0)
       this.lastAnomalySourceSnapshot = normalizeAnomalySourceSnapshot(config.lastAnomalySourceSnapshot)
     },
