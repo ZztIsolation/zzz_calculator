@@ -72,7 +72,7 @@ Run focused character, formula, maintenance or optimizer scripts from `package.j
 
 ## Scanner integration
 
-The current published line is ZZZ Scanner Next `1.0.49`, Helper `1.3.1`, protocol v4, with schema-v3 manifests. The browser keeps calculator data local; Helper handles the `zzz-scanner://` bridge and package lifecycle. Current support, hashes and compatibility come from `config/scanner-manifest.json`, `config/helper-manifest.json` and the [ZZZ-Scanner.Next repository](https://github.com/ZztIsolation/ZZZ-Scanner.Next). The [1.0.43 evidence](docs/archive/scanner-integration-1.0.43.md) is historical only.
+The current published line is ZZZ Scanner Next `1.0.51`, Helper `1.3.1`, protocol v4, with schema-v3 manifests. The browser keeps calculator data local; Helper handles the `zzz-scanner://` bridge and package lifecycle. Current support, hashes and compatibility come from `config/scanner-manifest.json`, `config/helper-manifest.json` and the [ZZZ-Scanner.Next repository](https://github.com/ZztIsolation/ZZZ-Scanner.Next). The [1.0.43 evidence](docs/archive/scanner-integration-1.0.43.md) is historical only.
 
 ## Third-party services and acknowledgements
 

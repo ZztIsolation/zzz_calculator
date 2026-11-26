@@ -82,10 +82,10 @@ assert.equal("tailwindcss" in directDependencies, false)
 assert.equal("katex" in directDependencies, false)
 assert.equal(scannerManifest.schemaVersion, 3)
 assert.equal(scannerManifest.launcherMinVersion, "1.3.1")
-assert.equal(scannerManifest.scannerVersion, "1.0.49")
+assert.equal(scannerManifest.scannerVersion, "1.0.51")
 assert.equal(
     createHash("sha256").update(scannerManifestBytes).digest("hex"),
-    "c14a2af8e67a2d6d5c3a81bd072fc1d7bac8cb89815b09de5ef48556c958b3f9",
+    "8108e0d3f8b7cc34a6a81f8501db6990e85eab644ea7499533f79a6a7f5c2128",
 )
 assert.equal(helperManifest.schemaVersion, 1)
 assert.equal(helperManifest.version, "1.3.1")
@@ -98,7 +98,7 @@ assert.equal(scannerManifest.support.minWindowsBuild, 17763)
 assert.deepEqual(scannerManifest.support.architectures, ["x64"])
 assert.deepEqual(scannerManifest.packages.map(packageInfo => packageInfo.id), ["win-x64-fdd", "win-x64-self-contained"])
 for (const packageInfo of scannerManifest.packages) {
-    assert.match(packageInfo.packageUrls[0], /^https:\/\/download\.zzzcaculator\.top\/downloads\/zzz-scanner\/1\.0\.49\//)
+    assert.match(packageInfo.packageUrls[0], /^https:\/\/download\.zzzcaculator\.top\/downloads\/zzz-scanner\/1\.0\.51\//)
     assert.equal(packageInfo.packageUrls.some(url => /^https:\/\//.test(url)), true)
     assert.match(packageInfo.sha256, /^[a-f0-9]{64}$/)
     assert.ok(packageInfo.size > 0)
