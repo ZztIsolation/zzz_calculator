@@ -1791,13 +1791,14 @@ export const useInventoryStore = defineStore("inventory", {
           processName: client.processName,
           visualProfileClient: client.visualProfileClient,
           visualProfileQuality: "current",
-          fastMode: true,
+          // Cloud templates misclassified a live 1080p substat; use verified ordinary OCR.
+          fastMode: request.client !== "cloud",
           captureMode: "dxgi",
           profileRouting: "strict",
-          overlapConflictMode: "recover",
+          overlapConflictMode: request.client === "cloud" ? "recheck" : "recover",
           panelAcceptMode: "safe",
-          panelStabilityMode: "text-core",
-          scrollAcceptMode: "early-one-row",
+          panelStabilityMode: request.client === "cloud" ? "panel" : "text-core",
+          scrollAcceptMode: request.client === "cloud" ? "safe" : "early-one-row",
           postScrollPanelAcceptMode: "safe",
           panelMinAcceptFloorMs: 120,
         })

@@ -232,7 +232,7 @@ describe("inventory store", () => {
       await store.confirmScanStart()
       expect(helper.elevatedCalls).toBe(2)
       expect(helper.startScanPayloads).toHaveLength(1)
-      expect(helper.startScanPayloads[0]).toMatchObject({ visualProfileClient: "cloud", maxItems: 47, stopAtNonLevel15: false })
+      expect(helper.startScanPayloads[0]).toMatchObject({ visualProfileClient: "cloud", maxItems: 47, stopAtNonLevel15: false, fastMode: false, panelStabilityMode: "panel", scrollAcceptMode: "safe", overlapConflictMode: "recheck" })
     },
   )
 
@@ -559,6 +559,7 @@ describe("inventory store", () => {
     store.scanStopAtNonLevel15 = false
     await store.startScan()
     const helper = scannerMockState.instances[0]
+    expect(helper.startScanPayloads[0]).toMatchObject({ visualProfileClient: "local", fastMode: true, panelStabilityMode: "text-core", scrollAcceptMode: "early-one-row" })
     const persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1")!)
     persisted.owners.push({ id: "other", label: "另一个账号" })
     persisted.currentOwnerId = "other"
